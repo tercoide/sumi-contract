@@ -1,0 +1,9 @@
+# Gambas Form File 3.0
+
+{ Form Form
+  MoveScaled(0,0,100,70)
+  Text = ("Choose")
+  Arrangement = Arrange.Vertical
+  Spacing = True
+  Margin = True
+}

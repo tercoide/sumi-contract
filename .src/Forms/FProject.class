@@ -7,6 +7,7 @@
 
 Private $p As Project
 Private $bFilling As Boolean
+Private $bOwn As Boolean                        ' our own command is running
 
 Private Const PRO_COLUMNS As Integer = 5
 
@@ -136,94 +137,88 @@ Private Function HolidaysBetween(d1 As Date, d2 As Date) As Integer
 
 End
 
-'' Text boxes, spin boxes and dates
+'' Text boxes, spin boxes and dates: each one is a field of the file, changed through Cmd (logged, undoable)
 Public Sub Field_Change()
+
+    Dim v As Variant
+    Dim sKey As String
 
     If $bFilling Or If Not $p Then Return
     Select Case Last.Name
-        Case "txtName"
-            $p.Name = txtName.Text
-            If sumi.Interactive Then fMain.UpdateTitle()
-        Case "txtCode"
-            $p.Code = txtCode.Text
-        Case "txtNotes"
-            $p.Notes = txtNotes.Text
-        Case "txtLocation"
-            $p.Location = txtLocation.Text
-        Case "txtCity"
-            $p.City = txtCity.Text
-        Case "txtProvince"
-            $p.Province = txtProvince.Text
-        Case "txtParcel"
-            $p.Parcel = txtParcel.Text
-        Case "spPlot"
-            $p.PlotArea = spPlot.Value
-        Case "spCovered"
-            $p.CoveredArea = spCovered.Value
-        Case "spSemi"
-            $p.SemiCoveredArea = spSemi.Value
-        Case "spFloors"
-            $p.Floors = spFloors.Value
-        Case "txtClient"
-            $p.Client = txtClient.Text
-        Case "txtClientTaxId"
-            $p.ClientTaxId = txtClientTaxId.Text
-        Case "txtClientPhone"
-            $p.ClientPhone = txtClientPhone.Text
-        Case "txtClientEmail"
-            $p.ClientEmail = txtClientEmail.Text
+        Case "txtName", "txtCode", "txtNotes", "txtLocation", "txtCity", "txtProvince", "txtParcel", "txtClient", "txtClientTaxId", "txtClientPhone", "txtClientEmail"
+            v = Last.Text
+        Case "txtCurrency", "txtIndex", "txtIndexBase"
+            v = Trim(Last.Text)
         Case "dtStart"
-            If dtStart.Value Then $p.StartDate = Date(Year(dtStart.Value), Month(dtStart.Value), Day(dtStart.Value))
-        Case "spDuration"
-            $p.DurationDays = spDuration.Value
-        Case "spWorkDays"
-            $p.WorkDaysPerWeek = spWorkDays.Value
-        Case "spHours"
-            $p.HoursPerDay = spHours.Value
-        Case "txtCurrency"
-            $p.Currency = Trim(txtCurrency.Text)
-        Case "spOverhead"
-            $p.OverheadPct = spOverhead.Value
-        Case "spProfit"
-            $p.ProfitPct = spProfit.Value
-        Case "spTaxes"
-            $p.TaxesPct = spTaxes.Value
-        Case "spAdvance"
-            $p.AdvancePct = spAdvance.Value
-        Case "spRetention"
-            $p.RetentionPct = spRetention.Value
-        Case "txtIndex"
-            $p.AdjustmentIndex = Trim(txtIndex.Text)
-        Case "txtIndexBase"
-            $p.AdjustmentBase = Trim(txtIndexBase.Text)
-        Case "spGuarantee"
-            $p.GuaranteeDays = spGuarantee.Value
+            If Not dtStart.Value Then Return
+            v = Format(dtStart.Value, "yyyy-mm-dd")
         Case Else
-            Return
+            v = Last.Value
     End Select
+    sKey = FieldKey(Last.Name)
+    If Not sKey Then Return
+    Run(sKey, v)
+
+End
+
+'' The file's name of a field
+Private Function FieldKey(sControl As String) As String
+
+    Dim i As Integer = ["txtName", "txtCode", "txtNotes", "txtLocation", "txtCity", "txtProvince", "txtParcel", "spPlot", "spCovered", "spSemi", "spFloors", "txtClient", "txtClientTaxId", "txtClientPhone", "txtClientEmail", "dtStart", "spDuration", "spWorkDays", "spHours", "txtCurrency", "spOverhead", "spProfit", "spTaxes", "spAdvance", "spRetention", "txtIndex", "txtIndexBase", "spGuarantee"].Find(sControl)
+
+    If i < 0 Then Return ""
+    Return ["name", "code", "notes", "location", "city", "province", "parcel", "plotArea", "coveredArea", "semiCoveredArea", "floors", "client", "clientTaxId", "clientPhone", "clientEmail", "startDate", "durationDays", "workDaysPerWeek", "hoursPerDay", "currency", "overheadPct", "profitPct", "taxesPct", "advancePct", "retentionPct", "adjustmentIndex", "adjustmentBase", "guaranteeDays"][i]
+
+End
+
+'' Sets one field of the project through Cmd, as our own edit (the box being typed in is not refilled)
+Private Sub Run(sKey As String, v As Variant)
+
+    Dim c As New Collection
+    Dim cOut As Collection
+
+    c[sKey] = v
+    $bOwn = True
+    cOut = Cmd.Run("project.set", c)
+    $bOwn = False
+    If Ui.Failed(cOut) Then ShowProject(sumi.Project)
     ShowDerived()
-    sumi.Changed()
+
+End
+
+'' After a change made elsewhere (an undo, the AI): show the project again; our own edits are already shown
+Public Sub Reload()
+
+    If $bOwn Then Return
+    ShowProject(sumi.Project)
 
 End
 
 '' The read-only combo boxes raise Click when a choice is made
 Public Sub Field_Click()
 
+    Dim sKey As String
+    Dim v As Variant
+
     If $bFilling Or If Not $p Then Return
     If Not (Last Is ComboBox) Or If Last.Index < 0 Then Return
     Select Case Last.Name
         Case "cmbWorkType"
-            $p.WorkType = Project.WorkTypes()[Last.Index]
+            sKey = "workType"
+            v = Project.WorkTypes()[Last.Index]
         Case "cmbUsage"
-            $p.Usage = Project.Usages()[Last.Index]
+            sKey = "use"
+            v = Project.Usages()[Last.Index]
         Case "cmbMode"
-            $p.ContractMode = Project.ContractModes()[Last.Index]
+            sKey = "contractMode"
+            v = Project.ContractModes()[Last.Index]
         Case "cmbPeriod"
-            $p.CertificatePeriod = Project.CertificatePeriods()[Last.Index]
+            sKey = "certificatePeriod"
+            v = Project.CertificatePeriods()[Last.Index]
         Case Else
             Return
     End Select
-    sumi.Changed()
+    Run(sKey, v)
 
 End
 
@@ -233,9 +228,8 @@ Public Sub btnBrowse_Click()
     Dialog.Filter = ["*.designer-proj", ("sumi-designer projects"), "*", ("All files")]
     Dialog.Path = IIf($p.DesignFile, $p.DesignFile, IIf(Config.FilesLastPath, Config.FilesLastPath, User.Home) & "/")
     If Dialog.OpenFile() Then Return
-    $p.DesignFile = Dialog.Path
+    Run("designFile", Dialog.Path)
     txtDesign.Text = $p.DesignFile
-    sumi.Changed()
 
 End
 
@@ -255,20 +249,44 @@ End
 Public Sub btnHolidayAdd_Click()
 
     If Not dtHoliday.Value Then Return
-    If Not $p.AddHoliday(dtHoliday.Value) Then Return
+    If $p.IsHoliday(dtHoliday.Value) Then Return
+    Run("holidays", HolidaysWith(dtHoliday.Value, -1))
     FillHolidays()
-    ShowDerived()
-    sumi.Changed()
 
 End
 
 Public Sub btnHolidayRemove_Click()
 
     If lstHolidays.Index < 0 Then Return
-    $p.Holidays.Remove(lstHolidays.Index)
+    Run("holidays", HolidaysWith(Null, lstHolidays.Index))
     FillHolidays()
-    ShowDerived()
-    sumi.Changed()
+
+End
+
+'' The holidays as the file has them, with dAdd added or the one at iRemove removed
+Private Function HolidaysWith(dAdd As Date, iRemove As Integer) As String[]
+
+    Dim a As New String[]
+    Dim i As Integer
+
+    For i = 0 To $p.Holidays.Max
+        If i <> iRemove Then a.Add(Format($p.Holidays[i], "yyyy-mm-dd"))
+    Next
+    If dAdd Then a.Add(Format(dAdd, "yyyy-mm-dd"))
+    Return a.Sort()
+
+End
+
+'' The professionals as the file has them, with one row changed, added or removed
+Private Function ProsJson(Optional iSkip As Integer = -1) As Variant[]
+
+    Dim a As New Variant[]
+    Dim i As Integer
+
+    For i = 0 To $p.Professionals.Max
+        If i <> iSkip Then a.Add($p.Professionals[i].ToJson())
+    Next
+    Return a
 
 End
 
@@ -296,33 +314,34 @@ End
 
 Public Sub tvPros_Save(Row As Integer, Column As Integer, Value As String)
 
+    Dim a As Variant[]
+
     If Row < 0 Or If Row > $p.Professionals.Max Then Return
-    $p.Professionals[Row].SetField(Column, Trim(Value))
-    tvPros[Row, Column].Text = Trim(Value)
-    sumi.Changed()
+    a = ProsJson()
+    a[Row][["role", "name", "registration", "phone", "email"][Column]] = Trim(Value)
+    Run("professionals", a)
+    FillPros()
 
 End
 
 Public Sub btnProAdd_Click()
 
-    Dim hPro As New Professional
+    Dim a As Variant[] = ProsJson()
 
     ' the usual roles first, then empty rows
-    hPro.Role = NextRole()
-    $p.Professionals.Add(hPro)
+    a.Add(["role": NextRole(), "name": ""])
+    Run("professionals", a)
     FillPros()
     tvPros.Row = $p.Professionals.Max
     tvPros.Column = 1
-    sumi.Changed()
 
 End
 
 Public Sub btnProRemove_Click()
 
     If tvPros.Row < 0 Or If tvPros.Row > $p.Professionals.Max Then Return
-    $p.Professionals.Remove(tvPros.Row)
+    Run("professionals", ProsJson(tvPros.Row))
     FillPros()
-    sumi.Changed()
 
 End
 

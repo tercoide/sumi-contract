@@ -1,0 +1,97 @@
+' Gambas module file
+
+'' Helpers to build forms in code (FPricing and the other tabs): boxes, buttons, labels, grids
+
+Public Function HBox(hParent As Container, Optional iHeight As Integer = 4, Optional bExpand As Boolean) As HBox
+
+    Dim h As New HBox(hParent)
+
+    h.H = Desktop.Scale * iHeight
+    h.Spacing = True
+    h.Expand = bExpand
+    Return h
+
+End
+
+Public Function VBox(hParent As Container, Optional bExpand As Boolean = True) As VBox
+
+    Dim h As New VBox(hParent)
+
+    h.Spacing = True
+    h.Expand = bExpand
+    Return h
+
+End
+
+Public Function Button(hParent As Container, sText As String, sEvent As String, Optional hObserver As Object, Optional sTip As String) As Button
+
+    Dim h As Button
+
+    h = New Button(hParent)
+    h.Text = sText
+    h.AutoResize = True
+    h.ToolTip = sTip
+    If hObserver Then Object.Attach(h, hObserver, sEvent)
+    Return h
+
+End
+
+Public Function Label(hParent As Container, sText As String, Optional iWidth As Integer) As Label
+
+    Dim h As New Label(hParent)
+
+    h.Text = sText
+    If iWidth Then
+        h.W = Desktop.Scale * iWidth
+    Else
+        h.AutoResize = True
+    Endif
+    Return h
+
+End
+
+'' A grid with these column titles and widths (in Desktop.Scale units; 0 = expand the last)
+Public Sub Columns(hGrid As GridView, aTitles As String[], aWidths As Integer[])
+
+    Dim i As Integer
+
+    hGrid.Header = GridView.Horizontal
+    hGrid.Columns.Count = aTitles.Count
+    For i = 0 To aTitles.Max
+        hGrid.Columns[i].Text = aTitles[i]
+        If i <= aWidths.Max And If aWidths[i] > 0 Then hGrid.Columns[i].Width = Desktop.Scale * aWidths[i]
+    Next
+
+End
+
+'' A number typed by a person: "1,5" or "1.5"; bad = True if it isn't one
+Public Function ParseNumber(sText As String, Optional ByRef bBad As Boolean) As Float
+
+    Dim f As Float
+
+    bBad = False
+    sText = Trim(Replace(sText, " ", ""))
+    If sText = "" Then Return 0
+    Try f = CFloat(Replace(sText, ",", "."))
+    If Error Then bBad = True
+    Return f
+
+End
+
+'' A number for a cell
+Public Function Num(f As Float, Optional sFormat As String = "0.00##") As String
+
+    If f = 0 Then Return ""
+    Return Format(f, sFormat)
+
+End
+
+'' Shows the error of a Cmd result; True if there was one
+Public Function Failed(c As Collection) As Boolean
+
+    If Not c.Exist("error") Then Return False
+    If sumi.Interactive Then Message.Warning(c["error"])
+    sumi.Status(c["error"])
+    Return True
+
+End

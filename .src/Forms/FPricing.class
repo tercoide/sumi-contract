@@ -1,0 +1,1137 @@
+' Gambas class file
+
+'' The Pricing tab (starting.txt, item 3): the project's price book.
+'' Top: import a library, the update coefficient and the freight. Pages:
+''   Analyses   the list (search, rubro) and the selected analysis as licita2003's sheet: header, lines by
+''              kind (materials, equipment, labor, sub-analyses), A B C D and the price; quantities edited in
+''              the grid; resources and sub-analyses added with FPick
+''   Resources  every resource in a grid edited in place (price, wage, override, loss, freight...), and the
+''              machine calculation of the selected equipment
+''   Labor charges, Rubros
+'' Every change goes through Cmd (logged, undoable); the tab refreshes from fMain.DataChanged.
+
+Private Const PAGE_ANALYSES As Integer = 0
+Private Const PAGE_RESOURCES As Integer = 1
+Private Const PAGE_CHARGES As Integer = 2
+Private Const PAGE_RUBROS As Integer = 3
+
+' resources grid columns
+Private Const RC_CODE As Integer = 0
+Private Const RC_KIND As Integer = 1
+Private Const RC_NAME As Integer = 2
+Private Const RC_UNIT As Integer = 3
+Private Const RC_PRICE As Integer = 4
+Private Const RC_WAGE As Integer = 5
+Private Const RC_CALC As Integer = 6
+Private Const RC_OVERRIDE As Integer = 7
+Private Const RC_LOSS As Integer = 8
+Private Const RC_ORIGIN As Integer = 9
+Private Const RC_DISTANCE As Integer = 10
+Private Const RC_LOAD As Integer = 11
+Private Const RC_UNITPRICE As Integer = 12
+Private Const RC_UPDATED As Integer = 13
+Private Const RC_SOURCE As Integer = 14
+
+Private $bFilling As Boolean
+Private $bOwn As Boolean                        ' our own command is running: don't refill the box being typed in
+Private $sAna As String                         ' the analysis shown
+Private $aAnaIds As New String[]                ' analyses list row -> id
+Private $aLineRows As New Integer[]             ' lines grid row -> line index (-1 = a title or a total)
+Private $aResIds As New String[]                ' resources grid row -> id
+Private $aRubros As New Integer[]               ' rubro combo index -> number (0 = none / all)
+
+' top
+Private lblInfo As Label
+Private spCoef As SpinBox
+Private spFreight As SpinBox
+Private tabPages As TabPanel
+
+' analyses page
+Private txtFind As TextBox
+Private cmbFilterRubro As ComboBox
+Private gvAna As GridView
+Private txtCode As TextBox
+Private txtName As TextBox
+Private txtUnit As TextBox
+Private cmbRubro As ComboBox
+Private spLabYield As SpinBox
+Private spEqYield As SpinBox
+Private tvLines As TableView
+Private lblTotals As Label
+Private lblProblems As TextLabel
+Private pnlSheet As VBox
+
+' resources page
+Private txtResFind As TextBox
+Private cmbResKind As ComboBox
+Private tvRes As TableView
+Private pnlMachine As HBox
+Private tvMachine As TableView
+Private lblMachine As Label
+Private btnMachine As Button
+
+' charges and rubros pages
+Private tvCharges As TableView
+Private lblCharges As Label
+Private tvRubros As TableView
+
+'' BUILDING THE TAB
+
+Public Sub _new()
+
+    Dim hTop, hRow As HBox
+    Dim hLeft As VBox
+    Dim hPage As Container
+    Dim s As String
+
+    ' top bar
+    hTop = Ui.HBox(Me)
+    Ui.Button(hTop, ("Import library..."), "Import", Me, ("Brings resources, analyses and rubros from a CSV library (licita2003 as Tincho converted it)"))
+    Ui.Label(hTop, ("Update coefficient"))
+    spCoef = New SpinBox(hTop) As "Coef"
+    spCoef.W = Desktop.Scale * 12
+    spCoef.MinValue = 0.0001
+    spCoef.MaxValue = 100000
+    spCoef.Precision = 4
+    spCoef.Step = 0.01
+    spCoef.ToolTip = ("Every unit price is multiplied by it: to bring old prices up to date (licita2003's coeficiente interno)")
+    Ui.Label(hTop, ("Freight $/km"))
+    spFreight = New SpinBox(hTop) As "Coef"
+    spFreight.W = Desktop.Scale * 12
+    spFreight.MaxValue = 1000000
+    spFreight.Precision = 2
+    spFreight.Step = 0.05
+    spFreight.ToolTip = ("What a truck costs a km: a material with distance and truck load adds cost/km × km / load to its price")
+    lblInfo = Ui.Label(hTop, "")
+    lblInfo.Expand = True
+    lblInfo.Alignment = Align.Right
+    lblInfo.Foreground = Color.Gray
+
+    tabPages = New TabPanel(Me) As "Pages"
+    tabPages.Expand = True
+    tabPages.Arrangement = Arrange.Vertical
+    tabPages.Spacing = True
+    tabPages.Margin = True
+    tabPages.Count = 4
+    tabPages[PAGE_ANALYSES].Text = ("Analyses")
+    tabPages[PAGE_RESOURCES].Text = ("Resources")
+    tabPages[PAGE_CHARGES].Text = ("Labor charges")
+    tabPages[PAGE_RUBROS].Text = ("Rubros")
+
+    ' ANALYSES: list | sheet
+    hPage = Ui.HBox(tabPages[PAGE_ANALYSES], 0, True)
+    hLeft = Ui.VBox(hPage, False)
+    hLeft.W = Desktop.Scale * 70
+    hRow = Ui.HBox(hLeft)
+    txtFind = New TextBox(hRow) As "Find"
+    txtFind.Expand = True
+    txtFind.Placeholder = ("Search by code or name")
+    cmbFilterRubro = New ComboBox(hRow) As "Find"
+    cmbFilterRubro.ReadOnly = True
+    cmbFilterRubro.W = Desktop.Scale * 26
+    gvAna = New GridView(hLeft) As "Ana"
+    gvAna.Expand = True
+    gvAna.Mode = Select.Single
+    Ui.Columns(gvAna, [("Code"), ("Name"), ("Unit"), ("Direct"), ("Price")], [8, 34, 5, 10, 10])
+    hRow = Ui.HBox(hLeft)
+    Ui.Button(hRow, ("New"), "AnaNew", Me, ("A new analysis"))
+    Ui.Button(hRow, ("Copy"), "AnaCopy", Me, ("A copy of this analysis, to change it"))
+    Ui.Button(hRow, ("Delete"), "AnaDelete", Me)
+
+    pnlSheet = Ui.VBox(hPage)
+    hRow = Ui.HBox(pnlSheet)
+    Ui.Label(hRow, ("Code"))
+    txtCode = New TextBox(hRow) As "AnaField"
+    txtCode.W = Desktop.Scale * 12
+    Ui.Label(hRow, ("Unit"))
+    txtUnit = New TextBox(hRow) As "AnaField"
+    txtUnit.W = Desktop.Scale * 8
+    Ui.Label(hRow, ("Rubro"))
+    cmbRubro = New ComboBox(hRow) As "AnaRubro"
+    cmbRubro.ReadOnly = True
+    cmbRubro.Expand = True
+    hRow = Ui.HBox(pnlSheet)
+    Ui.Label(hRow, ("Name"))
+    txtName = New TextBox(hRow) As "AnaField"
+    txtName.Expand = True
+    hRow = Ui.HBox(pnlSheet)
+    Ui.Label(hRow, ("Labor yield"))
+    spLabYield = New SpinBox(hRow) As "AnaField"
+    spLabYield.W = Desktop.Scale * 12
+    spLabYield.MinValue = 0.0001
+    spLabYield.MaxValue = 1000000
+    spLabYield.Precision = 3
+    spLabYield.ToolTip = ("Units made with the labor of the lines (e.g. a crew's day): the labor cost is divided by it")
+    Ui.Label(hRow, ("Equipment yield"))
+    spEqYield = New SpinBox(hRow) As "AnaField"
+    spEqYield.W = Desktop.Scale * 12
+    spEqYield.MinValue = 0.0001
+    spEqYield.MaxValue = 1000000
+    spEqYield.Precision = 3
+    spEqYield.ToolTip = ("Units made with the equipment hours of the lines: the equipment cost is divided by it")
+    Ui.Label(hRow, "").Expand = True
+
+    tvLines = New TableView(pnlSheet) As "Lines"
+    tvLines.Expand = True
+    tvLines.Mode = Select.Single
+    Ui.Columns(tvLines, [("Code"), ("Description"), ("Quantity"), ("Unit"), ("Unit price"), ("Total")], [12, 40, 10, 6, 12, 12])
+    hRow = Ui.HBox(pnlSheet)
+    Ui.Button(hRow, ("Add resource..."), "AddRes", Me)
+    Ui.Button(hRow, ("Add analysis..."), "AddAna", Me, ("Another analysis as a line: it stays linked, its changes follow"))
+    Ui.Button(hRow, ("Remove line"), "RemoveLine", Me)
+    Ui.Button(hRow, ("Flatten"), "Flatten", Me, ("The sub-analyses become their resources (the link is lost)"))
+    lblTotals = Ui.Label(pnlSheet, "")
+    lblTotals.Font.Bold = True
+    lblTotals.H = Desktop.Scale * 8
+    lblTotals.AutoResize = False
+    lblProblems = New TextLabel(pnlSheet)
+    lblProblems.Foreground = Color.Red
+    lblProblems.AutoResize = True
+
+    ' RESOURCES
+    hPage = tabPages[PAGE_RESOURCES]
+    hRow = Ui.HBox(hPage)
+    txtResFind = New TextBox(hRow) As "ResFind"
+    txtResFind.Expand = True
+    txtResFind.Placeholder = ("Search by code or name")
+    cmbResKind = New ComboBox(hRow) As "ResFind"
+    cmbResKind.ReadOnly = True
+    cmbResKind.W = Desktop.Scale * 20
+    cmbResKind.Add(("All kinds"))
+    For Each s In Resource.Kinds()
+        cmbResKind.Add(Tr(s))
+    Next
+    cmbResKind.Index = 0
+    Ui.Button(hRow, ("Add material"), "ResAddMat", Me)
+    Ui.Button(hRow, ("Add labor"), "ResAddLab", Me)
+    Ui.Button(hRow, ("Add equipment"), "ResAddEq", Me)
+    Ui.Button(hRow, ("Delete"), "ResDelete", Me)
+    tvRes = New TableView(hPage) As "Res"
+    tvRes.Expand = True
+    tvRes.Mode = Select.Single
+    Ui.Columns(tvRes, [("Code"), ("Kind"), ("Name"), ("Unit"), ("Price"), ("Wage/h"), ("Calculated"), ("Override"), ("Loss %"), ("Origin"), ("Distance km"), ("Truck load"), ("Unit price"), ("Updated"), ("Source")], [9, 9, 40, 5, 10, 8, 10, 7, 7, 12, 9, 9, 10, 10, 12])
+    pnlMachine = Ui.HBox(hPage, 22)
+    tvMachine = New TableView(pnlMachine) As "Machine"
+    tvMachine.W = Desktop.Scale * 50
+    Ui.Columns(tvMachine, [("Machine"), ("Value")], [26, 18])
+    hLeft = Ui.VBox(pnlMachine)
+    lblMachine = Ui.Label(hLeft, "")
+    lblMachine.Expand = True
+    lblMachine.Alignment = Align.TopNormal
+    lblMachine.AutoResize = False
+    btnMachine = Ui.Button(hLeft, ("Add a cost calculation"), "MachineAdd", Me, ("Depreciation, interest, repairs, fuel and lubricants, as licita2003's equ sheet"))
+    pnlMachine.Visible = False
+
+    ' LABOR CHARGES
+    hPage = tabPages[PAGE_CHARGES]
+    Ui.Label(hPage, ("What an hour of labor costs besides the wage: a % of it, or an amount spread over some hours (a monthly bonus over 176 h)."))
+    tvCharges = New TableView(hPage) As "Charges"
+    tvCharges.Expand = True
+    Ui.Columns(tvCharges, [("Charge"), ("% of the wage"), ("Amount"), ("Over hours")], [40, 14, 14, 14])
+    hRow = Ui.HBox(hPage)
+    Ui.Button(hRow, ("Add"), "ChargeAdd", Me)
+    Ui.Button(hRow, ("Remove"), "ChargeRemove", Me)
+    lblCharges = Ui.Label(hRow, "")
+    lblCharges.Expand = True
+
+    ' RUBROS
+    hPage = tabPages[PAGE_RUBROS]
+    tvRubros = New TableView(hPage) As "Rubros"
+    tvRubros.Expand = True
+    Ui.Columns(tvRubros, [("Number"), ("Name")], [10, 60])
+    hRow = Ui.HBox(hPage)
+    Ui.Button(hRow, ("Add"), "RubroAdd", Me)
+    Ui.Button(hRow, ("Remove"), "RubroRemove", Me)
+
+    tabPages.Index = PAGE_ANALYSES
+
+End
+
+'' SHOWING
+
+Public Sub ShowProject(p As Project)
+
+    $sAna = ""
+    Reload(True)
+
+End
+
+'' Shows the project's prices again (after any change: fMain.DataChanged)
+Public Sub Reload(Optional bAll As Boolean)
+
+    Dim b As PriceBook = sumi.Project.Prices
+
+    $bFilling = True
+    spCoef.Value = b.UpdateCoef
+    spFreight.Value = b.FreightPerKm
+    $bFilling = False
+    lblInfo.Text = Subst(("&1 analyses, &2 resources&3"), b.Analyses.Count, b.Resources.Count, IIf(b.Source, " - " & b.Source, ""))
+    FillRubroCombos()
+    Select Case tabPages.Index
+        Case PAGE_ANALYSES
+            FillAnalyses()
+            ShowAnalysis(bAll Or Not $bOwn)
+        Case PAGE_RESOURCES
+            FillResources()
+        Case PAGE_CHARGES
+            FillCharges()
+        Case PAGE_RUBROS
+            FillRubros()
+    End Select
+
+End
+
+Public Sub Pages_Click()
+
+    Reload(True)
+
+End
+
+Private Sub FillRubroCombos()
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim iNum As Integer
+    Dim iFilter As Integer
+
+    iFilter = 0
+    If cmbFilterRubro.Index > 0 And If cmbFilterRubro.Index <= $aRubros.Max Then iFilter = $aRubros[cmbFilterRubro.Index]
+    $bFilling = True
+    $aRubros.Clear
+    $aRubros.Add(0)
+    cmbFilterRubro.Clear
+    cmbFilterRubro.Add(("All rubros"))
+    cmbRubro.Clear
+    cmbRubro.Add(("(none)"))
+    For Each iNum In PriceBook.SortedCodesOf(b.Rubros)
+        $aRubros.Add(iNum)
+        cmbFilterRubro.Add(iNum & " - " & b.Rubros[CStr(iNum)])
+        cmbRubro.Add(iNum & " - " & b.Rubros[CStr(iNum)])
+    Next
+    cmbFilterRubro.Index = Max(0, $aRubros.Find(iFilter))
+    $bFilling = False
+
+End
+
+'' For GuiTest: shows a page and selects its first rows
+Public Sub TestPages(iPage As Integer)
+
+    tabPages.Index = iPage
+    Reload(True)
+    Select Case iPage
+        Case PAGE_ANALYSES
+            If gvAna.Rows.Count > 1 Then
+                gvAna.Row = 1
+                Ana_Change()
+            Endif
+        Case PAGE_RESOURCES
+            If tvRes.Rows.Count Then
+                tvRes.Row = tvRes.Rows.Max
+                ShowMachine()
+            Endif
+    End Select
+
+End
+
+'' THE ANALYSES LIST
+
+Public Sub Find_Change()
+
+    If $bFilling Then Return
+    FillAnalyses()
+
+End
+
+Public Sub Find_Click()
+
+    If $bFilling Then Return
+    FillAnalyses()
+
+End
+
+Private Sub FillAnalyses()
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim o As Object
+    Dim a As Analysis
+    Dim sText As String = Trim(txtFind.Text)
+    Dim iRubro As Integer
+    Dim i As Integer
+    Dim fDirect, fFactor As Float
+
+    If cmbFilterRubro.Index > 0 Then iRubro = $aRubros[cmbFilterRubro.Index]
+    fFactor = sumi.Project.PriceFactor()
+    $aAnaIds.Clear
+    For Each o In PriceBook.SortedByCode(b.Analyses)
+        a = o
+        If iRubro And If a.Rubro <> iRubro Then Continue
+        If sText And If InStr(a.Code & " " & a.Name, sText, 1, gb.IgnoreCase) = 0 Then Continue
+        $aAnaIds.Add(a.Id)
+    Next
+    $bFilling = True
+    gvAna.Rows.Count = $aAnaIds.Count
+    For i = 0 To $aAnaIds.Max
+        a = b.Analyses[$aAnaIds[i]]
+        fDirect = b.Direct(a)
+        gvAna[i, 0].Text = a.Code
+        gvAna[i, 1].Text = a.Name
+        gvAna[i, 2].Text = a.Unit
+        gvAna[i, 3].Text = Ui.Num(fDirect, "0.00")
+        gvAna[i, 4].Text = Ui.Num(fDirect * fFactor, "0.00")
+        gvAna[i, 3].Alignment = Align.Right
+        gvAna[i, 4].Alignment = Align.Right
+    Next
+    If Not b.Analyses.Exist($sAna) Then $sAna = ""
+    If $sAna = "" And If $aAnaIds.Count Then $sAna = $aAnaIds[0]
+    i = $aAnaIds.Find($sAna)
+    If i >= 0 Then gvAna.Row = i
+    $bFilling = False
+
+End
+
+Public Sub Ana_Change()
+
+    If $bFilling Then Return
+    If gvAna.Row < 0 Or If gvAna.Row > $aAnaIds.Max Then Return
+    If $aAnaIds[gvAna.Row] = $sAna Then Return
+    $sAna = $aAnaIds[gvAna.Row]
+    ShowAnalysis(True)
+
+End
+
+Public Sub Ana_Click()
+
+    Ana_Change()
+
+End
+
+'' THE ANALYSIS SHEET
+
+Private Function Current() As Analysis
+
+    If Not $sAna Then Return Null
+    Return sumi.Project.Prices.Analyses[$sAna]
+
+End
+
+'' The selected analysis: its header (unless we are typing in it), its lines, its totals
+Private Sub ShowAnalysis(bHeader As Boolean)
+
+    Dim a As Analysis = Current()
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim f As Float[]
+    Dim aProblems As String[]
+    Dim fFactor As Float = sumi.Project.PriceFactor()
+
+    pnlSheet.Enabled = (a <> Null)
+    If Not a Then
+        tvLines.Rows.Count = 0
+        lblTotals.Text = ("No analysis: import a library or make a new one.")
+        lblProblems.Text = ""
+        Return
+    Endif
+
+    If bHeader Then
+        $bFilling = True
+        txtCode.Text = a.Code
+        txtName.Text = a.Name
+        txtUnit.Text = a.Unit
+        cmbRubro.Index = Max(0, $aRubros.Find(a.Rubro))
+        spLabYield.Value = a.LaborYield
+        spEqYield.Value = a.EquipmentYield
+        $bFilling = False
+    Endif
+
+    FillLines(a)
+    f = b.Parts(a)
+    lblTotals.Text = Subst(("A materials &1   B equipment &2   C labor &3   D direct cost &4") & "\n" & ("Price = D × &5 = &6 &7"), Ui.Num(f[0], "0.00"), Ui.Num(f[1], "0.00"), Ui.Num(f[2], "0.00"), Format(f[0] + f[1] + f[2], "0.00"), Format(fFactor, "0.0000"), Format((f[0] + f[1] + f[2]) * fFactor, "0.00"), sumi.Project.Currency)
+    aProblems = b.Problems(a)
+    lblProblems.Text = IIf(aProblems.Count, aProblems.Join("<br>"), "")
+
+End
+
+'' The lines grouped as licita2003's sheet: materials, equipment, labor, sub-analyses
+Private Sub FillLines(a As Analysis)
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim aGroups As String[] = [Resource.MATERIAL, Resource.EQUIPMENT, Resource.LABOR, "analysis"]
+    Dim aTitles As String[] = [("A - Materials"), ("B - Equipment") & IIf(a.EquipmentYield <> 1, " (" & Subst(("÷ yield &1"), a.EquipmentYield) & ")", ""), ("C - Labor") & IIf(a.LaborYield <> 1, " (" & Subst(("÷ yield &1"), a.LaborYield) & ")", ""), ("Sub-analyses")]
+    Dim sGroup As String
+    Dim i, iRow, g As Integer
+    Dim l As AnalysisLine
+    Dim r As Resource
+    Dim n As Analysis
+    Dim fSum As Float
+    Dim bAny As Boolean
+
+    $aLineRows.Clear
+    tvLines.Rows.Count = 0
+    For g = 0 To aGroups.Max
+        sGroup = aGroups[g]
+        bAny = False
+        fSum = 0
+        For i = 0 To a.Lines.Max
+            l = a.Lines[i]
+            If l.IsAnalysis Then
+                If sGroup <> "analysis" Then Continue
+            Else
+                r = b.Resources[l.Ref]
+                If r Then
+                    If r.Kind <> sGroup Then Continue
+                Else
+                    If sGroup <> Resource.MATERIAL Then Continue        ' a missing resource shows with the materials
+                Endif
+            Endif
+            If Not bAny Then
+                iRow = AddLineRow(-1)
+                tvLines[iRow, 0].Text = aTitles[g]
+                tvLines[iRow, 0].ColumnSpan = 6
+                tvLines[iRow, 0].Font = Font["Bold"]
+                tvLines[iRow, 0].Background = Color.LightBackground
+                bAny = True
+            Endif
+            iRow = AddLineRow(i)
+            tvLines[iRow, 2].Text = Format(l.Quantity, "0.0####")
+            tvLines[iRow, 5].Text = Format(b.LineCost(a, l), "0.00")
+            If l.IsAnalysis Then
+                n = b.Analyses[l.Ref]
+                If n Then
+                    tvLines[iRow, 0].Text = n.Code
+                    tvLines[iRow, 1].Text = n.Name
+                    tvLines[iRow, 3].Text = n.Unit
+                    tvLines[iRow, 4].Text = Format(b.Direct(n), "0.00")
+                Else
+                    tvLines[iRow, 1].Text = ("(missing analysis)")
+                    tvLines[iRow, 1].Foreground = Color.Red
+                Endif
+            Else
+                r = b.Resources[l.Ref]
+                If r Then
+                    tvLines[iRow, 0].Text = r.Code
+                    tvLines[iRow, 1].Text = r.Name
+                    tvLines[iRow, 3].Text = r.Unit
+                    tvLines[iRow, 4].Text = Format(b.PriceOf(r), "0.00")
+                    If b.PriceOf(r) = 0 Then tvLines[iRow, 4].Foreground = Color.Red
+                Else
+                    tvLines[iRow, 1].Text = ("(missing resource)")
+                    tvLines[iRow, 1].Foreground = Color.Red
+                Endif
+            Endif
+            tvLines[iRow, 2].Alignment = Align.Right
+            tvLines[iRow, 4].Alignment = Align.Right
+            tvLines[iRow, 5].Alignment = Align.Right
+            fSum += b.LineCost(a, l)
+        Next
+        If bAny Then
+            iRow = AddLineRow(-1)
+            tvLines[iRow, 4].Text = ("Total")
+            tvLines[iRow, 5].Text = Format(fSum, "0.00")
+            tvLines[iRow, 5].Alignment = Align.Right
+            tvLines[iRow, 5].Font = Font["Bold"]
+        Endif
+    Next
+
+End
+
+Private Function AddLineRow(iLine As Integer) As Integer
+
+    tvLines.Rows.Count += 1
+    $aLineRows.Add(iLine)
+    Return tvLines.Rows.Max
+
+End
+
+'' Header fields: one command per change (typing in a box is coalesced in the log)
+Public Sub AnaField_Change()
+
+    Dim a As Analysis = Current()
+    Dim c As Collection
+
+    If $bFilling Or If Not a Then Return
+    If Last = txtCode Then
+        If Not Trim(txtCode.Text) Then Return
+        c = ["code": Trim(txtCode.Text)]
+    Else If Last = txtName Then
+        c = ["name": txtName.Text]
+    Else If Last = txtUnit Then
+        c = ["unit": Trim(txtUnit.Text)]
+    Else If Last = spLabYield Then
+        c = ["laborYield": spLabYield.Value]
+    Else If Last = spEqYield Then
+        c = ["equipmentYield": spEqYield.Value]
+    Else
+        Return
+    Endif
+    c["key"] = a.Id
+    Run("analysis.set", c)
+
+End
+
+Public Sub AnaRubro_Click()
+
+    Dim a As Analysis = Current()
+
+    If $bFilling Or If Not a Then Return
+    If cmbRubro.Index < 0 Then Return
+    Run("analysis.set", ["key": a.Id, "rubro": $aRubros[cmbRubro.Index]])
+
+End
+
+'' Runs a command as ours (the box being typed in is not refilled); False if it failed (and says why)
+Private Function Run(sCommand As String, c As Collection) As Boolean
+
+    Dim cOut As Collection
+
+    $bOwn = True
+    cOut = Cmd.Run(sCommand, c)
+    $bOwn = False
+    If Ui.Failed(cOut) Then
+        Reload(True)
+        Return False
+    Endif
+    Return True
+
+End
+
+Public Sub Lines_Click()
+
+    If tvLines.Row < 0 Or If tvLines.Row > $aLineRows.Max Then Return
+    If $aLineRows[tvLines.Row] < 0 Then Return
+    If tvLines.Column = 2 Then tvLines.Edit()
+
+End
+
+Public Sub Lines_Save(Row As Integer, Column As Integer, Value As String)
+
+    Dim a As Analysis = Current()
+    Dim f As Float
+    Dim bBad As Boolean
+
+    If Not a Or If Row > $aLineRows.Max Or If $aLineRows[Row] < 0 Then Return
+    f = Ui.ParseNumber(Value, ByRef bBad)
+    If bBad Then
+        Message.Warning(Subst(("&1 is not a number."), Value))
+        Return
+    Endif
+    Run("analysis.setline", ["key": a.Id, "index": $aLineRows[Row], "qty": f])
+    ShowAnalysis(False)
+
+End
+
+Public Sub AddRes_Click()
+
+    Dim a As Analysis = Current()
+    Dim sId As String
+
+    If Not a Then Return
+    sId = FPick.Choose("resource", ("Add a resource to ") & a.Code)
+    If Not sId Then Return
+    Run("analysis.addline", ["key": a.Id, "resource": sId, "qty": 1])
+    ShowAnalysis(False)
+
+End
+
+Public Sub AddAna_Click()
+
+    Dim a As Analysis = Current()
+    Dim sId As String
+
+    If Not a Then Return
+    sId = FPick.Choose("analysis", ("Add an analysis to ") & a.Code, a.Id)
+    If Not sId Then Return
+    Run("analysis.addline", ["key": a.Id, "analysis": sId, "qty": 1])
+    ShowAnalysis(False)
+
+End
+
+Public Sub RemoveLine_Click()
+
+    Dim a As Analysis = Current()
+
+    If Not a Or If tvLines.Row < 0 Or If tvLines.Row > $aLineRows.Max Then Return
+    If $aLineRows[tvLines.Row] < 0 Then Return
+    Run("analysis.removeline", ["key": a.Id, "index": $aLineRows[tvLines.Row]])
+    ShowAnalysis(False)
+
+End
+
+Public Sub Flatten_Click()
+
+    Dim a As Analysis = Current()
+
+    If Not a Then Return
+    If Message.Question(("The sub-analyses become their resources and stop following their changes. Go on?"), ("Flatten"), ("Cancel")) <> 1 Then Return
+    Run("analysis.flatten", ["key": a.Id])
+    ShowAnalysis(False)
+
+End
+
+Public Sub AnaNew_Click()
+
+    Dim c As Collection
+
+    $bOwn = True
+    c = Cmd.Run("analysis.add", ["name": ("New analysis"), "unit": "u"])
+    $bOwn = False
+    If Ui.Failed(c) Then Return
+    $sAna = c["id"]
+    txtFind.Text = ""
+    Reload(True)
+    txtName.SetFocus
+    txtName.SelectAll
+
+End
+
+Public Sub AnaCopy_Click()
+
+    Dim a As Analysis = Current()
+    Dim c As Collection
+
+    If Not a Then Return
+    $bOwn = True
+    c = Cmd.Run("analysis.copy", ["key": a.Id, "name": a.Name & " " & ("(copy)")])
+    $bOwn = False
+    If Ui.Failed(c) Then Return
+    $sAna = c["id"]
+    Reload(True)
+
+End
+
+Public Sub AnaDelete_Click()
+
+    Dim a As Analysis = Current()
+    Dim c As Collection
+
+    If Not a Then Return
+    If Message.Question(Subst(("Delete analysis &1 &2?"), a.Code, a.Name), ("Delete"), ("Cancel")) <> 1 Then Return
+    c = Cmd.Run("analysis.delete", ["key": a.Id])
+    If c.Exist("error") And If InStr(c["error"], ("analyses use")) Then
+        If Message.Warning(c["error"] & "\n\n" & ("Delete it anyway? Those lines will be missing."), ("Delete"), ("Cancel")) <> 1 Then Return
+        c = Cmd.Run("analysis.delete", ["key": a.Id, "force": True])
+    Endif
+    If Ui.Failed(c) Then Return
+    $sAna = ""
+    Reload(True)
+
+End
+
+'' THE TOP BAR
+
+Public Sub Coef_Change()
+
+    If $bFilling Then Return
+    Run("book.set", ["updateCoef": spCoef.Value, "freightPerKm": spFreight.Value])
+
+End
+
+Public Sub Import_Click()
+
+    Dim sDefault As String = User.Home &/ ".config/s64sketch/costs/licita2003"
+    Dim c As Collection
+    Dim bAdded As Boolean
+
+    Dialog.Title = ("The folder of the library (resources.csv, analyses.csv...)")
+    Dialog.Path = IIf(Exist(sDefault), sDefault, User.Home) & "/"
+    If Dialog.SelectDirectory() Then Return
+    If Exist(File.Dir(Dialog.Path) &/ "added") Then
+        bAdded = Message.Question(("There is an \"added\" folder next to it. Import it too?"), ("Yes"), ("No")) = 1
+    Endif
+    Inc Application.Busy
+    Who.Begin(Who.IMPORT)
+    c = Cmd.Run("prices.import", ["folder": Dialog.Path, "added": bAdded])
+    Who.Done()
+    Dec Application.Busy
+    If Ui.Failed(c) Then Return
+    $sAna = ""
+    Reload(True)
+    FReport.Run(("Library imported"), c["report"])
+
+End
+
+'' RESOURCES
+
+Public Sub ResFind_Change()
+
+    If $bFilling Then Return
+    FillResources()
+
+End
+
+Public Sub ResFind_Click()
+
+    If $bFilling Then Return
+    FillResources()
+
+End
+
+Private Function CurrentRes() As Resource
+
+    If tvRes.Row < 0 Or If tvRes.Row > $aResIds.Max Then Return Null
+    Return sumi.Project.Prices.Resources[$aResIds[tvRes.Row]]
+
+End
+
+Private Sub FillResources()
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim o As Object
+    Dim r As Resource
+    Dim sText As String = Trim(txtResFind.Text)
+    Dim sKind As String
+    Dim i, iKeep As Integer
+    Dim sKeep As String
+
+    If tvRes.Row >= 0 And If tvRes.Row <= $aResIds.Max Then sKeep = $aResIds[tvRes.Row]
+    If cmbResKind.Index > 0 Then sKind = Resource.Kinds()[cmbResKind.Index - 1]
+    $aResIds.Clear
+    For Each o In PriceBook.SortedByCode(b.Resources)
+        r = o
+        If sKind And If r.Kind <> sKind Then Continue
+        If sText And If InStr(r.Code & " " & r.Name, sText, 1, gb.IgnoreCase) = 0 Then Continue
+        $aResIds.Add(r.Id)
+    Next
+    $bFilling = True
+    tvRes.Rows.Count = $aResIds.Count
+    For i = 0 To $aResIds.Max
+        r = b.Resources[$aResIds[i]]
+        tvRes[i, RC_CODE].Text = r.Code
+        tvRes[i, RC_KIND].Text = Tr(r.Kind)
+        tvRes[i, RC_NAME].Text = r.Name
+        tvRes[i, RC_UNIT].Text = r.Unit
+        tvRes[i, RC_PRICE].Text = Ui.Num(r.Price)
+        tvRes[i, RC_WAGE].Text = IIf(r.Kind = Resource.LABOR, Ui.Num(r.Wage), "")
+        tvRes[i, RC_CALC].Text = IIf(r.HasCalculation(), Format(b.CalculatedPrice(r), "0.00"), "")
+        tvRes[i, RC_OVERRIDE].Text = IIf(r.HasCalculation(), IIf(r.PriceOverride, ("yes"), ("no")), "")
+        tvRes[i, RC_LOSS].Text = Ui.Num(r.LossPct)
+        tvRes[i, RC_ORIGIN].Text = r.Origin
+        tvRes[i, RC_DISTANCE].Text = Ui.Num(r.Distance)
+        tvRes[i, RC_LOAD].Text = Ui.Num(r.TruckLoad)
+        tvRes[i, RC_UNITPRICE].Text = Format(b.PriceOf(r), "0.00")
+        tvRes[i, RC_UPDATED].Text = r.Updated
+        tvRes[i, RC_SOURCE].Text = r.Source
+        For Each iKeep In [RC_PRICE, RC_WAGE, RC_CALC, RC_LOSS, RC_DISTANCE, RC_LOAD, RC_UNITPRICE]
+            tvRes[i, iKeep].Alignment = Align.Right
+        Next
+        If b.PriceOf(r) = 0 Then tvRes[i, RC_UNITPRICE].Foreground = Color.Red
+        ' what is used: the typed price or the calculation, the other grayed
+        If r.HasCalculation() Then
+            If r.PriceOverride Then tvRes[i, RC_CALC].Foreground = Color.Gray Else tvRes[i, RC_PRICE].Foreground = Color.Gray
+        Endif
+    Next
+    i = $aResIds.Find(sKeep)
+    If i >= 0 Then tvRes.Row = i
+    $bFilling = False
+    ShowMachine()
+
+End
+
+Public Sub Res_Click()
+
+    Dim r As Resource = CurrentRes()
+
+    ShowMachine()
+    If Not r Then Return
+    Select Case tvRes.Column
+        Case RC_KIND
+            tvRes.Edit(Resource.Kinds(), True)
+        Case RC_OVERRIDE
+            If r.HasCalculation() Then tvRes.Edit([("yes"), ("no")], True)
+        Case RC_CALC, RC_UNITPRICE, RC_UPDATED
+        Case RC_WAGE
+            If r.Kind = Resource.LABOR Then tvRes.Edit()
+        Default
+            tvRes.Edit()
+    End Select
+
+End
+
+Public Sub Res_Change()
+
+    If $bFilling Then Return
+    ShowMachine()
+
+End
+
+Public Sub Res_Save(Row As Integer, Column As Integer, Value As String)
+
+    Dim r As Resource
+    Dim c As New Collection
+    Dim bBad As Boolean
+    Dim f As Float
+
+    If Row < 0 Or If Row > $aResIds.Max Then Return
+    r = sumi.Project.Prices.Resources[$aResIds[Row]]
+    Select Case Column
+        Case RC_CODE
+            c["code"] = Trim(Value)
+        Case RC_KIND
+            If Resource.Kinds().Exist(Value) Then c["kind"] = Value
+        Case RC_NAME
+            c["name"] = Trim(Value)
+        Case RC_UNIT
+            c["unit"] = Trim(Value)
+        Case RC_OVERRIDE
+            c["override"] = (Value = ("yes"))
+        Case RC_ORIGIN
+            c["origin"] = Trim(Value)
+        Case RC_SOURCE
+            c["source"] = Trim(Value)
+        Case RC_PRICE, RC_WAGE, RC_LOSS, RC_DISTANCE, RC_LOAD
+            f = Ui.ParseNumber(Value, ByRef bBad)
+            If bBad Then
+                Message.Warning(Subst(("&1 is not a number."), Value))
+                Return
+            Endif
+            c[["price", "wage", "loss", "distance", "truckLoad"][[RC_PRICE, RC_WAGE, RC_LOSS, RC_DISTANCE, RC_LOAD].Find(Column)]] = f
+    End Select
+    If c.Count = 0 Then Return
+    c["key"] = r.Id
+    Run("resource.set", c)
+    FillResources()
+
+End
+
+Private Sub AddResource(sKind As String)
+
+    Dim c As Collection
+
+    c = Cmd.Run("resource.add", ["kind": sKind, "name": ("New") & " " & Tr(sKind), "unit": IIf(sKind = Resource.MATERIAL, "u", "h")])
+    If Ui.Failed(c) Then Return
+    txtResFind.Text = ""
+    FillResources()
+    tvRes.Row = $aResIds.Find(c["id"])
+    tvRes.Column = RC_NAME
+
+End
+
+Public Sub ResAddMat_Click()
+
+    AddResource(Resource.MATERIAL)
+
+End
+
+Public Sub ResAddLab_Click()
+
+    AddResource(Resource.LABOR)
+
+End
+
+Public Sub ResAddEq_Click()
+
+    AddResource(Resource.EQUIPMENT)
+
+End
+
+Public Sub ResDelete_Click()
+
+    Dim r As Resource = CurrentRes()
+    Dim c As Collection
+
+    If Not r Then Return
+    If Message.Question(Subst(("Delete resource &1 &2?"), r.Code, r.Name), ("Delete"), ("Cancel")) <> 1 Then Return
+    c = Cmd.Run("resource.delete", ["key": r.Id])
+    If c.Exist("error") And If InStr(c["error"], ("analyses use")) Then
+        If Message.Warning(c["error"] & "\n\n" & ("Delete it anyway? Those lines will be missing."), ("Delete"), ("Cancel")) <> 1 Then Return
+        c = Cmd.Run("resource.delete", ["key": r.Id, "force": True])
+    Endif
+    Ui.Failed(c)
+    FillResources()
+
+End
+
+'' The machine calculation of the selected equipment
+Private Sub ShowMachine()
+
+    Dim r As Resource = CurrentRes()
+    Dim aFields As String[] = Machine.Fields()
+    Dim aTitles As String[] = [("Power (HP)"), ("Cost"), ("Residual value %"), ("Life (hours)"), ("Hours a year"), ("Interest % a year"), ("Repairs % of depreciation"), ("Fuel"), ("Fuel price a liter"), ("Fuel use (l / HP·h)"), ("Lubricants % of fuel")]
+    Dim i As Integer
+    Dim m As Machine
+
+    If Not r Then
+        pnlMachine.Visible = False
+        Return
+    Endif
+    pnlMachine.Visible = (r.Kind = Resource.EQUIPMENT)
+    If Not pnlMachine.Visible Then Return
+    m = r.MachineCalc
+    tvMachine.Visible = (m <> Null)
+    btnMachine.Visible = (m = Null)
+    If Not m Then
+        lblMachine.Text = ("This equipment has no cost calculation: its price is typed.")
+        Return
+    Endif
+    tvMachine.Rows.Count = aFields.Count
+    For i = 0 To aFields.Max
+        tvMachine[i, 0].Text = aTitles[i]
+        tvMachine[i, 1].Text = CStr(Object.GetProperty(m, UCase(Left(aFields[i])) & Mid(aFields[i], 2)))
+        tvMachine[i, 1].Alignment = IIf(aFields[i] = "fuel", Align.Left, Align.Right)
+    Next
+    lblMachine.Text = Subst(("Depreciation &1 + interest &2 + repairs &3 + fuel &4 + lubricants &5 = &6 an hour"), Format(m.Depreciation(), "0.00"), Format(m.Interest(), "0.00"), Format(m.Repairs(), "0.00"), Format(m.FuelCost(), "0.00"), Format(m.Lubricants(), "0.00"), Format(m.PerHour(), "0.00")) & IIf(r.PriceOverride, "\n" & ("Not used: the typed price overrides it."), "")
+
+End
+
+Public Sub Machine_Click()
+
+    If tvMachine.Column = 1 Then tvMachine.Edit()
+
+End
+
+Public Sub Machine_Save(Row As Integer, Column As Integer, Value As String)
+
+    Dim r As Resource = CurrentRes()
+    Dim sField As String
+    Dim c As New Collection
+    Dim bBad As Boolean
+
+    If Not r Then Return
+    sField = Machine.Fields()[Row]
+    If sField = "fuel" Then
+        c["machine.fuel"] = Trim(Value)
+    Else
+        c["machine." & sField] = Ui.ParseNumber(Value, ByRef bBad)
+        If bBad Then
+            Message.Warning(Subst(("&1 is not a number."), Value))
+            Return
+        Endif
+    Endif
+    c["key"] = r.Id
+    Run("resource.set", c)
+    FillResources()
+
+End
+
+Public Sub MachineAdd_Click()
+
+    Dim r As Resource = CurrentRes()
+
+    If Not r Then Return
+    Run("resource.set", ["key": r.Id, "machine.power": 100, "override": False])
+    FillResources()
+
+End
+
+'' LABOR CHARGES
+
+Private Sub FillCharges()
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim i As Integer
+    Dim h As LaborCharge
+    Dim fFixed As Float
+
+    tvCharges.Rows.Count = b.Charges.Count
+    For i = 0 To b.Charges.Max
+        h = b.Charges[i]
+        tvCharges[i, 0].Text = h.Name
+        tvCharges[i, 1].Text = Ui.Num(h.Pct)
+        tvCharges[i, 2].Text = Ui.Num(h.Amount)
+        tvCharges[i, 3].Text = IIf(h.Amount, Ui.Num(h.Hours), "")
+        tvCharges[i, 1].Alignment = Align.Right
+        tvCharges[i, 2].Alignment = Align.Right
+        tvCharges[i, 3].Alignment = Align.Right
+        If h.Amount And If h.Hours > 0 Then fFixed += h.Amount / h.Hours
+    Next
+    lblCharges.Text = Subst(("Total: &1 % of the wage + &2 an hour"), Format(b.ChargesPct(), "0.00"), Format(fFixed, "0.00"))
+
+End
+
+Public Sub Charges_Click()
+
+    tvCharges.Edit()
+
+End
+
+Public Sub Charges_Save(Row As Integer, Column As Integer, Value As String)
+
+    Dim c As New Collection
+    Dim bBad As Boolean
+
+    If Column = 0 Then
+        c["name"] = Trim(Value)
+    Else
+        c[["", "pct", "amount", "hours"][Column]] = Ui.ParseNumber(Value, ByRef bBad)
+        If bBad Then
+            Message.Warning(Subst(("&1 is not a number."), Value))
+            Return
+        Endif
+    Endif
+    c["index"] = Row
+    Run("charge.set", c)
+    FillCharges()
+
+End
+
+Public Sub ChargeAdd_Click()
+
+    Run("charge.add", ["name": ("New charge"), "pct": 0])
+    FillCharges()
+
+End
+
+Public Sub ChargeRemove_Click()
+
+    If tvCharges.Row < 0 Then Return
+    Run("charge.delete", ["index": tvCharges.Row])
+    FillCharges()
+
+End
+
+'' RUBROS
+
+Private Sub FillRubros()
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim iNum As Integer
+    Dim i As Integer
+    Dim a As Integer[] = PriceBook.SortedCodesOf(b.Rubros)
+
+    tvRubros.Rows.Count = a.Count
+    For i = 0 To a.Max
+        iNum = a[i]
+        tvRubros[i, 0].Text = CStr(iNum)
+        tvRubros[i, 1].Text = b.Rubros[CStr(iNum)]
+    Next
+
+End
+
+Public Sub Rubros_Click()
+
+    If tvRubros.Column = 1 Then tvRubros.Edit()
+
+End
+
+Public Sub Rubros_Save(Row As Integer, Column As Integer, Value As String)
+
+    If Column <> 1 Or If Not Trim(Value) Then Return
+    Run("rubro.set", ["number": CInt(tvRubros[Row, 0].Text), "name": Trim(Value)])
+    FillRubros()
+
+End
+
+Public Sub RubroAdd_Click()
+
+    Dim a As Integer[] = PriceBook.SortedCodesOf(sumi.Project.Prices.Rubros)
+    Dim iNext As Integer = 1
+
+    If a.Count Then iNext = a[a.Max] + 1
+    Run("rubro.set", ["number": iNext, "name": ("NEW RUBRO")])
+    FillRubros()
+
+End
+
+Public Sub RubroRemove_Click()
+
+    Dim c As Collection
+    Dim iNum As Integer
+
+    If tvRubros.Row < 0 Then Return
+    iNum = CInt(tvRubros[tvRubros.Row, 0].Text)
+    c = Cmd.Run("rubro.delete", ["number": iNum])
+    If c.Exist("error") Then
+        If Message.Warning(c["error"] & "\n\n" & ("Remove it anyway?"), ("Remove"), ("Cancel")) <> 1 Then Return
+        c = Cmd.Run("rubro.delete", ["number": iNum, "force": True])
+    Endif
+    Ui.Failed(c)
+    FillRubros()
+
+End

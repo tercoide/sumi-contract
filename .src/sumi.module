@@ -13,11 +13,11 @@ Public Sub Status(sText As String)
 
 End
 
-'' The project changed: it needs saving, and the window shows it
+'' The project changed (Cmd calls it after every change): it needs saving, and the window shows it
 Public Sub Changed()
 
     If Not Project Then Return
     Project.RequiresSaving = True
-    If Interactive Then fMain.UpdateTitle()
+    If Interactive Then fMain.DataChanged()
 
 End

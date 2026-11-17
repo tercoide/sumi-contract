@@ -1,0 +1,150 @@
+' Gambas class file
+
+'' The History tab: the project's change log (Project.Changes), newest first. Who changed what, when, and how
+'' (a person, the AI with its model, an import); the selected change shows its before and after. Undo and redo
+'' act on your own last action (see Cmd).
+
+Private gvLog As GridView
+Private txtFind As TextBox
+Private cmbVia As ComboBox
+Private txtDetail As TextArea
+Private lblCount As Label
+Private $aRows As New Integer[]                 ' grid row -> index in Project.Changes
+
+Public Sub _new()
+
+    Dim hRow As HBox
+    Dim s As String
+
+    hRow = Ui.HBox(Me)
+    txtFind = New TextBox(hRow) As "Find"
+    txtFind.Expand = True
+    txtFind.Placeholder = ("Search in who and what")
+    cmbVia = New ComboBox(hRow) As "Find"
+    cmbVia.ReadOnly = True
+    cmbVia.W = Desktop.Scale * 20
+    cmbVia.Add(("Everyone"))
+    For Each s In [Who.PERSON, Who.AI, Who.IMPORT, Who.SYSTEM]
+        cmbVia.Add(Tr(s))
+    Next
+    cmbVia.Index = 0
+    Ui.Button(hRow, ("Undo"), "Undo", Me, ("Undo your last change"))
+    Ui.Button(hRow, ("Redo"), "Redo", Me)
+    lblCount = Ui.Label(hRow, "")
+
+    gvLog = New GridView(Me) As "Log"
+    gvLog.Expand = True
+    gvLog.Mode = Select.Single
+    Ui.Columns(gvLog, [("When"), ("Who"), ("How"), ("What"), ("")], [18, 16, 18, 80, 10])
+
+    txtDetail = New TextArea(Me)
+    txtDetail.H = Desktop.Scale * 18
+    txtDetail.ReadOnly = True
+    txtDetail.Wrap = True
+
+End
+
+Public Sub Reload()
+
+    Dim aChanges As Change[] = sumi.Project.Changes
+    Dim h As Change
+    Dim i, iRow As Integer
+    Dim sText As String = Trim(txtFind.Text)
+    Dim sVia As String
+
+    If cmbVia.Index > 0 Then sVia = [Who.PERSON, Who.AI, Who.IMPORT, Who.SYSTEM][cmbVia.Index - 1]
+    $aRows.Clear
+    For i = aChanges.Max DownTo 0
+        h = aChanges[i]
+        If sVia And If h.Via <> sVia Then Continue
+        If sText And If InStr(h.Who & " " & h.Summary & " " & h.Model, sText, 1, gb.IgnoreCase) = 0 Then Continue
+        $aRows.Add(i)
+    Next
+    gvLog.Rows.Count = $aRows.Count
+    For iRow = 0 To $aRows.Max
+        h = aChanges[$aRows[iRow]]
+        gvLog[iRow, 0].Text = h.When
+        gvLog[iRow, 1].Text = h.Who
+        gvLog[iRow, 2].Text = Tr(h.Via) & IIf(h.Model, " (" & h.Model & ")", "")
+        gvLog[iRow, 3].Text = h.Summary
+        gvLog[iRow, 4].Text = IIf(h.UndoneBy, ("undone"), "")
+        If h.UndoneBy Then gvLog[iRow, 3].Foreground = Color.Gray
+    Next
+    lblCount.Text = Subst(("&1 changes"), aChanges.Count)
+    ShowDetail()
+
+End
+
+Public Sub Find_Change()
+
+    Reload()
+
+End
+
+Public Sub Find_Click()
+
+    Reload()
+
+End
+
+Public Sub Log_Change()
+
+    ShowDetail()
+
+End
+
+Public Sub Log_Click()
+
+    ShowDetail()
+
+End
+
+'' The selected change: its command, arguments, and what each thing was before and after
+Private Sub ShowDetail()
+
+    Dim h As Change
+    Dim a As New String[]
+    Dim sTarget As String
+
+    If gvLog.Row < 0 Or If gvLog.Row > $aRows.Max Then
+        txtDetail.Text = ""
+        Return
+    Endif
+    h = sumi.Project.Changes[$aRows[gvLog.Row]]
+    a.Add(h.Summary)
+    a.Add(Subst(("&1 by &2, &3"), h.When, h.Who, Tr(h.Via) & IIf(h.Model, " " & h.Model, "")))
+    a.Add(("Command") & ": " & h.Command & " " & IIf(h.Params, JSON.Encode(h.Params), ""))
+    If h.UndoOf Then a.Add(("It undoes or redoes") & " " & h.UndoOf)
+    If h.UndoneBy Then a.Add(("Undone by") & " " & h.UndoneBy)
+    For Each sTarget In h.Targets
+        a.Add("")
+        a.Add(sTarget)
+        a.Add("  " & ("before") & ": " & Shorten(h.Before[sTarget]))
+        If h.After.Exist(sTarget) Then a.Add("  " & ("after") & ":  " & Shorten(h.After[sTarget]))
+    Next
+    txtDetail.Text = a.Join("\n")
+
+End
+
+Private Function Shorten(v As Variant) As String
+
+    Dim s As String
+
+    If TypeOf(v) = gb.String And If v = Cmd.ABSENT Then Return ("(didn't exist)")
+    s = JSON.Encode(v)
+    If Len(s) > 2000 Then s = Left(s, 2000) & "..."
+    Return s
+
+End
+
+Public Sub Undo_Click()
+
+    fMain.Undo()
+
+End
+
+Public Sub Redo_Click()
+
+    fMain.Undo(True)
+
+End

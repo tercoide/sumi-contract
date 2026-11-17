@@ -1,0 +1,25 @@
+' Gambas class file
+
+'' Shows a report (lines of text) that can be read and copied: what an import did, for instance
+
+Static Public Sub Run(sTitle As String, aLines As Variant)
+
+    Dim h As New FReport
+    Dim a As New String[]
+    Dim v As Variant
+
+    If Not sumi.Interactive Then Return
+    For Each v In aLines
+        a.Add(CStr(v))
+    Next
+    h.Text = sTitle
+    h.txtReport.Text = a.Join("\n")
+    h.ShowModal()
+
+End
+
+Public Sub btnClose_Click()
+
+    Me.Close
+
+End

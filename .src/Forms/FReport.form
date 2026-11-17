@@ -1,0 +1,26 @@
+# Gambas Form File 3.0
+
+{ Form Form
+  MoveScaled(0,0,100,70)
+  Arrangement = Arrange.Vertical
+  Spacing = True
+  Margin = True
+  { !txtReport TextArea
+    MoveScaled(0,0,98,60)
+    #Public = True
+    Expand = True
+    ReadOnly = True
+  }
+  { hButtons HBox
+    MoveScaled(0,62,98,4)
+    { Spring1 Spring
+      MoveScaled(0,0,60,4)
+    }
+    { btnClose Button
+      MoveScaled(80,0,16,4)
+      Text = ("Close")
+      Default = True
+      Cancel = True
+    }
+  }
+}

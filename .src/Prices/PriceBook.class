@@ -317,6 +317,19 @@ Static Public Function SortedByCode(c As Collection) As Object[]
 
 End
 
+'' The keys of a Collection keyed by numbers (Rubros), sorted
+Static Public Function SortedCodesOf(c As Collection) As Integer[]
+
+    Dim a As New Integer[]
+    Dim v As Variant
+
+    For Each v In c
+        a.Add(CInt(c.Key))
+    Next
+    Return a.Sort()
+
+End
+
 '' Codes that are numbers sort by value ("9" before "10"), before codes with letters
 Static Public Function SortKey(sCode As String) As String
 

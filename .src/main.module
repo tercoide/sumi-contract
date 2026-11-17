@@ -9,6 +9,7 @@
 Public Sub Application_Error()
 
     AppLog.Error(Error.Text & " (" & Error.Where & ")", "Application_Error")
+    If sumi.Interactive And If Application.Args.Count > 1 And If Application.Args[1] = "--gui-test" Then Quit 1
 
 End
 
@@ -44,6 +45,15 @@ Public Sub Main()
     sumi.Project = New Project
     Application.MainWindow = fMain
     fMain.Run()
+
+    ' the window test (see GuiTest)
+    For i = 1 To Application.Args.Max
+        If Application.Args[i] = "--gui-test" Then
+            Config.UserName = "gui-test"
+            GuiTest.Start()
+            Return
+        Endif
+    Next
 
     ' a file given on the command line
     For i = 1 To Application.Args.Max

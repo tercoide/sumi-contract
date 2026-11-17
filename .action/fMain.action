@@ -25,5 +25,13 @@
     Text = "Save as"
     Picture = "$ToolButton"
   }
+  { Action redo
+    Text = "Redo (Ctrl+Y)"
+    Picture = "$ToolButton"
+  }
+  { Action undo
+    Text = "Undo your last change (Ctrl+Z)"
+    Picture = "$ToolButton"
+  }
 }
 

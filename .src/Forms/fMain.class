@@ -1,16 +1,19 @@
 ' Gambas class file
 
 '' Main window, as in the rest of the sumi suite: the top button bar, the central tab strip (Project, Budget, Gantt,
-'' Pricing, Contracts: items 0 to 4 of starting.txt) and the status bar (messages on the left, the open file on the right).
+'' Pricing, Contracts: items 0 to 4 of starting.txt; History: the change log) and the status bar (messages on the left, the open file on the right).
 '' Each tab is a form embedded in its page (see Run); the ones not made yet show a placeholder.
 
 Public ProjectTab As FProject                   '' the Project tab: the work's own data
+Public PricingTab As FPricing                   '' the Pricing tab: resources, analyses, rubros, labor charges
+Public HistoryTab As FHistory                   '' the History tab: the change log
 
 Public Const TAB_PROJECT As Integer = 0         '' the work, its schedule and definitions
 Public Const TAB_BUDGET As Integer = 1          '' sumi-designer's quantities with prices, and the total
 Public Const TAB_GANTT As Integer = 2           '' each task in the construction's time window
 Public Const TAB_PRICING As Integer = 3         '' the unit price analysis of each task
 Public Const TAB_CONTRACTS As Integer = 4       '' the contracts given: their work and payments progress
+Public Const TAB_HISTORY As Integer = 5         '' who changed what, when
 
 Private $mRecent As Menu                        ' the recent files, under the Open button's arrow
 
@@ -23,11 +26,15 @@ Public Sub Run()
     Utils.SetIcon(tbSave, "actions/document-save.svg")
     Utils.SetIcon(tbSaveAs, "actions/document-save-as.svg")
     Utils.SetIcon(tbSettings, "actions/configure.svg")
+    Utils.SetIcon(tbUndo, "actions/edit-undo.svg")
+    Utils.SetIcon(tbRedo, "actions/edit-redo.svg")
     Utils.SetIcon(tbAbout, "actions/help-about.svg")
 
     ' the tabs
     ProjectTab = New FProject(tabMain[TAB_PROJECT])
-    For i = TAB_BUDGET To tabMain.Count - 1
+    PricingTab = New FPricing(tabMain[TAB_PRICING])
+    HistoryTab = New FHistory(tabMain[TAB_HISTORY])
+    For Each i In [TAB_BUDGET, TAB_GANTT, TAB_CONTRACTS]
         Placeholder(i)
     Next
     tabMain.Index = TAB_PROJECT
@@ -59,8 +66,66 @@ End
 Public Sub ProjectChanged()
 
     ProjectTab.ShowProject(sumi.Project)
+    PricingTab.ShowProject(sumi.Project)
+    HistoryTab.Reload()
     UpdateTitle()
     FillRecent()
+
+End
+
+'' Something changed through Cmd (a person, the AI, an undo): the title and the tab shown follow
+Public Sub DataChanged()
+
+    UpdateTitle()
+    RefreshTab(tabMain.Index)
+
+End
+
+Private Sub RefreshTab(iTab As Integer)
+
+    Select Case iTab
+        Case TAB_PROJECT
+            ProjectTab.Reload()
+        Case TAB_PRICING
+            PricingTab.Reload()
+        Case TAB_HISTORY
+            HistoryTab.Reload()
+    End Select
+
+End
+
+Public Sub tabMain_Click()
+
+    RefreshTab(tabMain.Index)
+
+End
+
+Public Sub Undo(Optional bRedo As Boolean)
+
+    Dim c As Collection = Cmd.Run(IIf(bRedo, "redo", "undo"))
+
+    If c.Exist("error") Then
+        SetStatus(c["error"])
+        If InStr(c["error"], ("changed after that")) Then Message.Warning(c["error"])
+    Else
+        SetStatus(c["summary"])
+        RefreshTab(tabMain.Index)
+    Endif
+
+End
+
+'' Ctrl+Z and Ctrl+Y, unless a text box is being edited (it has its own)
+Public Sub Form_KeyPress()
+
+    If Not Key.Control Then Return
+    If Application.ActiveControl Is TextBox Or If Application.ActiveControl Is TextArea Then Return
+    If Key.Code = Key["Z"] Then
+        Undo(Key.Shift)
+        Stop Event
+    Else If Key.Code = Key["Y"] Then
+        Undo(True)
+        Stop Event
+    Endif
 
 End
 
@@ -125,6 +190,10 @@ Public Function Action_Activate(sAction As String) As Boolean
             actions.FileSave()
         Case "file_saveas"
             actions.FileSaveAs()
+        Case "undo"
+            Undo()
+        Case "redo"
+            Undo(True)
         Case "config"
             fSettings.ShowModal()
         Case "about"

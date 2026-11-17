@@ -1,0 +1,144 @@
+' Gambas class file
+
+'' Chooses a resource or an analysis of the project's price book: a search box and a list.
+'' FPick.Choose("resource" | "analysis", sTitle) returns its Id, or "" if cancelled.
+
+Private $sMode As String
+Private $aIds As New String[]
+Private $sChosen As String
+Private txtFind As TextBox
+Private cmbKind As ComboBox
+Private gvList As GridView
+
+Static Public Function Choose(sMode As String, Optional sTitle As String, Optional sExclude As String) As String
+
+    Dim h As New FPick
+
+    h.Setup(sMode, sTitle, sExclude)
+    h.ShowModal()
+    Return h.Chosen()
+
+End
+
+Private $sExclude As String
+
+Public Sub Setup(sMode As String, sTitle As String, sExclude As String)
+
+    Dim hTop As HBox
+    Dim hButtons As HBox
+    Dim s As String
+
+    $sMode = sMode
+    $sExclude = sExclude
+    Me.Text = IIf(sTitle, sTitle, IIf(sMode = "analysis", ("Choose an analysis"), ("Choose a resource")))
+
+    hTop = Ui.HBox(Me)
+    txtFind = New TextBox(hTop) As "Find"
+    txtFind.Expand = True
+    txtFind.Placeholder = ("Search by code or name")
+    If sMode = "resource" Then
+        cmbKind = New ComboBox(hTop) As "Find"
+        cmbKind.ReadOnly = True
+        cmbKind.W = Desktop.Scale * 20
+        cmbKind.Add(("All kinds"))
+        For Each s In Resource.Kinds()
+            cmbKind.Add(Tr(s))
+        Next
+        cmbKind.Index = 0
+    Endif
+
+    gvList = New GridView(Me) As "List"
+    gvList.Expand = True
+    gvList.Mode = Select.Single
+    Ui.Columns(gvList, [("Code"), ("Name"), ("Unit"), ("Unit price")], [10, 50, 6, 12])
+
+    hButtons = Ui.HBox(Me)
+    Ui.Label(hButtons, "").Expand = True
+    Ui.Button(hButtons, ("Cancel"), "Cancel", Me)
+    Ui.Button(hButtons, ("OK"), "OK", Me)
+    Fill()
+    txtFind.SetFocus
+
+End
+
+Public Function Chosen() As String
+
+    Return $sChosen
+
+End
+
+Public Sub Find_Change()
+
+    Fill()
+
+End
+
+Public Sub Find_Click()
+
+    Fill()
+
+End
+
+Public Sub Find_Activate()
+
+    If gvList.Rows.Count = 1 Then
+        $sChosen = $aIds[0]
+        Me.Close
+    Endif
+
+End
+
+Private Sub Fill()
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim o As Object
+    Dim sText As String = Trim(txtFind.Text)
+    Dim sKind As String
+    Dim i As Integer
+
+    If cmbKind And If cmbKind.Index > 0 Then sKind = Resource.Kinds()[cmbKind.Index - 1]
+    $aIds.Clear
+    gvList.Rows.Count = 0
+    For Each o In PriceBook.SortedByCode(IIf($sMode = "analysis", b.Analyses, b.Resources))
+        If o.Id = $sExclude Then Continue
+        If sText And If InStr(o.Code & " " & o.Name, sText, 1, gb.IgnoreCase) = 0 Then Continue
+        If sKind And If o.Kind <> sKind Then Continue
+        $aIds.Add(o.Id)
+    Next
+    gvList.Rows.Count = $aIds.Count
+    For i = 0 To $aIds.Max
+        If $sMode = "analysis" Then
+            o = b.Analyses[$aIds[i]]
+            gvList[i, 3].Text = Ui.Num(b.Direct(o))
+        Else
+            o = b.Resources[$aIds[i]]
+            gvList[i, 3].Text = Ui.Num(b.PriceOf(o))
+        Endif
+        gvList[i, 0].Text = o.Code
+        gvList[i, 1].Text = o.Name
+        gvList[i, 2].Text = o.Unit
+    Next
+    If $aIds.Count Then gvList.Row = 0
+
+End
+
+Public Sub List_Activate()
+
+    OK_Click()
+
+End
+
+Public Sub OK_Click()
+
+    If gvList.Row < 0 Or If gvList.Row > $aIds.Max Then Return
+    $sChosen = $aIds[gvList.Row]
+    Me.Close
+
+End
+
+Public Sub Cancel_Click()
+
+    $sChosen = ""
+    Me.Close
+
+End

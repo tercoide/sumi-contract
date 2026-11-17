@@ -43,6 +43,19 @@
       { Separator1 Separator
         MoveScaled(21,0,1,4)
       }
+      { tbUndo ToolButton
+        MoveScaled(22,0,5,5)
+        ToolTip = ("Undo your last change (Ctrl+Z)")
+        Action = "undo"
+      }
+      { tbRedo ToolButton
+        MoveScaled(22,0,5,5)
+        ToolTip = ("Redo (Ctrl+Y)")
+        Action = "redo"
+      }
+      { Separator3 Separator
+        MoveScaled(28,0,1,4)
+      }
       { tbSettings ToolButton
         MoveScaled(23,0,5,5)
         ToolTip = ("Preferences")
@@ -66,7 +79,7 @@
       Expand = True
       Arrangement = Arrange.Fill
       Border = False
-      Count = 5
+      Count = 6
       Index = 0
       Text = ("Project")
       Index = 1
@@ -77,6 +90,8 @@
       Text = ("Pricing")
       Index = 4
       Text = ("Contracts")
+      Index = 5
+      Text = ("History")
       Index = 0
     }
     { StatusBar HBox
@@ -124,6 +139,14 @@
   }
   { Action file_saveas
     Text = "Save as"
+    Picture = "$ToolButton"
+  }
+  { Action redo
+    Text = "Redo (Ctrl+Y)"
+    Picture = "$ToolButton"
+  }
+  { Action undo
+    Text = "Undo your last change (Ctrl+Z)"
     Picture = "$ToolButton"
   }
 }

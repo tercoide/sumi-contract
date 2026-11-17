@@ -1,0 +1,74 @@
+' Gambas module file
+
+'' With GUI_SHOTS=<folder>, each step saves a picture of the window there (step-N.png).
+'' Opens the real window and goes through the tabs: gbx3 . -- --gui-test (needs a display; doesn't touch the
+'' user's files: the project is new and never saved). It catches the errors of building and filling the
+'' screens, which the smoke test can't see. Exit code: 0, or 1 at the first error (it is in the log).
+
+Private $hTimer As Timer
+Private $iStep As Integer
+
+Public Sub Start()
+
+    $hTimer = New Timer As "Step"
+    $hTimer.Delay = 300
+    $hTimer.Start
+
+End
+
+Private Sub Shot(iStep As Integer)
+
+    Dim sDir As String = Env["GUI_SHOTS"]
+
+    If Not sDir Or If iStep = 0 Then Return
+    Try Desktop.Screenshot(fMain.ScreenX, fMain.ScreenY, fMain.W, fMain.H).Save(sDir &/ "step-" & iStep & ".png")
+    If Error Then Print "gui-test: no picture: " & Error.Text
+
+End
+
+Public Sub Step_Timer()
+
+    Dim sLib As String = User.Home &/ ".config/s64sketch/costs/licita2003"
+    Dim c As Collection
+
+    Shot($iStep)
+    Inc $iStep
+    Select Case $iStep
+        Case 1
+            fMain.tabMain.Index = fMain.TAB_PRICING
+        Case 2
+            If Exist(sLib) Then
+                Who.Begin(Who.IMPORT)
+                c = Cmd.Run("prices.import", ["folder": sLib, "added": True])
+                Who.Done()
+                If c.Exist("error") Then Error.Raise("import: " & c["error"])
+            Else
+                Cmd.Run("resource.add", ["kind": "material", "name": "cemento", "unit": "kg", "price": 1])
+                Cmd.Run("analysis.add", ["name": "mezcla", "unit": "m3", "lines": [["resource": "MAT-0001", "qty": 300]]])
+            Endif
+            fMain.PricingTab.Reload(True)
+        Case 3
+            fMain.PricingTab.TestPages(1)
+        Case 4
+            fMain.PricingTab.TestPages(2)
+        Case 5
+            fMain.PricingTab.TestPages(3)
+        Case 6
+            fMain.PricingTab.TestPages(0)
+        Case 7
+            Cmd.Run("project.set", ["name": "GUI test"])
+            fMain.tabMain.Index = fMain.TAB_PROJECT
+        Case 8
+            fMain.Undo()
+            fMain.tabMain.Index = fMain.TAB_HISTORY
+        Case 9
+            fMain.HistoryTab.Reload()
+            fMain.tabMain.Index = fMain.TAB_BUDGET
+        Case 10
+            $hTimer.Stop
+            Print "gui-test: OK"
+            sumi.Project.RequiresSaving = False
+            Quit 0
+    End Select
+
+End
