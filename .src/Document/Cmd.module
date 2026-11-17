@@ -1,0 +1,1018 @@
+' Gambas module file
+
+'' The commands: the one way to change a project. The screens, the AI and imports all call Run, so the AI can
+'' do whatever a person can, and every change is written to the project's change log (Project.Changes): who,
+'' when, how (Who.Via), the command and its arguments, and the touched things before and after.
+''
+'' Run(command, args) returns a Collection: {"ok": True, ...results} or {"error": "why"}. Arguments and
+'' results are JSON-like (strings, numbers, booleans, Collections, arrays), so they go to the AI as they are.
+'' Things are named by Id or by code ("key").
+''
+'' Undo puts back the before of the caller's last change (a whole group: an AI script, an import), as a new
+'' "undo" entry: the log only grows. Redo undoes that undo. A change made later by someone else to the same
+'' thing blocks the undo (it would erase their work).
+''
+'' Commands (see Help): info, log, undo, redo, project.set, book.set, rubro.set, rubro.delete, charge.add,
+'' charge.set, charge.delete, resource.list, resource.get, resource.add, resource.set, resource.delete,
+'' analysis.list, analysis.get, analysis.add, analysis.set, analysis.copy, analysis.delete, analysis.addline,
+'' analysis.setline, analysis.removeline, analysis.flatten, prices.import
+
+Public Const ABSENT As String = "~absent~"      '' a snapshot of something that didn't exist
+Public Const COALESCE_SECONDS As Integer = 120  '' edits of the same field in a row become one change
+
+Private $hChange As Change                      ' the change being made
+Private $sGroup As String                       ' the group of BeginGroup
+Private $iDepth As Integer                      ' commands called by commands are part of the outer one
+
+'' THE ENTRY POINT
+
+Public Function Run(sCommand As String, Optional cArgs As Collection) As Collection
+
+    Dim cOut As Collection
+
+    If Not cArgs Then cArgs = New Collection
+    If Not sumi.Project Then Return Fail(("There is no project open."))
+    Inc $iDepth
+    Try cOut = Dispatch(LCase(sCommand), cArgs)
+    If Error Then
+        cOut = Fail(Error.Text & " (" & Error.Where & ")")
+        AppLog.Error("Cmd " & sCommand & ": " & Error.Text & " " & Error.Where, "Cmd.Run")
+    Endif
+    Dec $iDepth
+    If cOut.Exist("error") Then
+        $hChange = Null
+    Else If $hChange And If $iDepth = 0 Then
+        Finish()
+    Endif
+    Return cOut
+
+End
+
+'' The changes until EndGroup are one action (undone together)
+Public Sub BeginGroup()
+
+    $sGroup = Ids.Make("g")
+
+End
+
+Public Sub EndGroup()
+
+    $sGroup = ""
+
+End
+
+Private Function Dispatch(sCommand As String, c As Collection) As Collection
+
+    Select Case sCommand
+        Case "info"
+            Return Info()
+        Case "help"
+            Return Ok(["commands": Help()])
+        Case "log"
+            Return LogList(c)
+        Case "undo"
+            Return Undo(False)
+        Case "redo"
+            Return Undo(True)
+        Case "project.set"
+            Return ProjectSet(c)
+        Case "book.set"
+            Return BookSet(c)
+        Case "rubro.set"
+            Return RubroSet(c)
+        Case "rubro.delete"
+            Return RubroDelete(c)
+        Case "charge.add", "charge.set", "charge.delete"
+            Return ChargeCmd(sCommand, c)
+        Case "resource.list"
+            Return ResourceList(c)
+        Case "resource.get"
+            Return ResourceGet(c)
+        Case "resource.add"
+            Return ResourceAdd(c)
+        Case "resource.set"
+            Return ResourceSet(c)
+        Case "resource.delete"
+            Return ResourceDelete(c)
+        Case "analysis.list"
+            Return AnalysisList(c)
+        Case "analysis.get"
+            Return AnalysisGet(c)
+        Case "analysis.add"
+            Return AnalysisAdd(c)
+        Case "analysis.set"
+            Return AnalysisSet(c)
+        Case "analysis.copy"
+            Return AnalysisCopy(c)
+        Case "analysis.delete"
+            Return AnalysisDelete(c)
+        Case "analysis.addline", "analysis.setline", "analysis.removeline"
+            Return LineCmd(sCommand, c)
+        Case "analysis.flatten"
+            Return AnalysisFlatten(c)
+        Case "prices.import"
+            Return PricesImport(c)
+    End Select
+    Return Fail(Subst(("Unknown command &1."), sCommand))
+
+End
+
+'' What each command takes, for the AI and the help
+Public Function Help() As Collection
+
+    Dim c As New Collection
+
+    c["info"] = "{} -> the project, its counts and who you are"
+    c["log"] = "{limit?, who?, target?} -> the last changes"
+    c["undo"] = "{} -> undoes your last action"
+    c["redo"] = "{} -> redoes what you undid last"
+    c["project.set"] = "{field: value...} the Project tab's fields, as in the file: name, code, workType, use, location, city, province, parcel, plotArea, coveredArea, semiCoveredArea, floors, client, clientTaxId, clientPhone, clientEmail, startDate (yyyy-mm-dd), durationDays, workDaysPerWeek, hoursPerDay, holidays [yyyy-mm-dd...], currency, overheadPct, profitPct, taxesPct, contractMode, advancePct, retentionPct, certificatePeriod, adjustmentIndex, adjustmentBase, guaranteeDays, professionals [{role, name, registration, phone, email}...], notes, designFile"
+    c["book.set"] = "{updateCoef?, freightPerKm?} the price book's coefficients"
+    c["rubro.set"] = "{number, name}"
+    c["rubro.delete"] = "{number}"
+    c["charge.add"] = "{name, pct?, amount?, hours?} a labor charge: % of the wage, or an amount over some hours"
+    c["charge.set"] = "{index, name?, pct?, amount?, hours?}"
+    c["charge.delete"] = "{index}"
+    c["resource.list"] = "{kind?, text?, limit?} -> resources with their unit price"
+    c["resource.get"] = "{key} -> a resource (key = id or code), its prices and the analyses using it"
+    c["resource.add"] = "{kind, name, unit, code?, price?, wage?, machine?, loss?, origin?, distance?, truckLoad?, source?} -> its id and code"
+    c["resource.set"] = "{key, field: value...} fields: code, name, unit, kind, price, override, wage, loss, origin, distance, truckLoad, updated, source, machine (null removes it), machine.<power|cost|residualPct|lifeHours|hoursPerYear|interestPct|repairsPct|fuel|fuelPrice|fuelUse|lubricantPct>"
+    c["resource.delete"] = "{key, force?} refused while analyses use it, unless force"
+    c["analysis.list"] = "{rubro?, text?, limit?} -> analyses with their direct cost and price"
+    c["analysis.get"] = "{key} -> an analysis with its lines, parts A/B/C, direct cost, price and problems"
+    c["analysis.add"] = "{name, unit, rubro?, code?, laborYield?, equipmentYield?, note?, lines? [{resource|analysis: key, qty}...]} -> its id and code"
+    c["analysis.set"] = "{key, field: value...} fields: code, name, unit, rubro, laborYield, equipmentYield, note"
+    c["analysis.copy"] = "{key, code?, name?} -> the new id and code"
+    c["analysis.delete"] = "{key, force?} refused while other analyses use it, unless force"
+    c["analysis.addline"] = "{key, resource|analysis: key, qty}"
+    c["analysis.setline"] = "{key, index, qty}"
+    c["analysis.removeline"] = "{key, index}"
+    c["analysis.flatten"] = "{key} sub-analyses become their resources (the link is lost)"
+    c["prices.import"] = "{folder, added?} imports a CSV library (Tincho's licita2003 format)"
+    Return c
+
+End
+
+'' RESULTS
+
+Public Function Ok(Optional c As Collection) As Collection
+
+    If Not c Then c = New Collection
+    c["ok"] = True
+    Return c
+
+End
+
+Public Function Fail(sWhy As String) As Collection
+
+    Return ["error": sWhy]
+
+End
+
+'' THE LOG
+
+'' A change starts: who, the command, the arguments, the summary
+Private Sub Start(sCommand As String, cArgs As Collection, sSummary As String)
+
+    If $hChange Then                ' a command inside another one: it is part of it
+        If sSummary Then $hChange.Summary &= "; " & sSummary
+        Return
+    Endif
+    $hChange = New Change
+    $hChange.Who = Who.Name()
+    $hChange.UserId = Who.UserId()
+    $hChange.Via = Who.Via
+    $hChange.Model = Who.Model
+    $hChange.Command = sCommand
+    $hChange.Params = cArgs
+    $hChange.Summary = sSummary
+    $hChange.Group = $sGroup
+
+End
+
+'' sTarget is about to change: its before is kept (once)
+Private Sub Touch(sTarget As String)
+
+    If Not $hChange Then Return
+    If $hChange.Targets.Exist(sTarget) Then Return
+    $hChange.Targets.Add(sTarget)
+    $hChange.Before[sTarget] = Snapshot(sTarget)
+
+End
+
+Private Sub Finish()
+
+    Dim h As Change = $hChange
+    Dim sTarget As String
+    Dim hLast As Change
+
+    $hChange = Null
+    For Each sTarget In h.Targets
+        If sTarget <> "prices" Then h.After[sTarget] = Snapshot(sTarget)
+    Next
+
+    ' the same field edited again (typing in a box): one change
+    If sumi.Project.Changes.Count Then
+        hLast = sumi.Project.Changes[sumi.Project.Changes.Max]
+        If CanCoalesce(hLast, h) Then
+            hLast.After = h.After
+            hLast.Params = h.Params
+            hLast.Summary = h.Summary
+            hLast.When = h.When
+            sumi.Changed()
+            Return
+        Endif
+    Endif
+
+    sumi.Project.Changes.Add(h)
+    sumi.Changed()
+
+End
+
+Private Function CanCoalesce(hLast As Change, h As Change) As Boolean
+
+    Dim sKey As String
+
+    If Not (h.Command Like "*.set*") Then Return False
+    If hLast.Command <> h.Command Or If hLast.UserId <> h.UserId Or If hLast.Via <> h.Via Then Return False
+    If hLast.UndoneBy Or If hLast.UndoOf Or If h.Group Or If hLast.Group Then Return False
+    If hLast.Targets.Join() <> h.Targets.Join() Then Return False
+    If DateDiff(Project.ReadDate(hLast.When, Now), Project.ReadDate(h.When, Now), gb.Second) > COALESCE_SECONDS Then Return False
+    ' the same fields
+    If hLast.Params.Count <> h.Params.Count Then Return False
+    For Each sKey In KeysOf(h.Params)
+        If Not hLast.Params.Exist(sKey) Then Return False
+    Next
+    If h.Params.Exist("index") And If hLast.Params["index"] <> h.Params["index"] Then Return False
+    Return True
+
+End
+
+Private Function KeysOf(c As Collection) As String[]
+
+    Dim a As New String[]
+    Dim v As Variant
+
+    For Each v In c
+        a.Add(c.Key)
+    Next
+    Return a
+
+End
+
+'' The state of a target, as JSON (ABSENT if it doesn't exist)
+Public Function Snapshot(sTarget As String) As Variant
+
+    Dim p As Project = sumi.Project
+    Dim b As PriceBook = p.Prices
+    Dim sId As String
+    Dim c As Collection
+    Dim a As Variant[]
+    Dim h As LaborCharge
+
+    If sTarget Begins "resource:" Then
+        sId = Mid$(sTarget, 10)
+        If Not b.Resources.Exist(sId) Then Return ABSENT
+        Return b.Resources[sId].ToJson()
+    Else If sTarget Begins "analysis:" Then
+        sId = Mid$(sTarget, 10)
+        If Not b.Analyses.Exist(sId) Then Return ABSENT
+        Return b.Analyses[sId].ToJson()
+    Endif
+    Select Case sTarget
+        Case "project"
+            c = p.ToJson()
+            c.Remove("prices")
+            c.Remove("changes")
+            c.Remove("modified")
+            Return c
+        Case "book"
+            Return ["updateCoef": b.UpdateCoef, "freightPerKm": b.FreightPerKm, "source": b.Source]
+        Case "rubros"
+            Return b.RubrosJson()
+        Case "charges"
+            a = New Variant[]
+            For Each h In b.Charges
+                a.Add(h.ToJson())
+            Next
+            Return a
+        Case "prices"
+            Return b.ToJson()
+    End Select
+    Return ABSENT
+
+End
+
+'' Puts a target back as a snapshot says
+Public Sub Restore(sTarget As String, v As Variant)
+
+    Dim p As Project = sumi.Project
+    Dim b As PriceBook = p.Prices
+    Dim sId As String
+    Dim c As Collection
+    Dim w As Variant
+    Dim r As Resource
+    Dim a As Analysis
+
+    If sTarget Begins "resource:" Then
+        sId = Mid$(sTarget, 10)
+        If IsAbsent(v) Then
+            If b.Resources.Exist(sId) Then b.Resources.Remove(sId)
+        Else
+            r = Resource.FromJson(v)
+            b.Resources[sId] = r
+        Endif
+        Return
+    Else If sTarget Begins "analysis:" Then
+        sId = Mid$(sTarget, 10)
+        If IsAbsent(v) Then
+            If b.Analyses.Exist(sId) Then b.Analyses.Remove(sId)
+        Else
+            a = Analysis.FromJson(v)
+            b.Analyses[sId] = a
+        Endif
+        Return
+    Endif
+    Select Case sTarget
+        Case "project"
+            p.FromJson(v)
+        Case "book"
+            c = v
+            b.UpdateCoef = c["updateCoef"]
+            b.FreightPerKm = c["freightPerKm"]
+            b.Source = c["source"]
+        Case "rubros"
+            b.Rubros.Clear
+            For Each w In v
+                If w["name"] Then b.Rubros[CStr(w["number"])] = w["name"]
+            Next
+        Case "charges"
+            b.Charges.Clear
+            For Each w In v
+                b.Charges.Add(LaborCharge.FromJson(w))
+            Next
+        Case "prices"
+            p.Prices = New PriceBook
+            p.Prices.FromJson(v)
+    End Select
+
+End
+
+Private Function IsAbsent(v As Variant) As Boolean
+
+    If TypeOf(v) = gb.String And If v = ABSENT Then Return True
+    Return IsNull(v)
+
+End
+
+Private Function SameSnapshot(v1 As Variant, v2 As Variant) As Boolean
+
+    Return JSON.Encode(v1) = JSON.Encode(v2)
+
+End
+
+'' Undo the caller's last action; or (bRedo) undo the caller's last undo, if nothing of theirs came after it
+Private Function Undo(bRedo As Boolean) As Collection
+
+    Dim aChanges As Change[] = sumi.Project.Changes
+    Dim i As Integer
+    Dim h, hFound As Change
+    Dim aGroup As New Change[]
+    Dim sTarget As String
+    Dim sMe As String = Who.UserId()
+    Dim hNew As Change
+
+    For i = aChanges.Max DownTo 0
+        h = aChanges[i]
+        If h.UserId <> sMe Then Continue
+        If bRedo Then
+            ' the last thing I did must be an undo that is still in force
+            If h.Command = "undo" And If Not h.UndoneBy Then hFound = h
+            Break
+        Endif
+        If h.UndoneBy Or If h.Command = "undo" Or If h.Command = "redo" Then Continue
+        hFound = h
+        Break
+    Next
+    If Not hFound Then Return Fail(IIf(bRedo, ("Nothing to redo."), ("Nothing to undo.")))
+
+    ' its whole group, newest first
+    If hFound.Group Then
+        For i = aChanges.Max DownTo 0
+            If aChanges[i].Group = hFound.Group And If Not aChanges[i].UndoneBy And If aChanges[i].Command <> "undo" Then aGroup.Add(aChanges[i])
+        Next
+    Else
+        aGroup.Add(hFound)
+    Endif
+
+    ' nobody changed those things since (where the after is known)
+    For Each h In aGroup
+        For Each sTarget In h.Targets
+            If Not h.After.Exist(sTarget) Then Continue
+            If Not SameSnapshot(Snapshot(sTarget), h.After[sTarget]) Then Return Fail(Subst(("&1 changed after that (&2): it can't be undone without losing that work."), sTarget, LastChangeOf(sTarget, h)))
+        Next
+    Next
+
+    hNew = New Change
+    hNew.Who = Who.Name()
+    hNew.UserId = sMe
+    hNew.Via = Who.Via
+    hNew.Model = Who.Model
+    hNew.Command = IIf(bRedo, "redo", "undo")
+    hNew.Params = New Collection
+    hNew.UndoOf = hFound.Id
+    If bRedo Then
+        hNew.Summary = ("Redo: ") & Mid$(hFound.Summary, Len(("Undo: ")) + 1)
+    Else
+        hNew.Summary = ("Undo: ") & hFound.Summary
+    Endif
+    For Each h In aGroup
+        For Each sTarget In h.Targets
+            If Not hNew.Targets.Exist(sTarget) Then
+                hNew.Targets.Add(sTarget)
+                hNew.Before[sTarget] = Snapshot(sTarget)
+            Endif
+            Restore(sTarget, h.Before[sTarget])
+        Next
+    Next
+    ' a redo makes the undone changes count again
+    If bRedo Then
+        For Each h In aChanges
+            If h.UndoneBy = hFound.Id Then h.UndoneBy = ""
+        Next
+    Endif
+    For Each h In aGroup
+        h.UndoneBy = hNew.Id
+    Next
+    For Each sTarget In hNew.Targets
+        If sTarget <> "prices" Then hNew.After[sTarget] = Snapshot(sTarget)
+    Next
+    sumi.Project.Changes.Add(hNew)
+    sumi.Changed()
+    Return Ok(["summary": hNew.Summary])
+
+End
+
+'' Who changed a target after change h
+Private Function LastChangeOf(sTarget As String, hAfter As Change) As String
+
+    Dim i As Integer
+    Dim h As Change
+
+    For i = sumi.Project.Changes.Max DownTo 0
+        h = sumi.Project.Changes[i]
+        If h = hAfter Then Break
+        If h.Targets.Exist(sTarget) Then Return h.Who & ", " & h.When
+    Next
+    Return "?"
+
+End
+
+Private Function LogList(c As Collection) As Collection
+
+    Dim aOut As New Variant[]
+    Dim i As Integer
+    Dim h As Change
+    Dim iLimit As Integer = 50
+
+    If c.Exist("limit") Then iLimit = c["limit"]
+    For i = sumi.Project.Changes.Max DownTo 0
+        h = sumi.Project.Changes[i]
+        If c.Exist("who") And If InStr(h.Who, c["who"], 1, gb.IgnoreCase) = 0 Then Continue
+        If c.Exist("target") And If Not h.Targets.Exist(c["target"]) Then Continue
+        aOut.Add(["id": h.Id, "when": h.When, "who": h.Who, "via": h.Via & IIf(h.Model, " " & h.Model, ""), "summary": h.Summary, "undone": h.UndoneBy <> ""])
+        If aOut.Count >= iLimit Then Break
+    Next
+    Return Ok(["changes": aOut])
+
+End
+
+'' INFO
+
+Private Function Info() As Collection
+
+    Dim p As Project = sumi.Project
+
+    Return Ok(["name": p.Name, "client": p.Client, "location": p.Location, "file": p.FileName, "currency": p.Currency, "startDate": Format(p.StartDate, "yyyy-mm-dd"), "endDate": Format(p.EndDate(), "yyyy-mm-dd"), "priceFactor": p.PriceFactor(), "updateCoef": p.Prices.UpdateCoef, "resources": p.Prices.Resources.Count, "analyses": p.Prices.Analyses.Count, "rubros": p.Prices.Rubros.Count, "changes": p.Changes.Count, "you": Who.Name(), "via": Who.Via])
+
+End
+
+'' THE PROJECT
+
+Private Function ProjectSet(c As Collection) As Collection
+
+    Dim aAllowed As String[]
+    Dim cSet As New Collection
+    Dim v As Variant
+    Dim sKey As String
+
+    aAllowed = KeysOf(sumi.Project.ToJson())
+    For Each sKey In ["prices", "created", "modified", "changes"]
+        If aAllowed.Exist(sKey) Then aAllowed.Remove(aAllowed.Find(sKey))
+    Next
+    For Each v In c
+        If Not aAllowed.Exist(c.Key) Then Return Fail(Subst(("The project has no field &1."), c.Key))
+        cSet[c.Key] = v
+    Next
+    If cSet.Count = 0 Then Return Fail(("Nothing to set."))
+    Start("project.set", c, ("Project: ") & KeysOf(cSet).Join(", "))
+    Touch("project")
+    sumi.Project.FromJson(cSet)
+    Return Ok()
+
+End
+
+'' THE PRICE BOOK
+
+Private Function BookSet(c As Collection) As Collection
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim sKey As String
+
+    If c.Count = 0 Then Return Fail(("Nothing to set."))
+    For Each sKey In KeysOf(c)
+        If Not ["updateCoef", "freightPerKm"].Exist(sKey) Then Return Fail(Subst(("The price book has no field &1."), sKey))
+    Next
+    Start("book.set", c, ("Price coefficients: ") & KeysOf(c).Join(", "))
+    Touch("book")
+    If c.Exist("updateCoef") Then b.UpdateCoef = c["updateCoef"]
+    If c.Exist("freightPerKm") Then b.FreightPerKm = c["freightPerKm"]
+    Return Ok()
+
+End
+
+Private Function RubroSet(c As Collection) As Collection
+
+    Dim iNumber As Integer
+
+    If Not c.Exist("number") Or If Not c["name"] Then Return Fail(("rubro.set needs a number and a name."))
+    iNumber = c["number"]
+    If iNumber <= 0 Then Return Fail(("A rubro number is 1 or more."))
+    Start("rubro.set", c, Subst(("Rubro &1: &2"), iNumber, c["name"]))
+    Touch("rubros")
+    sumi.Project.Prices.Rubros[CStr(iNumber)] = c["name"]
+    Return Ok()
+
+End
+
+Private Function RubroDelete(c As Collection) As Collection
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim a As Analysis
+    Dim n As Integer
+
+    If Not b.Rubros.Exist(CStr(c["number"])) Then Return Fail(Subst(("There is no rubro &1."), c["number"]))
+    For Each a In b.Analyses
+        If a.Rubro = c["number"] Then Inc n
+    Next
+    If n And If Not c["force"] Then Return Fail(Subst(("&1 analyses are in rubro &2."), n, c["number"]))
+    Start("rubro.delete", c, Subst(("Rubro &1 deleted"), c["number"]))
+    Touch("rubros")
+    b.Rubros.Remove(CStr(c["number"]))
+    Return Ok()
+
+End
+
+Private Function ChargeCmd(sCommand As String, c As Collection) As Collection
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim h As LaborCharge
+    Dim i As Integer = -1
+
+    If sCommand <> "charge.add" Then
+        If Not c.Exist("index") Then Return Fail(("It needs the index of the charge."))
+        i = c["index"]
+        If i < 0 Or If i > b.Charges.Max Then Return Fail(Subst(("There is no charge &1."), i))
+    Endif
+    Select Case sCommand
+        Case "charge.add"
+            Start(sCommand, c, Subst(("Labor charge added: &1"), c["name"]))
+            Touch("charges")
+            h = New LaborCharge
+            b.Charges.Add(h)
+        Case "charge.set"
+            Start(sCommand, c, Subst(("Labor charge &1 changed"), b.Charges[i].Name))
+            Touch("charges")
+            h = b.Charges[i]
+        Case "charge.delete"
+            Start(sCommand, c, Subst(("Labor charge deleted: &1"), b.Charges[i].Name))
+            Touch("charges")
+            b.Charges.Remove(i)
+            Return Ok()
+    End Select
+    If c.Exist("name") Then h.Name = c["name"]
+    If c.Exist("pct") Then h.Pct = c["pct"]
+    If c.Exist("amount") Then h.Amount = c["amount"]
+    If c.Exist("hours") Then h.Hours = c["hours"]
+    Return Ok()
+
+End
+
+'' RESOURCES
+
+Private Function FindRes(c As Collection) As Resource
+
+    If Not c["key"] Then Return Null
+    Return sumi.Project.Prices.FindResource(CStr(c["key"]))
+
+End
+
+Public Function DescribeResource(r As Resource) As Collection
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim c As Collection = r.ToJson()
+
+    c["unitPrice"] = b.PriceOf(r)
+    c["basePrice"] = b.BasePrice(r)
+    If r.HasCalculation() Then c["calculated"] = b.CalculatedPrice(r)
+    If b.Freight(r) Then c["freight"] = b.Freight(r)
+    Return c
+
+End
+
+Private Function ResourceList(c As Collection) As Collection
+
+    Dim aOut As New Variant[]
+    Dim r As Resource
+    Dim o As Object
+    Dim iLimit As Integer = 1000000
+    Dim b As PriceBook = sumi.Project.Prices
+
+    If c.Exist("limit") Then iLimit = c["limit"]
+    For Each o In PriceBook.SortedByCode(b.Resources)
+        r = o
+        If c["kind"] And If r.Kind <> c["kind"] Then Continue
+        If c["text"] And If InStr(r.Code & " " & r.Name, c["text"], 1, gb.IgnoreCase) = 0 Then Continue
+        aOut.Add(["id": r.Id, "code": r.Code, "name": r.Name, "unit": r.Unit, "kind": r.Kind, "unitPrice": b.PriceOf(r)])
+        If aOut.Count >= iLimit Then Break
+    Next
+    Return Ok(["resources": aOut])
+
+End
+
+Private Function ResourceGet(c As Collection) As Collection
+
+    Dim r As Resource = FindRes(c)
+    Dim cOut As Collection
+    Dim aUsed As New String[]
+    Dim a As Analysis
+
+    If Not r Then Return Fail(Subst(("There is no resource &1."), c["key"]))
+    cOut = DescribeResource(r)
+    For Each a In sumi.Project.Prices.UsedBy(r.Id, False)
+        aUsed.Add(a.Code)
+    Next
+    cOut["usedBy"] = aUsed
+    Return Ok(["resource": cOut])
+
+End
+
+Private Function ResourceAdd(c As Collection) As Collection
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim r As New Resource
+    Dim sBad As String
+    Dim cSet As New Collection
+    Dim v As Variant
+
+    If c["kind"] And If Not Resource.Kinds().Exist(c["kind"]) Then Return Fail(Subst(("Unknown kind &1: material, labor or equipment."), c["kind"]))
+    If Not Trim(c["name"]) Then Return Fail(("A resource needs a name."))
+    If c["code"] And If b.ResourceByCode(CStr(c["code"])) Then Return Fail(Subst(("There is already a resource &1."), c["code"]))
+    For Each v In c
+        If c.Key <> "id" Then cSet[c.Key] = v
+    Next
+    If c["kind"] Then r.Kind = c["kind"]
+    sBad = r.Apply(cSet)
+    If sBad Then Return Fail(Subst(("Resources have no field &1."), sBad))
+    If Not r.Code Then r.Code = b.NextResourceCode(r.Kind)
+    If Not r.Updated And If c.Exist("price") Then r.Updated = Format(Now, "yyyy-mm-dd")
+    Start("resource.add", c, Subst(("Resource added: &1 &2"), r.Code, r.Name))
+    Touch("resource:" & r.Id)
+    b.Resources[r.Id] = r
+    Return Ok(["id": r.Id, "code": r.Code])
+
+End
+
+Private Function ResourceSet(c As Collection) As Collection
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim r As Resource = FindRes(c)
+    Dim cSet As New Collection
+    Dim v As Variant
+    Dim sBad As String
+    Dim hTest As Resource
+
+    If Not r Then Return Fail(Subst(("There is no resource &1."), c["key"]))
+    For Each v In c
+        If c.Key <> "key" Then cSet[c.Key] = v
+    Next
+    If cSet.Count = 0 Then Return Fail(("Nothing to set."))
+    If cSet.Exist("code") And If CStr(cSet["code"]) <> r.Code And If b.ResourceByCode(CStr(cSet["code"])) Then Return Fail(Subst(("There is already a resource &1."), cSet["code"]))
+    If cSet.Exist("code") And If Not Trim(CStr(cSet["code"])) Then Return Fail(("A code can't be empty."))
+    ' try it on a copy first: a bad field changes nothing
+    hTest = Resource.FromJson(r.ToJson())
+    sBad = hTest.Apply(cSet)
+    If sBad Then Return Fail(Subst(("Resources have no field &1 (or a bad value)."), sBad))
+    Start("resource.set", c, Subst(("Resource &1: &2"), r.Code, KeysOf(cSet).Join(", ")))
+    Touch("resource:" & r.Id)
+    r.Apply(cSet)
+    If cSet.Exist("price") And If Not cSet.Exist("updated") Then r.Updated = Format(Now, "yyyy-mm-dd")
+    Return Ok()
+
+End
+
+Private Function ResourceDelete(c As Collection) As Collection
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim r As Resource = FindRes(c)
+    Dim aUsed As Analysis[]
+
+    If Not r Then Return Fail(Subst(("There is no resource &1."), c["key"]))
+    aUsed = b.UsedBy(r.Id, False)
+    If aUsed.Count And If Not c["force"] Then Return Fail(Subst(("&1 analyses use &2 (the first: &3)."), aUsed.Count, r.Code, aUsed[0].Code))
+    Start("resource.delete", c, Subst(("Resource deleted: &1 &2"), r.Code, r.Name))
+    Touch("resource:" & r.Id)
+    b.Resources.Remove(r.Id)
+    Return Ok()
+
+End
+
+'' ANALYSES
+
+Private Function FindAna(c As Collection) As Analysis
+
+    If Not c["key"] Then Return Null
+    Return sumi.Project.Prices.FindAnalysis(CStr(c["key"]))
+
+End
+
+Public Function DescribeAnalysis(a As Analysis) As Collection
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim c As Collection = a.ToJson()
+    Dim f As Float[] = b.Parts(a)
+    Dim aLines As New Variant[]
+    Dim l As AnalysisLine
+    Dim cLine As Collection
+    Dim i As Integer
+
+    For i = 0 To a.Lines.Max
+        l = a.Lines[i]
+        cLine = ["index": i, "qty": l.Quantity, "cost": b.LineCost(a, l)]
+        If l.IsAnalysis Then
+            cLine["analysis"] = l.Ref
+            If b.Analyses.Exist(l.Ref) Then
+                cLine["code"] = b.Analyses[l.Ref].Code
+                cLine["name"] = b.Analyses[l.Ref].Name
+                cLine["unit"] = b.Analyses[l.Ref].Unit
+                cLine["unitPrice"] = b.Direct(b.Analyses[l.Ref])
+            Endif
+        Else
+            cLine["resource"] = l.Ref
+            If b.Resources.Exist(l.Ref) Then
+                cLine["code"] = b.Resources[l.Ref].Code
+                cLine["name"] = b.Resources[l.Ref].Name
+                cLine["unit"] = b.Resources[l.Ref].Unit
+                cLine["kind"] = b.Resources[l.Ref].Kind
+                cLine["unitPrice"] = b.PriceOf(b.Resources[l.Ref])
+            Endif
+        Endif
+        aLines.Add(cLine)
+    Next
+    c["lines"] = aLines
+    c["materials"] = f[0]
+    c["equipment"] = f[1]
+    c["labor"] = f[2]
+    c["direct"] = f[0] + f[1] + f[2]
+    c["price"] = (f[0] + f[1] + f[2]) * sumi.Project.PriceFactor()
+    c["problems"] = b.Problems(a)
+    Return c
+
+End
+
+Private Function AnalysisList(c As Collection) As Collection
+
+    Dim aOut As New Variant[]
+    Dim a As Analysis
+    Dim o As Object
+    Dim iLimit As Integer = 1000000
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim fFactor As Float = sumi.Project.PriceFactor()
+    Dim fDirect As Float
+
+    If c.Exist("limit") Then iLimit = c["limit"]
+    For Each o In PriceBook.SortedByCode(b.Analyses)
+        a = o
+        If c["rubro"] And If a.Rubro <> c["rubro"] Then Continue
+        If c["text"] And If InStr(a.Code & " " & a.Name, c["text"], 1, gb.IgnoreCase) = 0 Then Continue
+        fDirect = b.Direct(a)
+        aOut.Add(["id": a.Id, "code": a.Code, "name": a.Name, "unit": a.Unit, "rubro": a.Rubro, "direct": fDirect, "price": fDirect * fFactor])
+        If aOut.Count >= iLimit Then Break
+    Next
+    Return Ok(["analyses": aOut])
+
+End
+
+Private Function AnalysisGet(c As Collection) As Collection
+
+    Dim a As Analysis = FindAna(c)
+    Dim cOut As Collection
+    Dim aUsed As New String[]
+    Dim u As Analysis
+
+    If Not a Then Return Fail(Subst(("There is no analysis &1."), c["key"]))
+    cOut = DescribeAnalysis(a)
+    For Each u In sumi.Project.Prices.UsedBy(a.Id, True)
+        aUsed.Add(u.Code)
+    Next
+    cOut["usedBy"] = aUsed
+    Return Ok(["analysis": cOut])
+
+End
+
+'' A line from {resource: key, qty} or {analysis: key, qty}; Null and sWhy if it can't be made
+Private Function MakeLine(c As Collection, hFor As Analysis, ByRef sWhy As String) As AnalysisLine
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim r As Resource
+    Dim a As Analysis
+    Dim fQty As Float
+
+    If c.Exist("qty") Then fQty = c["qty"] Else fQty = 1
+    If c["analysis"] Then
+        a = b.FindAnalysis(CStr(c["analysis"]))
+        If Not a Then
+            sWhy = Subst(("There is no analysis &1."), c["analysis"])
+            Return Null
+        Endif
+        If hFor And If b.Contains(a, hFor.Id) Then
+            sWhy = Subst(("&1 uses &2: it would be a loop."), a.Code, hFor.Code)
+            Return Null
+        Endif
+        Return AnalysisLine.Make(True, a.Id, fQty)
+    Endif
+    r = b.FindResource(CStr(c["resource"]))
+    If Not r Then
+        sWhy = Subst(("There is no resource &1."), c["resource"])
+        Return Null
+    Endif
+    Return AnalysisLine.Make(False, r.Id, fQty)
+
+End
+
+Private Function AnalysisAdd(c As Collection) As Collection
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim a As New Analysis
+    Dim cSet As New Collection
+    Dim v As Variant
+    Dim sBad, sWhy As String
+    Dim l As AnalysisLine
+
+    If Not Trim(c["name"]) Then Return Fail(("An analysis needs a name."))
+    If c["code"] And If b.AnalysisByCode(CStr(c["code"])) Then Return Fail(Subst(("There is already an analysis &1."), c["code"]))
+    For Each v In c
+        If c.Key <> "id" And If c.Key <> "lines" Then cSet[c.Key] = v
+    Next
+    sBad = a.Apply(cSet)
+    If sBad Then Return Fail(Subst(("Analyses have no field &1."), sBad))
+    If Not a.Code Then a.Code = b.NextAnalysisCode()
+    If c.Exist("lines") Then
+        For Each v In c["lines"]
+            l = MakeLine(v, a, ByRef sWhy)
+            If Not l Then Return Fail(sWhy)
+            a.Lines.Add(l)
+        Next
+    Endif
+    Start("analysis.add", c, Subst(("Analysis added: &1 &2"), a.Code, a.Name))
+    Touch("analysis:" & a.Id)
+    b.Analyses[a.Id] = a
+    Return Ok(["id": a.Id, "code": a.Code])
+
+End
+
+Private Function AnalysisSet(c As Collection) As Collection
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim a As Analysis = FindAna(c)
+    Dim cSet As New Collection
+    Dim v As Variant
+    Dim sBad As String
+    Dim hTest As Analysis
+
+    If Not a Then Return Fail(Subst(("There is no analysis &1."), c["key"]))
+    For Each v In c
+        If c.Key <> "key" Then cSet[c.Key] = v
+    Next
+    If cSet.Count = 0 Then Return Fail(("Nothing to set."))
+    If cSet.Exist("lines") Then Return Fail(("Lines change with analysis.addline, setline and removeline."))
+    If cSet.Exist("code") And If CStr(cSet["code"]) <> a.Code And If b.AnalysisByCode(CStr(cSet["code"])) Then Return Fail(Subst(("There is already an analysis &1."), cSet["code"]))
+    If cSet.Exist("code") And If Not Trim(CStr(cSet["code"])) Then Return Fail(("A code can't be empty."))
+    hTest = Analysis.FromJson(a.ToJson())
+    sBad = hTest.Apply(cSet)
+    If sBad Then Return Fail(Subst(("Analyses have no field &1 (or a bad value)."), sBad))
+    Start("analysis.set", c, Subst(("Analysis &1: &2"), a.Code, KeysOf(cSet).Join(", ")))
+    Touch("analysis:" & a.Id)
+    a.Apply(cSet)
+    Return Ok()
+
+End
+
+Private Function AnalysisCopy(c As Collection) As Collection
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim a As Analysis = FindAna(c)
+    Dim n As Analysis
+    Dim sCode As String
+
+    If Not a Then Return Fail(Subst(("There is no analysis &1."), c["key"]))
+    sCode = IIf(c["code"], CStr(c["code"]), b.NextAnalysisCode())
+    If b.AnalysisByCode(sCode) Then Return Fail(Subst(("There is already an analysis &1."), sCode))
+    n = a.Copy(sCode)
+    If c["name"] Then n.Name = c["name"]
+    Start("analysis.copy", c, Subst(("Analysis &1 copied as &2"), a.Code, n.Code))
+    Touch("analysis:" & n.Id)
+    b.Analyses[n.Id] = n
+    Return Ok(["id": n.Id, "code": n.Code])
+
+End
+
+Private Function AnalysisDelete(c As Collection) As Collection
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim a As Analysis = FindAna(c)
+    Dim aUsed As Analysis[]
+
+    If Not a Then Return Fail(Subst(("There is no analysis &1."), c["key"]))
+    aUsed = b.UsedBy(a.Id, True)
+    If aUsed.Count And If Not c["force"] Then Return Fail(Subst(("&1 analyses use &2 (the first: &3)."), aUsed.Count, a.Code, aUsed[0].Code))
+    Start("analysis.delete", c, Subst(("Analysis deleted: &1 &2"), a.Code, a.Name))
+    Touch("analysis:" & a.Id)
+    b.Analyses.Remove(a.Id)
+    Return Ok()
+
+End
+
+Private Function LineCmd(sCommand As String, c As Collection) As Collection
+
+    Dim a As Analysis = FindAna(c)
+    Dim l As AnalysisLine
+    Dim i As Integer
+    Dim sWhy As String
+
+    If Not a Then Return Fail(Subst(("There is no analysis &1."), c["key"]))
+    If sCommand <> "analysis.addline" Then
+        If Not c.Exist("index") Then Return Fail(("It needs the index of the line."))
+        i = c["index"]
+        If i < 0 Or If i > a.Lines.Max Then Return Fail(Subst(("Analysis &1 has no line &2."), a.Code, i))
+    Endif
+    Select Case sCommand
+        Case "analysis.addline"
+            l = MakeLine(c, a, ByRef sWhy)
+            If Not l Then Return Fail(sWhy)
+            Start(sCommand, c, Subst(("Analysis &1: line added, &2 &3"), a.Code, l.Quantity, sumi.Project.Prices.DescribeRef(l)))
+            Touch("analysis:" & a.Id)
+            a.Lines.Add(l)
+            Return Ok(["index": a.Lines.Max])
+        Case "analysis.setline"
+            If Not c.Exist("qty") Then Return Fail(("It needs the quantity (qty)."))
+            Start(sCommand, c, Subst(("Analysis &1: &2 now &3"), a.Code, sumi.Project.Prices.DescribeRef(a.Lines[i]), c["qty"]))
+            Touch("analysis:" & a.Id)
+            a.Lines[i].Quantity = c["qty"]
+        Case "analysis.removeline"
+            Start(sCommand, c, Subst(("Analysis &1: line removed, &2"), a.Code, sumi.Project.Prices.DescribeRef(a.Lines[i])))
+            Touch("analysis:" & a.Id)
+            a.Lines.Remove(i)
+    End Select
+    Return Ok()
+
+End
+
+Private Function AnalysisFlatten(c As Collection) As Collection
+
+    Dim a As Analysis = FindAna(c)
+
+    If Not a Then Return Fail(Subst(("There is no analysis &1."), c["key"]))
+    Start("analysis.flatten", c, Subst(("Analysis &1 flattened"), a.Code))
+    Touch("analysis:" & a.Id)
+    sumi.Project.Prices.Flatten(a)
+    Return Ok()
+
+End
+
+'' IMPORT
+
+Private Function PricesImport(c As Collection) As Collection
+
+    Dim sFolder As String = c["folder"]
+
+    If Not sFolder Then Return Fail(("It needs the folder of the library."))
+    Start("prices.import", c, Subst(("Price library imported: &1"), File.Name(sFolder)))
+    Touch("prices")
+    If LibraryImport.ImportFolder(sumi.Project.Prices, sFolder, c["added"]) Then
+        $hChange = Null
+        Return Fail(LibraryImport.Report.Join("\n"))
+    Endif
+    Return Ok(["report": LibraryImport.Report])
+
+End

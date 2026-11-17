@@ -19,8 +19,10 @@ Public Function Run() As Integer
     TestProjectFile()
     TestSchedule()
     TestCsv()
+    TestIds()
     TestPrices()
     TestImport()
+    TestCmd()
     TestIcons()
 
     Shell "rm -rf " & Shell$($sTemp) Wait
@@ -155,84 +157,81 @@ Private Sub TestCsv()
 
 End
 
+Private $cIds As Collection                     ' code -> Id of the small book
+
 '' A small book: cement, sand, a laborer, a machine; mortar; masonry using mortar
 Private Function SmallBook() As PriceBook
 
     Dim b As New PriceBook
-    Dim r As Resource
     Dim a As Analysis
-    Dim l As LaborCategory
-    Dim m As Machine
 
+    $cIds = New Collection
     b.DefaultCharges()
-    r = New Resource
-    r.Code = 2001
-    r.Name = "cement"
-    r.Unit = "t"
-    r.Price = 100
-    b.Resources["2001"] = r
-    r = New Resource
-    r.Code = 3001
-    r.Name = "sand"
-    r.Unit = "m3"
-    r.Price = 10
-    r.LossPct = 10
-    b.Resources["3001"] = r
-    r = New Resource
-    r.Code = 90009
-    r.Name = "ayudante"
-    r.Kind = Resource.LABOR
-    r.Unit = "h"
-    r.Price = 3
-    b.Resources["90009"] = r
-    r = New Resource
-    r.Code = 100001
-    r.Name = "excavadora"
-    r.Kind = Resource.EQUIPMENT
-    r.Unit = "h"
-    r.Price = 90
-    b.Resources["100001"] = r
-    l = New LaborCategory
-    l.Code = 90009
-    l.Wage = 1.36
-    b.Labor["90009"] = l
-    ' licita2003's "equ" row 1
-    m = New Machine
-    m.Code = 100001
-    m.Power = 110
-    m.Cost = 390000
-    m.FuelPrice = 1.35
-    b.Machines["100001"] = m
+    AddRes(b, "2001", "cement", "t", Resource.MATERIAL, 100)
+    AddRes(b, "3001", "sand", "m3", Resource.MATERIAL, 10).LossPct = 10
+    AddRes(b, "90009", "ayudante", "h", Resource.LABOR, 3).PriceOverride = True
+    b.Resources[$cIds["90009"]].Wage = 1.36
+    With AddRes(b, "100001", "excavadora", "h", Resource.EQUIPMENT, 90)
+        .PriceOverride = True
+        ' licita2003's "equ" row 1
+        .MachineCalc = New Machine
+        .MachineCalc.Power = 110
+        .MachineCalc.Cost = 390000
+        .MachineCalc.FuelPrice = 1.35
+    End With
 
     a = New Analysis
-    a.Code = 1
+    a.Code = "1"
     a.Name = "mortar"
     a.Unit = "m3"
     a.LaborYield = 2
-    AddLine(a, False, 2001, 0.3)
-    AddLine(a, False, 3001, 1)
-    AddLine(a, False, 90009, 4)
-    b.Analyses["1"] = a
+    a.Lines.Add(AnalysisLine.Make(False, $cIds["2001"], 0.3))
+    a.Lines.Add(AnalysisLine.Make(False, $cIds["3001"], 1))
+    a.Lines.Add(AnalysisLine.Make(False, $cIds["90009"], 4))
+    b.Analyses[a.Id] = a
+    $cIds["a1"] = a.Id
     a = New Analysis
-    a.Code = 2
+    a.Code = "2"
     a.Name = "masonry"
     a.Unit = "m2"
-    AddLine(a, True, 1, 0.5)
-    AddLine(a, False, 100001, 0.1)
-    AddLine(a, False, 2001, 0.1)
-    b.Analyses["2"] = a
+    a.Lines.Add(AnalysisLine.Make(True, $cIds["a1"], 0.5))
+    a.Lines.Add(AnalysisLine.Make(False, $cIds["100001"], 0.1))
+    a.Lines.Add(AnalysisLine.Make(False, $cIds["2001"], 0.1))
+    b.Analyses[a.Id] = a
+    $cIds["a2"] = a.Id
     Return b
 
 End
 
-Private Sub AddLine(a As Analysis, bAnalysis As Boolean, iCode As Integer, fQty As Float)
+Private Function AddRes(b As PriceBook, sCode As String, sName As String, sUnit As String, sKind As String, fPrice As Float) As Resource
 
-    Dim l As New AnalysisLine
+    Dim r As New Resource
 
-    l.IsAnalysis = bAnalysis
-    l.Code = iCode
-    l.Quantity = fQty
-    a.Lines.Add(l)
+    r.Code = sCode
+    r.Name = sName
+    r.Unit = sUnit
+    r.Kind = sKind
+    r.Price = fPrice
+    b.Resources[r.Id] = r
+    $cIds[sCode] = r.Id
+    Return r
+
+End
+
+Private Sub TestIds()
+
+    Dim c As New Collection
+    Dim i As Integer
+    Dim s As String
+
+    For i = 1 To 2000
+        s = Ids.Make("r")
+        If c.Exist(s) Then Break
+        c[s] = 1
+    Next
+    Check(c.Count = 2000, "2000 ids are all different")
+    Check(Len(s) = 14 And s Begins "r-", "an id looks like r-xxxxxxxxxxxx: " & s)
+    Check(Ids.Make("r") > "r-" & String(12, "0"), "ids sort")
 
 End
 
@@ -242,48 +241,68 @@ Private Sub TestPrices()
     Dim f As Float[]
     Dim p, q As Project
     Dim sFile As String = $sTemp &/ "prices." & JsonFile.FileExtension
+    Dim a1, a2 As Analysis
+    Dim rAyu, rExc As Resource
+
+    a1 = b.Analyses[$cIds["a1"]]
+    a2 = b.Analyses[$cIds["a2"]]
+    rAyu = b.Resources[$cIds["90009"]]
+    rExc = b.Resources[$cIds["100001"]]
 
     ' mortar: A = 0.3 * 100 + 1 * 10 * 1.1 = 41; C = 4 * 3 / 2 = 6
-    f = b.Parts(b.Analyses["1"])
+    f = b.Parts(a1)
     Check(Abs(f[0] - 41) < 1e-9 And f[1] = 0 And Abs(f[2] - 6) < 1e-9, "mortar parts: " & Utils.JoinNumbers(f, " "))
     ' masonry: 0.5 mortar (A 20.5, C 3) + 0.1 h machine (B 9) + 0.1 t cement (A 10)
-    f = b.Parts(b.Analyses["2"])
+    f = b.Parts(a2)
     Check(Abs(f[0] - 30.5) < 1e-9 And Abs(f[1] - 9) < 1e-9 And Abs(f[2] - 3) < 1e-9, "masonry parts, with the linked mortar: " & Utils.JoinNumbers(f, " "))
-    Check(Abs(b.Direct(b.Analyses["2"]) - 42.5) < 1e-9, "masonry direct cost")
+    Check(Abs(b.Direct(a2) - 42.5) < 1e-9, "masonry direct cost")
+    Check(Abs(b.LineCost(a2, a2.Lines[0]) - 0.5 * 47) < 1e-9, "the cost of a sub-analysis line")
 
     ' the mortar changes: the masonry follows
-    b.Resources["2001"].Price = 200
-    Check(Abs(b.Parts(b.Analyses["2"])[0] - 55.5) < 1e-9, "a sub-analysis is linked")
+    b.Resources[$cIds["2001"]].Price = 200
+    Check(Abs(b.Parts(a2)[0] - 55.5) < 1e-9, "a sub-analysis is linked")
     b.UpdateCoef = 2
-    Check(Abs(b.Direct(b.Analyses["2"]) - 135) < 1e-9, "the update coefficient applies to every price")
+    Check(Abs(b.Direct(a2) - 135) < 1e-9, "the update coefficient applies to every price")
     b.UpdateCoef = 1
-    b.Resources["2001"].Price = 100
+    b.Resources[$cIds["2001"]].Price = 100
 
     ' calculations: licita2003's equ row 1 = 104.9295 $/h; labor 1.36 + 43.2% + 200/176 + 60/1056
-    Check(Abs(b.Machines["100001"].PerHour() - 104.9295) < 1e-6, "machine per hour: " & b.Machines["100001"].PerHour())
-    Check(Abs(b.LaborCost(b.Labor["90009"]) - (1.36 * 1.432 + 200 / 176 + 60 / 1056)) < 1e-9, "labor per hour: " & b.LaborCost(b.Labor["90009"]))
-    b.Resources["90009"].Calculated = True
-    Check(Abs(b.UnitPrice(90009) - b.LaborCost(b.Labor["90009"])) < 1e-9, "a calculated resource takes its calculation")
-    b.Resources["90009"].Calculated = False
+    Check(Abs(b.CalculatedPrice(rExc) - 104.9295) < 1e-6, "machine per hour: " & b.CalculatedPrice(rExc))
+    Check(Abs(b.CalculatedPrice(rAyu) - (1.36 * 1.432 + 200 / 176 + 60 / 1056)) < 1e-9, "labor per hour: " & b.CalculatedPrice(rAyu))
+    Check(b.PriceOf(rAyu) = 3, "an override keeps the typed price")
+    rAyu.PriceOverride = False
+    Check(Abs(b.PriceOf(rAyu) - b.CalculatedPrice(rAyu)) < 1e-9, "without override, the calculation")
+    rAyu.PriceOverride = True
+
+    ' freight: 0.85 $/km x 1000 km / 6 pipes = 141.67 a pipe (licita2003's Notas)
+    With b.Resources[$cIds["3001"]]
+        .Distance = 1000
+        .TruckLoad = 6
+        Check(Abs(b.Freight(b.Resources[$cIds["3001"]]) - 850 / 6) < 1e-9, "freight a unit")
+        Check(Abs(b.PriceOf(b.Resources[$cIds["3001"]]) - (10 + 850 / 6) * 1.1) < 1e-9, "freight is part of the price, before losses")
+        .Distance = 0
+    End With
 
     ' problems, loops, missing things
-    Check(b.Problems(b.Analyses["2"]).Count = 0, "masonry has no problems: " & b.Problems(b.Analyses["2"]).Join("; "))
-    AddLine(b.Analyses["1"], True, 2, 1)
-    Check(b.Problems(b.Analyses["1"]).Count > 0, "a loop is a problem")
-    f = b.Parts(b.Analyses["1"])            ' it must end
+    Check(b.Problems(a2).Count = 0, "masonry has no problems: " & b.Problems(a2).Join("; "))
+    a1.Lines.Add(AnalysisLine.Make(True, a2.Id, 1))
+    Check(b.Problems(a1).Count > 0, "a loop is a problem")
+    f = b.Parts(a1)
     Check(True, "a loop ends")
-    b.Analyses["1"].Lines.Remove(b.Analyses["1"].Lines.Max)
-    AddLine(b.Analyses["2"], False, 4444, 1)
-    Check(b.Problems(b.Analyses["2"]).Count = 1, "a missing resource is a problem")
-    b.Analyses["2"].Lines.Remove(b.Analyses["2"].Lines.Max)
-    Check(Utils.JoinNumbers(b.UsedBy(1, True)) = "2", "UsedBy: mortar is used by masonry")
-    Check(b.NextResourceCode(Resource.LABOR) = 90010 And b.NextAnalysisCode() = 3, "next codes")
+    a1.Lines.Remove(a1.Lines.Max)
+    a2.Lines.Add(AnalysisLine.Make(False, "r-nothing", 1))
+    Check(b.Problems(a2).Count = 1, "a missing resource is a problem")
+    a2.Lines.Remove(a2.Lines.Max)
+    Check(b.UsedBy(a1.Id, True).Count = 1 And b.UsedBy(a1.Id, True)[0] = a2, "UsedBy: mortar is used by masonry")
+    Check(b.NextResourceCode(Resource.LABOR) = "MO-0001" And b.NextAnalysisCode() = "AN-0001", "next codes")
+    Check(b.FindResource("2001") = b.FindResource($cIds["2001"]), "found by code and by id")
+    Check(PriceBook.SortedByCode(b.Resources)[0].Code = "2001" And PriceBook.SortedByCode(b.Resources)[3].Code = "100001", "sorted by code as numbers")
 
-    ' flatten: masonry becomes cement 0.15 + 0.1, sand 0.5, ayudante 2, machine 0.1; the cost doesn't change
-    f = b.Parts(b.Analyses["2"])
-    b.Flatten(b.Analyses["2"])
-    Check(b.Analyses["2"].Lines.Count = 4, "flatten merges the resources: " & b.Analyses["2"].Lines.Count)
-    Check(Abs(b.Direct(b.Analyses["2"]) - (f[0] + f[1] + f[2] * 2)) < 1e-9, "flatten: the labor yield of the mortar is lost, as in licita2003")
+    ' flatten: masonry becomes cement, sand, ayudante, machine; the mortar's labor yield is lost
+    f = b.Parts(a2)
+    b.Flatten(a2)
+    Check(a2.Lines.Count = 4, "flatten merges the resources: " & a2.Lines.Count)
+    Check(Abs(b.Direct(a2) - (f[0] + f[1] + f[2] * 2)) < 1e-9, "flatten: the labor yield of the mortar is lost, as in licita2003")
 
     ' the file
     p = New Project
@@ -291,9 +310,10 @@ Private Sub TestPrices()
     Check(Not JsonFile.SaveFile(sFile, p), "save prices")
     q = JsonFile.LoadFile(sFile)
     Check(q.Prices.Resources.Count = 4 And q.Prices.Analyses.Count = 2 And q.Prices.Charges.Count = 10, "prices after load")
-    Check(Abs(q.Prices.Direct(q.Prices.Analyses["2"]) - 42.5) < 1e-9, "the same cost after load")
-    Check(q.Prices.Analyses["2"].Lines[0].IsAnalysis, "a sub-analysis line after load")
-    Check(Abs(q.Prices.Machines["100001"].PerHour() - 104.9295) < 1e-6, "a machine after load")
+    Check(Abs(q.Prices.Direct(q.Prices.Analyses[$cIds["a2"]]) - 42.5) < 1e-9, "the same cost after load")
+    Check(q.Prices.Analyses[$cIds["a2"]].Lines[0].IsAnalysis, "a sub-analysis line after load")
+    Check(Abs(q.Prices.CalculatedPrice(q.Prices.Resources[$cIds["100001"]]) - 104.9295) < 1e-6, "a machine after load")
+    Check(q.Prices.Resources[$cIds["90009"]].PriceOverride And q.Prices.Resources[$cIds["90009"]].Wage = 1.36, "override and wage after load")
 
 End
 
@@ -302,22 +322,29 @@ Private Sub TestImport()
     Dim sDir As String = $sTemp &/ "lib" &/ "base"
     Dim b As New PriceBook
     Dim sReal As String = User.Home &/ ".config/s64sketch/costs/licita2003"
+    Dim r As Resource
 
     Shell "mkdir -p " & Shell$(sDir) & " " & Shell$($sTemp &/ "lib/added") Wait
     File.Save(sDir &/ "rubros.csv", "number,name\n1,MOVIMIENTO DE SUELOS\n")
-    File.Save(sDir &/ "resources.csv", "code,name,unit,price,origin,loss,kind\n2001,\"cemento, portland\",t,254.0,Corrientes,,material\n90009,ayudante,h,2.79,Corrientes,,labor\n")
+    File.Save(sDir &/ "resources.csv", "code,name,unit,price,origin,loss,kind\n2001,\"cemento, portland\",t,254.0,Corrientes,,material\n90009,ayudante,h,2.79,Corrientes,,labor\n90010,mo electrica,h,3.75,Corrientes,,labor\n")
     File.Save(sDir &/ "analyses.csv", "code,rubro,name,unit,equipment_yield,labor_yield\n1,1,Excavacion,m3,1,1\n")
     File.Save(sDir &/ "analysis-items.csv", "analysis,resource,quantity\n1,90009,3.4\n1,7777,1\n9,2001,1\n")
-    File.Save(sDir &/ "labor.csv", "code,category,wage_per_hour\n90009,Ayudante,1.14\n")
+    File.Save(sDir &/ "labor.csv", "code,category,wage_per_hour\n90009,Ayudante,1.14\n90010,Sereno,1.04\n")
     File.Save($sTemp &/ "lib/added/resources.csv", "code,name,unit,price,origin,loss,kind\n7777,bañadera,u,,,,material\n")
 
     Check(Not LibraryImport.ImportFolder(b, sDir, True), "import a library: " & LibraryImport.Report.Join("; "))
-    Check(b.Resources.Count = 3 And b.Analyses.Count = 1 And b.Rubros.Count = 1 And b.Labor.Count = 1, "imported counts")
-    Check(b.Resources["2001"].Name = "cemento, portland", "a quoted name")
-    Check(b.Analyses["1"].Lines.Count = 2, "analysis lines (one of an analysis that doesn't exist skipped)")
-    Check(Not b.Resources["90009"].Calculated And b.UnitPrice(90009) = 2.79, "labor keeps its typed price")
-    Check(InStr(LibraryImport.Report.Join("\n"), "differ from their calculation"), "the report says the labor calculation differs")
+    Check(b.Resources.Count = 4 And b.Analyses.Count = 1 And b.Rubros.Count = 1, "imported counts: " & b.Resources.Count)
+    Check(b.ResourceByCode("2001").Name = "cemento, portland", "a quoted name")
+    Check(b.AnalysisByCode("1").Lines.Count = 2, "analysis lines (one of an analysis that doesn't exist skipped)")
+    r = b.ResourceByCode("90009")
+    Check(r.PriceOverride And b.PriceOf(r) = 2.79 And r.Wage = 1.14, "labor keeps its typed price as an override, with its wage")
+    Check(b.ResourceByCode("90010").Name = "Sereno", "the mdo name wins (90010 is Sereno)")
+    Check(b.ResourceByCode("7777").Name = "bañadera" And b.PriceOf(b.ResourceByCode("7777")) = 0, "the added folder fills a missing resource, without price")
+    Check(InStr(LibraryImport.Report.Join("\n"), "overrides"), "the report lists the overrides")
     Check(InStr(LibraryImport.Report.Join("\n"), "have no price"), "the report says what has no price")
+    ' importing again updates, doesn't duplicate
+    LibraryImport.ImportFolder(b, sDir, True)
+    Check(b.Resources.Count = 4 And b.Analyses.Count = 1 And b.AnalysisByCode("1").Lines.Count = 2, "importing again updates")
     b = New PriceBook
     Check(LibraryImport.ImportFolder(b, $sTemp &/ "nothing"), "an empty folder is refused")
 
@@ -327,10 +354,92 @@ Private Sub TestImport()
         b.DefaultCharges()
         Check(Not LibraryImport.ImportFolder(b, sReal, True), "import licita2003")
         Check(b.Analyses.Count >= 467 And b.Resources.Count >= 395, Subst("licita2003: &1 analyses, &2 resources", b.Analyses.Count, b.Resources.Count))
-        ' licita2003 analysis 1: Excavacion para sanjas continuas a mano = 3.4 h of ayudante 90009
-        Check(Abs(b.Direct(b.Analyses["1"]) - 3.4 * b.Resources["90009"].Price) < 1e-9, "licita2003 analysis 1 costs 3.4 h of ayudante")
+        ' licita2003 analysis 1: Excavacion para sanjas continuas a mano = 3.4 h of ayudante 90009 (typed 2.79)
+        Check(Abs(b.Direct(b.AnalysisByCode("1")) - 3.4 * 2.79) < 1e-9, "licita2003 analysis 1 costs 3.4 h of ayudante at 2.79")
+        Check(b.ResourceByCode("90010").Name = "Sereno", "licita2003: 90010 is Sereno")
         If Env["SMOKE_VERBOSE"] Then Print LibraryImport.Report.Join("\n")
     Endif
+
+End
+
+Private Sub TestCmd()
+
+    Dim c As Collection
+    Dim p As Project
+    Dim sMat, sAna As String
+    Dim n As Integer
+    Dim sFile As String = $sTemp &/ "cmd." & JsonFile.FileExtension
+
+    p = New Project
+    sumi.Project = p
+    Config.UserName = "Tester"
+
+    ' project fields
+    c = Cmd.Run("project.set", ["name": "Obra 1", "overheadPct": 20])
+    Check(c["ok"] And p.Name = "Obra 1" And p.OverheadPct = 20, "project.set")
+    Check(Cmd.Run("project.set", ["nonsense": 1]).Exist("error"), "project.set refuses an unknown field")
+    Check(p.Changes.Count = 1 And p.Changes[0].Who = "Tester" And p.Changes[0].Via = Who.PERSON, "the change is logged with who: " & p.Changes.Count)
+    ' typing in the same field: one change
+    Cmd.Run("project.set", ["name": "Obra 12"])
+    Cmd.Run("project.set", ["name": "Obra 123"])
+    Check(p.Changes.Count = 2 And p.Changes[1].Before["project"]["name"] = "Obra 1", "edits of one field in a row are one change")
+
+    ' resources and analyses
+    c = Cmd.Run("resource.add", ["kind": "material", "name": "cemento", "unit": "kg", "price": 0.25])
+    sMat = c["id"]
+    Check(c["ok"] And c["code"] = "MAT-0001", "resource.add gives an id and a code: " & JSON.Encode(c))
+    Check(Cmd.Run("resource.add", ["kind": "nonsense", "name": "x"]).Exist("error"), "resource.add refuses a bad kind")
+    c = Cmd.Run("analysis.add", ["name": "mezcla", "unit": "m3", "lines": [["resource": "MAT-0001", "qty": 300]]])
+    sAna = c["id"]
+    Check(c["ok"] And Abs(p.Prices.Direct(p.Prices.Analyses[sAna]) - 75) < 1e-9, "analysis.add with a line by code: " & JSON.Encode(c))
+    c = Cmd.Run("analysis.get", ["key": c["code"]])
+    Check(c["ok"] And Abs(c["analysis"]["direct"] - 75) < 1e-9 And c["analysis"]["lines"][0]["code"] = "MAT-0001", "analysis.get describes it")
+    Check(Cmd.Run("analysis.addline", ["key": sAna, "analysis": sAna, "qty": 1]).Exist("error"), "a loop is refused")
+    Check(Cmd.Run("resource.delete", ["key": sMat]).Exist("error"), "a used resource can't be deleted")
+    c = Cmd.Run("resource.set", ["key": "MAT-0001", "price": 0.5])
+    Check(c["ok"] And Abs(p.Prices.Direct(p.Prices.Analyses[sAna]) - 150) < 1e-9, "resource.set changes the analyses")
+    Check(p.Prices.Resources[sMat].Updated = Format(Now, "yyyy-mm-dd"), "a new price gets today's date")
+    Check(Cmd.Run("resource.set", ["key": sMat, "wrong": 1]).Exist("error") And p.Prices.Resources[sMat].Price = 0.5, "a bad field changes nothing")
+    Check(Cmd.Run("resource.list", ["text": "cem"])["resources"].Count = 1, "resource.list filters")
+    Check(Cmd.Run("analysis.list")["analyses"][0]["price"] > 150, "analysis.list gives prices")
+
+    ' undo and redo
+    n = p.Changes.Count
+    c = Cmd.Run("undo")
+    Check(c["ok"] And p.Prices.Resources[sMat].Price = 0.25, "undo puts the price back: " & JSON.Encode(c))
+    Check(p.Changes.Count = n + 1 And p.Changes[n - 1].UndoneBy <> "", "undo is a new entry and marks the undone one")
+    c = Cmd.Run("redo")
+    Check(c["ok"] And p.Prices.Resources[sMat].Price = 0.5, "redo")
+    Check(Cmd.Run("redo").Exist("error"), "nothing more to redo")
+    c = Cmd.Run("undo")
+    Check(c["ok"] And p.Prices.Resources[sMat].Price = 0.25, "undo again after a redo")
+    Cmd.Run("redo")
+    ' an AI group is undone at once
+    Who.Begin(Who.AI, "claude-test")
+    Cmd.BeginGroup()
+    Cmd.Run("resource.set", ["key": sMat, "price": 1])
+    Cmd.Run("analysis.set", ["key": sAna, "name": "mezcla AI"])
+    Cmd.EndGroup()
+    Who.Done()
+    Check(p.Changes[p.Changes.Max].Via = Who.AI And p.Changes[p.Changes.Max].Model = "claude-test", "the AI's changes say so")
+    c = Cmd.Run("undo")
+    Check(c["ok"] And p.Prices.Resources[sMat].Price = 0.5 And p.Prices.Analyses[sAna].Name = "mezcla", "an AI group is undone together: " & JSON.Encode(c))
+    ' someone else changed it since: no undo
+    Cmd.Run("resource.set", ["key": sMat, "price": 2])
+    Config.UserId = "u-other"
+    Cmd.Run("resource.set", ["key": sMat, "loss": 5])
+    Config.UserId = ""
+    Config.UserId = p.Changes[0].UserId
+    Check(Cmd.Run("undo").Exist("error") And p.Prices.Resources[sMat].Price = 2, "an undo that would erase someone else's work is refused")
+
+    ' the log is saved with the file
+    Check(Not JsonFile.SaveFile(sFile, p), "save with the log")
+    Check(JsonFile.LoadFile(sFile).Changes.Count = p.Changes.Count, "the log after load")
+    c = Cmd.Run("log", ["limit": 3])
+    Check(c["changes"].Count = 3 And c["changes"][0]["who"] <> "", "log lists the last changes")
+    Check(Cmd.Run("nonsense").Exist("error"), "an unknown command")
+    Check(Cmd.Help().Count >= 25, "help lists the commands")
+    Config.UserName = ""
 
 End
 

@@ -1,0 +1,48 @@
+' Gambas module file
+
+'' Permanent identifiers. Everything that can be referenced (resources, analyses, budget items, contracts,
+'' people...) has an Id that never changes and is unique everywhere, so files from different people can be
+'' merged and the change log can always find what it talks about. What people see and type is the Code,
+'' which can be renamed freely.
+''
+'' An Id is "<prefix>-<12 chars>": 8 for the time (seconds since 2020, base 32, so they sort by creation) and
+'' 4 random, plus a counter so ids made in the same second by this program stay distinct.
+
+Private Const DIGITS As String = "0123456789abcdefghjkmnpqrstvwxyz"     ' base 32 without i, l, o, u
+Private $iLast As Long
+Private $iCount As Integer
+Private $bSeeded As Boolean
+
+Public Function Make(sPrefix As String) As String
+
+    Dim iNow As Long
+    Dim s As String
+
+    If Not $bSeeded Then
+        Randomize
+        $bSeeded = True
+    Endif
+    iNow = DateDiff(Date(2020, 1, 1), Now, gb.Second)
+    If iNow = $iLast Then
+        Inc $iCount
+    Else
+        $iLast = iNow
+        $iCount = 0
+    Endif
+    s = Base32(iNow * 1024 + ($iCount Mod 1024), 8) & Base32(Int(Rnd(0, 1048576)), 4)
+    Return sPrefix & "-" & s
+
+End
+
+Private Function Base32(iValue As Long, iLen As Integer) As String
+
+    Dim s As String
+
+    While iLen > 0
+        s = Mid$(DIGITS, (iValue Mod 32) + 1, 1) & s
+        iValue = iValue \ 32
+        Dec iLen
+    Wend
+    Return s
+
+End

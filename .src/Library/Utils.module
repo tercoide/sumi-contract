@@ -30,3 +30,16 @@ Public Function JoinNumbers(aList As Object, Optional sSep As String = ", ") As 
     Return a.Join(sSep)
 
 End
+
+'' Only the digits 0-9? ("" is False, unless bEmptyOk)
+Public Function IsDigits(s As String, Optional bEmptyOk As Boolean) As Boolean
+
+    Dim i As Integer
+
+    If s = "" Then Return bEmptyOk
+    For i = 1 To Len(s)
+        If InStr("0123456789", Mid$(s, i, 1)) = 0 Then Return False
+    Next
+    Return True
+
+End

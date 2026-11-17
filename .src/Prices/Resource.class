@@ -1,23 +1,29 @@
 ' Gambas class file
 
 '' A resource an analysis uses: a material, a labor category (hours) or a piece of equipment (hours).
-'' Labor and equipment can take their price from their calculation (PriceBook.Labor / Machines, same code)
-'' instead of the typed one: Calculated.
+'' Its base price is typed (materials), or calculated: labor from its Wage plus the book's charges, equipment
+'' from its Machine. A typed price can override the calculation (PriceOverride), as licita2003's hand edits did.
+'' Freight: a material bought far away adds the book's FreightPerKm × Distance / TruckLoad a unit.
 
 Public Const MATERIAL As String = "material"
 Public Const LABOR As String = "labor"
 Public Const EQUIPMENT As String = "equipment"
 
-Public Code As Integer
+Public Id As String                             '' permanent (see Ids)
+Public Code As String = ""                      '' what people see and type; unique in the book
 Public Name As String = ""
 Public Unit As String = ""
 Public Kind As String = "material"              '' MATERIAL, LABOR or EQUIPMENT
-Public Price As Float                           '' typed unit price (before the book's update coefficient)
-Public Calculated As Boolean                    '' labor / equipment: the price comes from its calculation
+Public Price As Float                           '' typed unit price
+Public PriceOverride As Boolean                 '' labor / equipment: use Price, not the calculation
+Public Wage As Float                            '' labor: $ an hour before charges (0 = no calculation)
+Public MachineCalc As Machine                       '' equipment: its hourly cost calculation (Null = none)
 Public LossPct As Float                         '' waste: the price is raised by this
 Public Origin As String = ""                    '' where it is bought
+Public Distance As Float                        '' km to the work (freight)
+Public TruckLoad As Float                       '' units a truck carries (freight; 0 = no freight)
 Public Updated As String = ""                   '' when the price was last set (yyyy-mm-dd)
-Public Source As String = ""                    '' where the price came from (a list, a supplier...)
+Public Source As String = ""                    '' where the price came from (a list, a supplier, a web page...)
 
 Static Public Function Kinds() As String[]
 
@@ -25,18 +31,54 @@ Static Public Function Kinds() As String[]
 
 End
 
+'' The code prefix of new resources of a kind
+Static Public Function CodePrefix(sKind As String) As String
+
+    Select Case sKind
+        Case LABOR
+            Return "MO"
+        Case EQUIPMENT
+            Return "EQ"
+    End Select
+    Return "MAT"
+
+End
+
+Public Sub _new()
+
+    Id = Ids.Make("r")
+
+End
+
+'' Does it have a calculation of its price?
+Public Function HasCalculation() As Boolean
+
+    Select Case Kind
+        Case LABOR
+            Return Wage > 0
+        Case EQUIPMENT
+            Return MachineCalc <> Null
+    End Select
+
+End
+
 Public Function ToJson() As Collection
 
     Dim c As New JSONCollection
 
+    c["id"] = Id
     c["code"] = Code
     c["name"] = Name
     c["unit"] = Unit
     c["kind"] = Kind
     c["price"] = Price
-    If Calculated Then c["calculated"] = True
+    If PriceOverride Then c["override"] = True
+    If Wage Then c["wage"] = Wage
+    If MachineCalc Then c["machine"] = MachineCalc.ToJson()
     If LossPct Then c["loss"] = LossPct
     If Origin Then c["origin"] = Origin
+    If Distance Then c["distance"] = Distance
+    If TruckLoad Then c["truckLoad"] = TruckLoad
     If Updated Then c["updated"] = Updated
     If Source Then c["source"] = Source
     Return c
@@ -47,16 +89,65 @@ Static Public Function FromJson(c As Collection) As Resource
 
     Dim r As New Resource
 
-    r.Code = c["code"]
-    If c.Exist("name") Then r.Name = c["name"]
-    If c.Exist("unit") Then r.Unit = c["unit"]
-    If c.Exist("kind") Then r.Kind = c["kind"]
-    If c.Exist("price") Then r.Price = c["price"]
-    If c.Exist("calculated") Then r.Calculated = c["calculated"]
-    If c.Exist("loss") Then r.LossPct = c["loss"]
-    If c.Exist("origin") Then r.Origin = c["origin"]
-    If c.Exist("updated") Then r.Updated = c["updated"]
-    If c.Exist("source") Then r.Source = c["source"]
+    If c["id"] Then r.Id = c["id"]
+    r.Apply(c)
     Return r
+
+End
+
+'' Sets the fields present in c (the file's names; "machine": Null removes the calculation, "machine.<field>"
+'' sets one of its fields). Returns the name of a field it doesn't know, or "".
+Public Function Apply(c As Collection) As String
+
+    Dim v As Variant
+    Dim sKey As String
+
+    For Each v In c
+        sKey = c.Key
+        Select Case sKey
+            Case "id"
+            Case "code"
+                Code = CStr(v)
+            Case "name"
+                Name = v
+            Case "unit"
+                Unit = v
+            Case "kind"
+                If Not Kinds().Exist(v) Then Return "kind"
+                Kind = v
+            Case "price"
+                Price = v
+            Case "override"
+                PriceOverride = v
+            Case "wage"
+                Wage = v
+            Case "machine"
+                If IsNull(v) Then
+                    MachineCalc = Null
+                Else
+                    MachineCalc = Machine.FromJson(v)
+                Endif
+            Case "loss"
+                LossPct = v
+            Case "origin"
+                Origin = v
+            Case "distance"
+                Distance = v
+            Case "truckLoad"
+                TruckLoad = v
+            Case "updated"
+                Updated = v
+            Case "source"
+                Source = v
+            Default
+                If sKey Begins "machine." Then
+                    If Not MachineCalc Then MachineCalc = New Machine
+                    If MachineCalc.SetField(Mid$(sKey, 9), v) Then Return sKey
+                Else
+                    Return sKey
+                Endif
+        End Select
+    Next
+    Return ""
 
 End

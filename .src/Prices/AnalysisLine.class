@@ -1,17 +1,17 @@
 ' Gambas class file
 
 '' One line of an analysis: a quantity of a resource, or of another analysis (a sub-analysis, kept linked:
-'' when it changes, every analysis using it follows)
+'' when it changes, every analysis using it follows). It points by Id, so renaming codes breaks nothing.
 
 Public IsAnalysis As Boolean
-Public Code As Integer
+Public Ref As String                            '' the Id of the resource or analysis
 Public Quantity As Float
 
 Public Function ToJson() As Collection
 
     Dim c As New JSONCollection
 
-    If IsAnalysis Then c["analysis"] = Code Else c["resource"] = Code
+    If IsAnalysis Then c["analysis"] = Ref Else c["resource"] = Ref
     c["qty"] = Quantity
     Return c
 
@@ -23,9 +23,9 @@ Static Public Function FromJson(c As Collection) As AnalysisLine
 
     If c.Exist("analysis") Then
         l.IsAnalysis = True
-        l.Code = c["analysis"]
+        l.Ref = c["analysis"]
     Else
-        l.Code = c["resource"]
+        l.Ref = c["resource"]
     Endif
     l.Quantity = c["qty"]
     Return l
@@ -37,8 +37,19 @@ Public Function Copy() As AnalysisLine
     Dim l As New AnalysisLine
 
     l.IsAnalysis = IsAnalysis
-    l.Code = Code
+    l.Ref = Ref
     l.Quantity = Quantity
+    Return l
+
+End
+
+Static Public Function Make(bAnalysis As Boolean, sRef As String, fQty As Float) As AnalysisLine
+
+    Dim l As New AnalysisLine
+
+    l.IsAnalysis = bAnalysis
+    l.Ref = sRef
+    l.Quantity = fQty
     Return l
 
 End

@@ -10,6 +10,10 @@ Public Depot As String                          '' the configuration file
 Public Log As String                            '' today's log file (AppLog.Path)
 Public LogLevel As String = "info"              '' debug, info, warning, error (see AppLog)
 
+'' WHO WORKS HERE (until there are logins, see Who)
+Public UserName As String = ""                  '' the person at this computer, for the change log
+Public UserId As String = ""                    '' permanent, made the first time (Ids)
+
 '' INTERFACE
 Public ButtonSize As Integer = 32
 Public IconFamily As String
@@ -38,6 +42,7 @@ Static Public Function Behaviour() As Collection
 
     Dim o As New Collection
 
+    o.Add(["Team", ("Your name"), "text", Null, ("Written in the change log of every change you make. Until there are logins, each computer says who works on it.")], "UserName")
     o.Add(["Formats", ("Currency symbol"), "text", Null, ("Shown before every amount.")], "Currency")
     o.Add(["Formats", ("Decimals for amounts"), "integer", [0, 4], ("Digits after the decimal point in prices and totals.")], "DigitsMoney")
     o.Add(["Formats", ("Decimals for quantities"), "integer", [0, 6], ("Digits after the decimal point in quantities.")], "DigitsQuantity")

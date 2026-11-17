@@ -1,0 +1,46 @@
+' Gambas module file
+
+'' Who is making the changes, for the change log: a person at the screen, the AI (working for that person,
+'' with its model), an import, or the program itself. The user wants company logins with roles later (one
+'' place for the data, BIM style); until then the person is Config.UserName on this computer.
+
+Public Const PERSON As String = "person"
+Public Const AI As String = "ai"
+Public Const IMPORT As String = "import"
+Public Const SYSTEM As String = "system"
+
+Public Via As String = "person"                 '' PERSON, AI, IMPORT or SYSTEM
+Public Model As String = ""                     '' the AI model, when Via = AI
+
+'' The person's name: the settings', or the system user's
+Public Function Name() As String
+
+    If Config.UserName Then Return Config.UserName
+    Return User.Name
+
+End
+
+Public Function UserId() As String
+
+    If Not Config.UserId Then
+        Config.UserId = Ids.Make("u")
+        If Config.Depot Then Config.Save(Config.Depot)
+    Endif
+    Return Config.UserId
+
+End
+
+'' The AI (or an import) works until Done: its changes are logged as such
+Public Sub Begin(sVia As String, Optional sModel As String)
+
+    Via = sVia
+    Model = sModel
+
+End
+
+Public Sub Done()
+
+    Via = PERSON
+    Model = ""
+
+End

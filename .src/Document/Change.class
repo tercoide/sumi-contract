@@ -1,0 +1,79 @@
+' Gambas class file
+
+'' One entry of a project's change log: who changed what, when, how, and the values before and after.
+'' The log only grows: an undo is a new entry that puts the before back (UndoOf). Entries of one action
+'' (an AI script, an import) share a Group, and are undone together.
+
+Public Id As String                             '' permanent (Ids)
+Public When As String                           '' yyyy-mm-dd hh:nn:ss
+Public Who As String                            '' the person's name
+Public UserId As String
+Public Via As String                            '' Who.PERSON, AI, IMPORT, SYSTEM
+Public Model As String = ""                     '' the AI's model
+Public Command As String                        '' the command (Cmd) that did it
+Public Params As Collection                       '' its arguments
+Public Summary As String                        '' in words, for people
+Public Group As String = ""                     '' the action it belongs to
+Public Targets As New String[]                  '' what it touched: "resource:<id>", "analysis:<id>", "project"...
+Public Before As New Collection                 '' the targets before (target -> JSON, Null = didn't exist)
+Public After As New Collection                  '' and after (not kept for whole price books: too big)
+Public UndoOf As String = ""                    '' this entry undoes (or redoes) that one
+Public UndoneBy As String = ""                  '' the entry that undid this one
+
+Public Sub _new()
+
+    Id = Ids.Make("c")
+    When = Format(Now, "yyyy-mm-dd hh:nn:ss")
+
+End
+
+Public Function ToJson() As Collection
+
+    Dim c As New JSONCollection
+
+    c["id"] = Id
+    c["when"] = When
+    c["who"] = Who
+    c["userId"] = UserId
+    c["via"] = Via
+    If Model Then c["model"] = Model
+    c["command"] = Command
+    If Params Then c["args"] = Params
+    c["summary"] = Summary
+    If Group Then c["group"] = Group
+    c["targets"] = Targets
+    c["before"] = Before
+    If After.Count Then c["after"] = After
+    If UndoOf Then c["undoOf"] = UndoOf
+    If UndoneBy Then c["undoneBy"] = UndoneBy
+    Return c
+
+End
+
+Static Public Function FromJson(c As Collection) As Change
+
+    Dim h As New Change
+    Dim v As Variant
+
+    h.Id = c["id"]
+    h.When = c["when"]
+    h.Who = c["who"]
+    h.UserId = c["userId"]
+    h.Via = c["via"]
+    If c.Exist("model") Then h.Model = c["model"]
+    h.Command = c["command"]
+    If c.Exist("args") Then h.Params = c["args"]
+    h.Summary = c["summary"]
+    If c.Exist("group") Then h.Group = c["group"]
+    If c.Exist("targets") Then
+        For Each v In c["targets"]
+            h.Targets.Add(v)
+        Next
+    Endif
+    If c.Exist("before") Then h.Before = c["before"]
+    If c.Exist("after") Then h.After = c["after"]
+    If c.Exist("undoOf") Then h.UndoOf = c["undoOf"]
+    If c.Exist("undoneBy") Then h.UndoneBy = c["undoneBy"]
+    Return h
+
+End

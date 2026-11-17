@@ -4,7 +4,8 @@
 '' worked out by PriceBook.Parts: materials + equipment / EquipmentYield + labor / LaborYield, as in licita2003's
 '' editor (a crew's day priced, divided by the units it makes in a day).
 
-Public Code As Integer
+Public Id As String                             '' permanent (see Ids)
+Public Code As String = ""                      '' what people see and type; unique in the book
 Public Rubro As Integer                         '' the rubro (work category) number
 Public Name As String = ""
 Public Unit As String = ""
@@ -13,12 +14,19 @@ Public EquipmentYield As Float = 1
 Public Lines As New AnalysisLine[]
 Public Note As String = ""
 
+Public Sub _new()
+
+    Id = Ids.Make("a")
+
+End
+
 Public Function ToJson() As Collection
 
     Dim c As New JSONCollection
     Dim aLines As New Variant[]
     Dim l As AnalysisLine
 
+    c["id"] = Id
     c["code"] = Code
     c["rubro"] = Rubro
     c["name"] = Name
@@ -39,29 +47,54 @@ Static Public Function FromJson(c As Collection) As Analysis
     Dim a As New Analysis
     Dim v As Variant
 
-    a.Code = c["code"]
-    If c.Exist("rubro") Then a.Rubro = c["rubro"]
-    If c.Exist("name") Then a.Name = c["name"]
-    If c.Exist("unit") Then a.Unit = c["unit"]
-    If c.Exist("laborYield") Then a.LaborYield = c["laborYield"]
-    If c.Exist("equipmentYield") Then a.EquipmentYield = c["equipmentYield"]
+    If c["id"] Then a.Id = c["id"]
+    a.Apply(c)
     If c.Exist("lines") Then
         For Each v In c["lines"]
             a.Lines.Add(AnalysisLine.FromJson(v))
         Next
     Endif
-    If c.Exist("note") Then a.Note = c["note"]
     Return a
 
 End
 
-'' A copy with another code
-Public Function Copy(iCode As Integer) As Analysis
+'' Sets the fields present in c (the file's names, not the lines). Returns a field it doesn't know, or "".
+Public Function Apply(c As Collection) As String
+
+    Dim v As Variant
+
+    For Each v In c
+        Select Case c.Key
+            Case "id", "lines"
+            Case "code"
+                Code = CStr(v)
+            Case "rubro"
+                Rubro = v
+            Case "name"
+                Name = v
+            Case "unit"
+                Unit = v
+            Case "laborYield"
+                LaborYield = v
+            Case "equipmentYield"
+                EquipmentYield = v
+            Case "note"
+                Note = v
+            Default
+                Return c.Key
+        End Select
+    Next
+    Return ""
+
+End
+
+'' A copy with a new Id and another code
+Public Function Copy(sCode As String) As Analysis
 
     Dim a As New Analysis
     Dim l As AnalysisLine
 
-    a.Code = iCode
+    a.Code = sCode
     a.Rubro = Rubro
     a.Name = Name
     a.Unit = Unit

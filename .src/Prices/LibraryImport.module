@@ -9,18 +9,23 @@
 ''   labor.csv           code,category,wage_per_hour,...               (the "mdo" sheet)
 ''   equipment.csv       number,name,power_hp,cost,residual,life_h,use_h_year,...,fuel,fuel_price,fuel_use,...
 '' and, if asked, the "added" folder next to it (the same files, with what was added after the xls).
-'' What is there replaces the book's items with the same code; nothing else is removed.
-'' Labor and equipment keep the typed prices of the library (what the bids used): their calculations are
-'' brought too and the report says how far they are; a resource is switched to its calculation in the
-'' Resources page.
+'' The library's codes become the items' Codes (each gets a new Id); an item whose Code the book already has is
+'' updated, nothing is removed.
+'' Labor and equipment get their calculation (the wage, the machine); where the library's typed price differs
+'' from it, the typed price is kept as an override (what the bids used, often hand edits) and the report lists
+'' them. The mdo sheet's category names win over the resources' (decided with the user: 90010 is Sereno).
 
 Public Report As New String[]                   '' what the last import did, for the user
+
+Private $cRes As Collection                     ' code -> Resource of the book being imported into
+Private $cAna As Collection                     ' code -> Analysis
 
 '' Imports sFolder (and its sibling "added" when bAdded). Returns True if nothing could be read.
 Public Function ImportFolder(hBook As PriceBook, sFolder As String, Optional bAdded As Boolean) As Boolean
 
     Dim sAdded As String = File.Dir(sFolder) &/ "added"
-    Dim iBefore As Integer
+    Dim r As Resource
+    Dim a As Analysis
 
     Report.Clear
     If Not Exist(sFolder &/ "resources.csv") And If Not Exist(sFolder &/ "analyses.csv") Then
@@ -28,16 +33,38 @@ Public Function ImportFolder(hBook As PriceBook, sFolder As String, Optional bAd
         Return True
     Endif
 
-    iBefore = hBook.Resources.Count + hBook.Analyses.Count
+    $cRes = New Collection
+    For Each r In hBook.Resources
+        $cRes[r.Code] = r
+    Next
+    $cAna = New Collection
+    For Each a In hBook.Analyses
+        $cAna[a.Code] = a
+    Next
+
     ImportFiles(hBook, sFolder)
     If bAdded And If Exist(sAdded) Then
         Report.Add(("From the added folder:"))
         ImportFiles(hBook, sAdded)
     Endif
     hBook.Source = File.Name(sFolder)
-    CompareCalculations(hBook)
+    KeepTypedPrices(hBook)
     ReportMissing(hBook)
-    AppLog.Info("Imported price library " & sFolder & ": " & Report.Join(" / "), "LibraryImport")
+    AppLog.Info("Imported price library " & sFolder & ": " & Report.Count & " report lines", "LibraryImport")
+
+End
+
+Private Function GetResource(hBook As PriceBook, sCode As String) As Resource
+
+    Dim r As Resource = $cRes[sCode]
+
+    If Not r Then
+        r = New Resource
+        r.Code = sCode
+        $cRes[sCode] = r
+        hBook.Resources[r.Id] = r
+    Endif
+    Return r
 
 End
 
@@ -47,11 +74,10 @@ Private Sub ImportFiles(hBook As PriceBook, sFolder As String)
     Dim c As Collection
     Dim r As Resource
     Dim a As Analysis
-    Dim l As AnalysisLine
-    Dim lab As LaborCategory
-    Dim m As Machine
     Dim n, nBad As Integer
     Dim sTag As String = File.Name(sFolder)
+    Dim cMissing As New Collection
+    Dim sCode As String
 
     ' rubros
     aRows = Csv.Read(sFolder &/ "rubros.csv")
@@ -71,10 +97,9 @@ Private Sub ImportFiles(hBook As PriceBook, sFolder As String)
     If aRows Then
         n = 0
         For Each c In aRows
-            If ToInt(c["code"]) <= 0 Then Continue
-            r = hBook.Resources[CStr(ToInt(c["code"]))]
-            If Not r Then r = New Resource
-            r.Code = ToInt(c["code"])
+            sCode = CodeOf(c["code"])
+            If Not sCode Then Continue
+            r = GetResource(hBook, sCode)
             r.Name = Trim(c["name"])
             r.Unit = Trim(c["unit"])
             If Resource.Kinds().Exist(c["kind"]) Then r.Kind = c["kind"]
@@ -84,61 +109,26 @@ Private Sub ImportFiles(hBook As PriceBook, sFolder As String)
             Endif
             If c.Exist("origin") Then r.Origin = Trim(c["origin"])
             If c.Exist("loss") And If Trim(c["loss"]) Then r.LossPct = ToFloat(c["loss"])
-            hBook.Resources[CStr(r.Code)] = r
             Inc n
         Next
         Report.Add(Subst(("&1 resources"), n))
     Endif
 
-    ' analyses and their lines
-    aRows = Csv.Read(sFolder &/ "analyses.csv")
-    If aRows Then
-        n = 0
-        For Each c In aRows
-            If ToInt(c["code"]) <= 0 Then Continue
-            a = New Analysis
-            a.Code = ToInt(c["code"])
-            a.Rubro = ToInt(c["rubro"])
-            a.Name = Trim(c["name"])
-            a.Unit = Trim(c["unit"])
-            a.EquipmentYield = IIf(ToFloat(c["equipment_yield"]) > 0, ToFloat(c["equipment_yield"]), 1)
-            a.LaborYield = IIf(ToFloat(c["labor_yield"]) > 0, ToFloat(c["labor_yield"]), 1)
-            hBook.Analyses[CStr(a.Code)] = a
-            Inc n
-        Next
-        Report.Add(Subst(("&1 analyses"), n))
-    Endif
-    aRows = Csv.Read(sFolder &/ "analysis-items.csv")
-    If aRows Then
-        n = 0
-        nBad = 0
-        For Each c In aRows
-            a = hBook.Analyses[CStr(ToInt(c["analysis"]))]
-            If Not a Then
-                Inc nBad
-                Continue
-            Endif
-            l = New AnalysisLine
-            l.Code = ToInt(c["resource"])
-            l.Quantity = ToFloat(c["quantity"])
-            a.Lines.Add(l)
-            Inc n
-        Next
-        Report.Add(Subst(("&1 analysis lines"), n))
-        If nBad Then Report.Add(Subst(("&1 lines of analyses that don't exist were skipped"), nBad))
-    Endif
-
-    ' labor categories (the "mdo" sheet): the wage; the charges are the book's
+    ' labor categories (the "mdo" sheet): the wage, the name
     aRows = Csv.Read(sFolder &/ "labor.csv")
     If aRows Then
         n = 0
         For Each c In aRows
-            If ToInt(c["code"]) <= 0 Then Continue
-            lab = New LaborCategory
-            lab.Code = ToInt(c["code"])
-            lab.Name = Trim(c["category"])
-            lab.Wage = ToFloat(c["wage_per_hour"])
-            hBook.Labor[CStr(lab.Code)] = lab
+            sCode = CodeOf(c["code"])
+            If Not sCode Then Continue
+            r = GetResource(hBook, sCode)
+            r.Kind = Resource.LABOR
+            If Not r.Unit Then r.Unit = "h"
+            If Trim(c["category"]) And If LCase(Trim(c["category"])) <> LCase(r.Name) Then
+                If r.Name Then Report.Add(Subst(("&1: named &2 (it was &3 in the resources)"), sCode, Trim(c["category"]), r.Name))
+                r.Name = Trim(c["category"])
+            Endif
+            r.Wage = ToFloat(c["wage_per_hour"])
             Inc n
         Next
         Report.Add(Subst(("&1 labor categories"), n))
@@ -150,66 +140,129 @@ Private Sub ImportFiles(hBook As PriceBook, sFolder As String)
         n = 0
         For Each c In aRows
             If ToInt(c["number"]) <= 0 Then Continue
-            m = New Machine
-            m.Code = 100000 + ToInt(c["number"])
-            m.Name = Trim(c["name"])
-            m.Power = ToFloat(c["power_hp"])
-            m.Cost = ToFloat(c["cost"])
-            If m.Cost > 0 Then m.ResidualPct = ToFloat(c["residual"]) / m.Cost * 100
-            If ToFloat(c["life_h"]) > 0 Then m.LifeHours = ToFloat(c["life_h"])
-            If ToFloat(c["use_h_year"]) > 0 Then m.HoursPerYear = ToFloat(c["use_h_year"])
-            m.Fuel = Trim(c["fuel"])
-            m.FuelPrice = ToFloat(c["fuel_price"])
-            If m.Power > 0 Then m.FuelUse = ToFloat(c["fuel_use"]) / m.Power      ' the csv has liters an hour
-            hBook.Machines[CStr(m.Code)] = m
+            r = GetResource(hBook, CStr(100000 + ToInt(c["number"])))
+            r.Kind = Resource.EQUIPMENT
+            If Not r.Name Then r.Name = Trim(c["name"])
+            If Not r.Unit Then r.Unit = "h"
+            r.MachineCalc = New Machine
+            With r.MachineCalc
+                .Power = ToFloat(c["power_hp"])
+                .Cost = ToFloat(c["cost"])
+                If .Cost > 0 Then .ResidualPct = ToFloat(c["residual"]) / .Cost * 100
+                If ToFloat(c["life_h"]) > 0 Then .LifeHours = ToFloat(c["life_h"])
+                If ToFloat(c["use_h_year"]) > 0 Then .HoursPerYear = ToFloat(c["use_h_year"])
+                .Fuel = Trim(c["fuel"])
+                .FuelPrice = ToFloat(c["fuel_price"])
+                If .Power > 0 Then .FuelUse = ToFloat(c["fuel_use"]) / .Power        ' the csv has liters an hour
+            End With
             Inc n
         Next
         Report.Add(Subst(("&1 machines"), n))
     Endif
 
+    ' analyses and their lines
+    aRows = Csv.Read(sFolder &/ "analyses.csv")
+    If aRows Then
+        n = 0
+        For Each c In aRows
+            sCode = CodeOf(c["code"])
+            If Not sCode Then Continue
+            a = $cAna[sCode]
+            If a Then
+                a.Lines.Clear
+            Else
+                a = New Analysis
+                a.Code = sCode
+                $cAna[sCode] = a
+                hBook.Analyses[a.Id] = a
+            Endif
+            a.Rubro = ToInt(c["rubro"])
+            a.Name = Trim(c["name"])
+            a.Unit = Trim(c["unit"])
+            a.EquipmentYield = IIf(ToFloat(c["equipment_yield"]) > 0, ToFloat(c["equipment_yield"]), 1)
+            a.LaborYield = IIf(ToFloat(c["labor_yield"]) > 0, ToFloat(c["labor_yield"]), 1)
+            Inc n
+        Next
+        Report.Add(Subst(("&1 analyses"), n))
+    Endif
+    aRows = Csv.Read(sFolder &/ "analysis-items.csv")
+    If aRows Then
+        n = 0
+        nBad = 0
+        For Each c In aRows
+            a = $cAna[CodeOf(c["analysis"])]
+            If Not a Then
+                Inc nBad
+                Continue
+            Endif
+            sCode = CodeOf(c["resource"])
+            r = $cRes[sCode]
+            If Not r Then
+                ' a resource the library doesn't have: made empty, so the line is kept and the problem shows
+                r = GetResource(hBook, sCode)
+                r.Name = ("(missing in the library)")
+                cMissing[sCode] = sCode
+            Endif
+            a.Lines.Add(AnalysisLine.Make(False, r.Id, ToFloat(c["quantity"])))
+            Inc n
+        Next
+        Report.Add(Subst(("&1 analysis lines"), n))
+        If nBad Then Report.Add(Subst(("&1 lines of analyses that don't exist were skipped"), nBad))
+    Endif
+
 End
 
-'' Labor and equipment: how far the typed price is from the calculation
-Private Sub CompareCalculations(hBook As PriceBook)
+'' Labor and equipment whose typed price differs from the calculation keep the typed one as an override
+Private Sub KeepTypedPrices(hBook As PriceBook)
 
     Dim r As Resource
     Dim fCalc As Float
     Dim aLines As New String[]
 
     For Each r In hBook.Resources
-        If r.Kind = Resource.MATERIAL Or If Not hBook.HasCalculation(r) Then Continue
-        r.Calculated = True
-        fCalc = hBook.BasePrice(r)
-        r.Calculated = False
-        If Abs(fCalc - r.Price) > 0.005 Then aLines.Add(Subst("&1 &2: &3 / &4", r.Code, r.Name, Format(r.Price, "0.00"), Format(fCalc, "0.00")))
+        If r.Kind = Resource.MATERIAL Or If Not r.HasCalculation() Then Continue
+        fCalc = hBook.CalculatedPrice(r)
+        If r.Price > 0 And If Abs(fCalc - r.Price) > 0.005 Then
+            r.PriceOverride = True
+            aLines.Add(Subst("&1 &2: &3 / &4", r.Code, r.Name, Format(r.Price, "0.00"), Format(fCalc, "0.00")))
+        Else
+            r.PriceOverride = False
+        Endif
     Next
     If aLines.Count Then
-        Report.Add(Subst(("&1 labor and equipment prices differ from their calculation (typed / calculated; the typed ones are used):"), aLines.Count))
+        Report.Add(Subst(("&1 labor and equipment prices were typed over their calculation and are kept as overrides (typed / calculated):"), aLines.Count))
         Report.Insert(aLines)
     Endif
 
 End
 
-'' Resources and sub-analyses the analyses use but the book doesn't have
+'' Resources the analyses use but the library doesn't have, and resources without a price
 Private Sub ReportMissing(hBook As PriceBook)
 
-    Dim a As Analysis
-    Dim l As AnalysisLine
-    Dim cMissing As New Collection
-    Dim nNoPrice As Integer
     Dim r As Resource
+    Dim aMissing As New String[]
+    Dim nNoPrice As Integer
 
-    For Each a In hBook.Analyses
-        For Each l In a.Lines
-            If l.IsAnalysis Then Continue
-            If Not hBook.Resources.Exist(CStr(l.Code)) Then cMissing[CStr(l.Code)] = l.Code
-        Next
-    Next
     For Each r In hBook.Resources
-        If hBook.BasePrice(r) = 0 Then Inc nNoPrice
+        If r.Name = ("(missing in the library)") Then
+            aMissing.Add(r.Code)
+        Else If hBook.PriceOf(r) = 0 Then
+            Inc nNoPrice
+        Endif
     Next
-    If cMissing.Count Then Report.Add(Subst(("&1 resources used by analyses are missing: &2"), cMissing.Count, Utils.JoinNumbers(PriceBook.SortedCodes(cMissing))))
+    If aMissing.Count Then Report.Add(Subst(("&1 resources used by analyses are missing in the library, made empty: &2"), aMissing.Count, aMissing.Join(", ")))
     If nNoPrice Then Report.Add(Subst(("&1 resources have no price"), nNoPrice))
+
+End
+
+'' A code as written in the CSV ("2001", "2001.0") as text; "" if there is none
+Private Function CodeOf(v As Variant) As String
+
+    Dim s As String = Trim(CStr(v))
+
+    If s = "" Or If s = "0" Then Return ""
+    If InStr(s, ".") And If Utils.IsDigits(Left(s, InStr(s, ".") - 1)) And If Utils.IsDigits(Replace(Mid(s, InStr(s, ".") + 1), "0", ""), True) Then s = Left(s, InStr(s, ".") - 1)
+    Return s
 
 End
 

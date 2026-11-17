@@ -1,10 +1,8 @@
 ' Gambas class file
 
-'' The hourly cost of a piece of equipment, as licita2003's "equ" sheet: depreciation + interest + repairs
+'' The hourly cost of a piece of equipment (Resource.Machine), as licita2003's "equ" sheet: depreciation + interest + repairs
 '' + fuel + lubricants
 
-Public Code As Integer                          '' the equipment resource it prices (1000xx)
-Public Name As String = ""
 Public Power As Float                           '' HP
 Public Cost As Float                            '' purchase cost today
 Public ResidualPct As Float = 10                '' value left at the end of its life, % of Cost
@@ -59,8 +57,6 @@ Public Function ToJson() As Collection
 
     Dim c As New JSONCollection
 
-    c["code"] = Code
-    c["name"] = Name
     c["power"] = Power
     c["cost"] = Cost
     c["residualPct"] = ResidualPct
@@ -79,11 +75,25 @@ End
 Static Public Function FromJson(c As Collection) As Machine
 
     Dim m As New Machine
-    Dim s As String
+    Dim v As Variant
 
-    For Each s In ["code", "name", "power", "cost", "residualPct", "lifeHours", "hoursPerYear", "interestPct", "repairsPct", "fuel", "fuelPrice", "fuelUse", "lubricantPct"]
-        If c.Exist(s) Then Object.SetProperty(m, UCase(Left(s)) & Mid(s, 2), c[s])
+    For Each v In c
+        m.SetField(c.Key, v)
     Next
     Return m
+
+End
+
+Static Public Function Fields() As String[]
+
+    Return ["power", "cost", "residualPct", "lifeHours", "hoursPerYear", "interestPct", "repairsPct", "fuel", "fuelPrice", "fuelUse", "lubricantPct"]
+
+End
+
+'' Sets a field by its file name; True if there is no such field
+Public Function SetField(sName As String, v As Variant) As Boolean
+
+    If Not Fields().Exist(sName) Then Return True
+    Object.SetProperty(Me, UCase(Left(sName)) & Mid(sName, 2), v)
 
 End

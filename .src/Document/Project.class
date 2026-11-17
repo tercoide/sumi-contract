@@ -56,6 +56,9 @@ Public GuaranteeDays As Integer = 365           '' from the provisional to the f
 '' PRICES: resources, analyses, rubros, labor and equipment (see PriceBook)
 Public Prices As New PriceBook
 
+'' THE CHANGE LOG: every change made through Cmd (see Change), kept with the file
+Public Changes As New Change[]
+
 Public Created As Date = Now
 Public Modified As Date = Now
 
@@ -168,6 +171,7 @@ Public Function ToJson() As Collection
 
     Dim aList As Variant[]
     Dim hPro As Professional
+    Dim hChange As Change
     Dim d As Date
 
     c["name"] = Name
@@ -214,6 +218,11 @@ Public Function ToJson() As Collection
     c["adjustmentBase"] = AdjustmentBase
     c["guaranteeDays"] = GuaranteeDays
     c["prices"] = Prices.ToJson()
+    aList = New Variant[]
+    For Each hChange In Changes
+        aList.Add(hChange.ToJson())
+    Next
+    c["changes"] = aList
     c["created"] = Format(Created, "yyyy-mm-dd hh:nn:ss")
     c["modified"] = Format(Modified, "yyyy-mm-dd hh:nn:ss")
     Return c
@@ -276,6 +285,12 @@ Public Sub FromJson(c As Collection)
     If c.Exist("prices") Then
         Prices = New PriceBook
         Prices.FromJson(c["prices"])
+    Endif
+    If c.Exist("changes") Then
+        Changes.Clear
+        For Each v In c["changes"]
+            Changes.Add(Change.FromJson(v))
+        Next
     Endif
     If c.Exist("created") Then Created = ReadDate(c["created"], Created)
     If c.Exist("modified") Then Modified = ReadDate(c["modified"], Modified)
