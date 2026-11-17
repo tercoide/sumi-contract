@@ -1,0 +1,474 @@
+' Gambas module file
+
+'' The PDF reports (decided with the user 2026-11-17: the outputs are PDF, all of them): the budget by rubro,
+'' its summary, the analyses it uses (licita2003's A B C D layout), the Gantt, and a contract's certificate.
+'' Each writes a file and returns "" or why it couldn't. See PdfDoc.
+
+Private Const MARGIN As Float = 15
+Private Const LINE_H As Float = 4.6               ' mm a table row
+
+Private $hPdf As PdfDoc
+Private $fY As Float                            ' where the next row goes
+Private $sTitle As String
+Private $aCols As Float[]                       ' x of each column (left edge)
+Private $aWidths As Float[]
+Private $aAlign As String[]
+Private $aHeads As String[]
+
+Public Function Kinds() As String[]
+
+    Return ["budget", "summary", "analyses", "gantt", "certificate"]
+
+End
+
+'' Writes the report sKind to sFile; for a certificate, sContract and sCert say which. "" or the reason it failed.
+Public Function Make(sKind As String, sFile As String, Optional sContract As String, sCert As String) As String
+
+    Dim sWhy As String
+
+    Select Case sKind
+        Case "budget"
+            sWhy = BudgetReport(False)
+        Case "summary"
+            sWhy = BudgetReport(True)
+        Case "analyses"
+            sWhy = AnalysesReport()
+        Case "gantt"
+            sWhy = GanttReport()
+        Case "certificate"
+            sWhy = CertificateReport(sContract, sCert)
+        Default
+            Return Subst(("Unknown report &1."), sKind)
+    End Select
+    If sWhy Then Return sWhy
+    Footers()
+    If $hPdf.Save(sFile) Then Return Subst(("Can't write &1."), sFile)
+    AppLog.Info("Report " & sKind & " written to " & sFile, "Reports.Make")
+    Return ""
+
+End
+
+'' THE PAGE
+
+Private Sub Start(sTitle As String, Optional bLandscape As Boolean)
+
+    $hPdf = New PdfDoc(bLandscape)
+    $sTitle = sTitle
+    NewPage()
+
+End
+
+'' A new page with the header: the work, the client, the title, the date
+Private Sub NewPage()
+
+    Dim p As Project = sumi.Project
+    Dim fW As Float = $hPdf.PageW()
+
+    $hPdf.NewPage()
+    $hPdf.Text(MARGIN, 14, p.Title(), 13, True)
+    $hPdf.Text(fW - MARGIN, 14, $sTitle, 11, True, "r")
+    $hPdf.Text(MARGIN, 19, Trim(p.Client & IIf(p.Client And p.Location, " - ", "") & p.Location & IIf(p.City, ", " & p.City, "")), 8.5)
+    $hPdf.Text(fW - MARGIN, 19, Format(Now, "dd/mm/yyyy"), 8.5, False, "r")
+    $hPdf.Line(MARGIN, 21.5, fW - MARGIN, 21.5, 0.4)
+    $fY = 28
+    If $aHeads And If $aHeads.Count Then Heads()
+
+End
+
+'' "Page n of m" on every page: PdfDoc writes it when saving (the count is known then)
+Private Sub Footers()
+
+    $hPdf.Footer = ("Page &1 of &2") & " - sumi-contract - " & sumi.Project.Title()
+
+End
+
+'' Room for fH mm more, or a new page
+Private Sub Need(fH As Float)
+
+    If $fY + fH > $hPdf.PageH() - 14 Then NewPage()
+
+End
+
+'' A table: column titles, widths in mm (0 = the rest), alignments
+Private Sub Table(aHeads As String[], aWidths As Float[], aAlign As String[])
+
+    Dim i As Integer
+    Dim fX, fRest As Float
+
+    $aHeads = aHeads
+    $aAlign = aAlign
+    $aWidths = New Float[]
+    fRest = $hPdf.PageW() - 2 * MARGIN
+    For i = 0 To aWidths.Max
+        fRest -= aWidths[i]
+    Next
+    $aCols = New Float[]
+    fX = MARGIN
+    For i = 0 To aWidths.Max
+        $aCols.Add(fX)
+        $aWidths.Add(IIf(aWidths[i] > 0, aWidths[i], fRest))
+        fX += $aWidths[i]
+    Next
+    Need(LINE_H * 3)
+    Heads()
+
+End
+
+Private Sub Heads()
+
+    Dim i As Integer
+
+    $hPdf.Box(MARGIN, $fY - 3.6, $hPdf.PageW() - 2 * MARGIN, LINE_H + 0.4, &HDDE4EE)
+    For i = 0 To $aHeads.Max
+        CellText(i, $aHeads[i], True)
+    Next
+    $fY += LINE_H + 0.6
+
+End
+
+Private Sub CellText(i As Integer, sText As String, Optional bBold As Boolean, iColor As Integer = 0)
+
+    Dim fSize As Float = 8
+    Dim s As String = $hPdf.Fit(sText, $aWidths[i] - 1.5, fSize, bBold)
+
+    Select Case $aAlign[i]
+        Case "r"
+            $hPdf.Text($aCols[i] + $aWidths[i] - 0.8, $fY, s, fSize, bBold, "r", iColor)
+        Case "c"
+            $hPdf.Text($aCols[i] + $aWidths[i] / 2, $fY, s, fSize, bBold, "c", iColor)
+        Default
+            $hPdf.Text($aCols[i] + 0.8, $fY, s, fSize, bBold, "l", iColor)
+    End Select
+
+End
+
+'' A row of the table; bBold for titles and totals, a band behind when iBand
+Private Sub Row(aCells As String[], Optional bBold As Boolean, iBand As Integer = -1)
+
+    Dim i As Integer
+
+    Need(LINE_H)
+    If iBand >= 0 Then $hPdf.Box(MARGIN, $fY - 3.4, $hPdf.PageW() - 2 * MARGIN, LINE_H, iBand)
+    For i = 0 To Min(aCells.Max, $aCols.Max)
+        CellText(i, aCells[i], bBold)
+    Next
+    $fY += LINE_H
+
+End
+
+Private Sub EndTable()
+
+    $aHeads = Null
+
+End
+
+Private Sub Gap(Optional fH As Float = 3)
+
+    $fY += fH
+
+End
+
+Private Function Money(f As Float) As String
+
+    Return Format(f, "#,##0.00")
+
+End
+
+'' THE BUDGET (bSummary: only the rubros)
+
+Private Function BudgetReport(bSummary As Boolean) As String
+
+    Dim p As Project = sumi.Project
+    Dim h As Budget = p.Budget
+    Dim iRubro As Integer
+    Dim b As BudgetItem
+    Dim f, fAll As Float[]
+    Dim k As Coef
+    Dim fArea As Float
+
+    If h.Items.Count = 0 Then Return ("The budget has no items.")
+    fAll = h.Totals()
+    If bSummary Then
+        Start(("Budget summary"))
+        Table([("Rubro"), ("Description"), ("Direct cost"), ("Price"), ("%")], [14, 0, 30, 32, 16], ["l", "l", "r", "r", "r"])
+        For Each iRubro In h.UsedRubros()
+            f = h.Totals(iRubro)
+            Row([CStr(iRubro), p.Prices.RubroName(iRubro), Money(f[0]), Money(f[1]), Share(f[1], fAll[1])])
+        Next
+    Else
+        Start(("Budget"), True)
+        Table([("Item"), ("Description"), ("Unit"), ("Quantity"), ("Unit price"), ("Total"), ("%")], [16, 0, 14, 26, 30, 34, 16], ["l", "l", "c", "r", "r", "r", "r"])
+        For Each iRubro In h.UsedRubros()
+            f = h.Totals(iRubro)
+            Need(LINE_H * 3)
+            Row([CStr(iRubro), p.Prices.RubroName(iRubro), "", "", "", Money(f[1]), Share(f[1], fAll[1])], True, &HEEF1F5)
+            For Each b In h.Items
+                If b.Rubro <> iRubro Then Continue
+                Row([b.Code, h.DescriptionOf(b), h.UnitOf(b), Format(b.Quantity, "#,##0.00"), Money(h.UnitPrice(b)), Money(h.Total(b)), Share(h.Total(b), fAll[1])])
+            Next
+        Next
+    Endif
+    Gap(1)
+    $hPdf.Line(MARGIN, $fY - 3.8, $hPdf.PageW() - MARGIN, $fY - 3.8, 0.3)
+    If bSummary Then
+        Row(["", ("Total") & " (" & p.Currency & ")", Money(fAll[0]), Money(fAll[1]), ""], True)
+    Else
+        Row(["", ("Direct cost"), "", "", "", Money(fAll[0]), ""], True)
+        Row(["", ("Total price") & " (" & p.Currency & ")", "", "", "", Money(fAll[1]), ""], True)
+    Endif
+    EndTable()
+    Gap()
+    fArea = p.CoveredArea + p.SemiCoveredArea / 2
+    Need(LINE_H * 6)
+    $hPdf.Text(MARGIN, $fY, ("From cost to price"), 9, True)
+    Gap(LINE_H)
+    $hPdf.Text(MARGIN, $fY, Subst(("General expenses &1%, profit &2%, taxes &3%: × &4"), p.OverheadPct, p.ProfitPct, p.TaxesPct, Format(p.PriceFactor(), "0.0000")), 8)
+    Gap(LINE_H)
+    For Each iRubro In h.UsedRubros()
+        For Each k In h.CoefsOf(iRubro)
+            Need(LINE_H)
+            $hPdf.Text(MARGIN, $fY, Subst(("Rubro &1: &2 &3%"), iRubro, k.Name, k.Pct), 8)
+            Gap(LINE_H)
+        Next
+    Next
+    For Each b In h.Items
+        For Each k In b.Coefs
+            Need(LINE_H)
+            $hPdf.Text(MARGIN, $fY, Subst(("Item &1: &2 &3%"), b.Code, k.Name, k.Pct), 8)
+            Gap(LINE_H)
+        Next
+    Next
+    If fArea > 0 Then
+        Need(LINE_H)
+        $hPdf.Text(MARGIN, $fY, Subst(("&1 &2 a m² (&3 m²)"), p.Currency, Format(fAll[1] / fArea, "#,##0"), Format(fArea, "#,##0.00")), 8, True)
+    Endif
+    Return ""
+
+End
+
+Private Function Share(fPart As Float, fWhole As Float) As String
+
+    If fWhole = 0 Then Return ""
+    Return Format(fPart / fWhole, "0.0%")
+
+End
+
+'' THE ANALYSES THE BUDGET USES (with their sub-analyses), as licita2003's sheet
+
+Private Function AnalysesReport() As String
+
+    Dim p As Project = sumi.Project
+    Dim b As PriceBook = p.Prices
+    Dim aIds As New String[]
+    Dim item As BudgetItem
+    Dim a As Analysis
+    Dim i As Integer
+
+    For Each item In p.Budget.Items
+        If item.Analysis Then AddWithSubs(item.Analysis, aIds, 0)
+    Next
+    If aIds.Count = 0 Then
+        ' no budget yet: every analysis of the price book
+        For Each a In PriceBook.SortedByCode(b.Analyses)
+            aIds.Add(a.Id)
+        Next
+    Endif
+    If aIds.Count = 0 Then Return ("There are no analyses.")
+    Start(("Unit price analyses"))
+    For i = 0 To aIds.Max
+        a = b.Analyses[aIds[i]]
+        If a Then OneAnalysis(a)
+    Next
+    Return ""
+
+End
+
+Private Sub AddWithSubs(sId As String, aIds As String[], iDepth As Integer)
+
+    Dim a As Analysis = sumi.Project.Prices.Analyses[sId]
+    Dim l As AnalysisLine
+
+    If Not a Or If aIds.Exist(sId) Or If iDepth > PriceBook.MAX_DEPTH Then Return
+    aIds.Add(sId)
+    For Each l In a.Lines
+        If l.IsAnalysis Then AddWithSubs(l.Ref, aIds, iDepth + 1)
+    Next
+
+End
+
+Private Sub OneAnalysis(a As Analysis)
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim f As Float[] = b.Parts(a)
+    Dim aGroups As String[] = [Resource.MATERIAL, Resource.EQUIPMENT, Resource.LABOR, "analysis"]
+    Dim aTitles As String[] = [("A - Materials"), ("B - Equipment"), ("C - Labor"), ("Sub-analyses")]
+    Dim g As Integer
+    Dim l As AnalysisLine
+    Dim r As Resource
+    Dim n As Analysis
+    Dim bAny As Boolean
+    Dim fFactor As Float = sumi.Project.PriceFactor()
+
+    Need(LINE_H * 8)
+    $hPdf.Box(MARGIN, $fY - 4, $hPdf.PageW() - 2 * MARGIN, 6, &HDDE4EE)
+    $hPdf.Text(MARGIN + 1, $fY, a.Code & "  " & a.Name, 9.5, True)
+    $hPdf.Text($hPdf.PageW() - MARGIN - 1, $fY, ("Unit") & ": " & a.Unit & "   " & ("Rubro") & ": " & a.Rubro, 8.5, False, "r")
+    Gap(LINE_H + 1.5)
+    If a.LaborYield <> 1 Or a.EquipmentYield <> 1 Then
+        $hPdf.Text(MARGIN, $fY, Subst(("Labor yield &1, equipment yield &2"), a.LaborYield, a.EquipmentYield), 8)
+        Gap(LINE_H)
+    Endif
+    Table([("Code"), ("Description"), ("Quantity"), ("Unit"), ("Unit price"), ("Total")], [18, 0, 22, 14, 26, 28], ["l", "l", "r", "c", "r", "r"])
+    For g = 0 To aGroups.Max
+        bAny = False
+        For Each l In a.Lines
+            If l.IsAnalysis Then
+                If aGroups[g] <> "analysis" Then Continue
+            Else
+                r = b.Resources[l.Ref]
+                If Not r Or If r.Kind <> aGroups[g] Then Continue
+            Endif
+            If Not bAny Then
+                Row(["", aTitles[g], "", "", "", ""], True)
+                bAny = True
+            Endif
+            If l.IsAnalysis Then
+                n = b.Analyses[l.Ref]
+                If n Then Row([n.Code, n.Name, Format(l.Quantity, "0.0###"), n.Unit, Money(b.Direct(n)), Money(b.LineCost(a, l))])
+            Else
+                Row([r.Code, r.Name, Format(l.Quantity, "0.0###"), r.Unit, Money(b.PriceOf(r)), Money(b.LineCost(a, l))])
+            Endif
+        Next
+    Next
+    EndTable()
+    Need(LINE_H * 3)
+    $hPdf.Text($hPdf.PageW() - MARGIN, $fY, Subst(("A &1 + B &2 + C &3 = D direct cost &4"), Money(f[0]), Money(f[1]), Money(f[2]), Money(f[0] + f[1] + f[2])), 8.5, True, "r")
+    Gap(LINE_H)
+    $hPdf.Text($hPdf.PageW() - MARGIN, $fY, Subst(("Price = D × &1 = &2"), Format(fFactor, "0.0000"), Money((f[0] + f[1] + f[2]) * fFactor)), 8.5, True, "r")
+    Gap(LINE_H * 2)
+
+End
+
+'' THE GANTT
+
+Private Function GanttReport() As String
+
+    Dim p As Project = sumi.Project
+    Dim s As Schedule = p.Schedule
+    Dim h As Budget = p.Budget
+    Dim b As BudgetItem
+    Dim t As GanttTask
+    Dim iRubro As Integer
+    Dim fX0, fW, fScale As Float
+    Dim f As Float[]
+    Dim i As Integer
+    Dim d As Date
+
+    If h.Items.Count = 0 Then Return ("The budget has no items.")
+    If s.Compute(h) Then Return s.Problem
+    Start(("Gantt"), True)
+    Table([("Item"), ("Task"), ("Days"), ("Start"), ("End"), ""], [14, 70, 12, 18, 18, 0], ["l", "l", "r", "c", "c", "l"])
+    fX0 = $aCols[5] + 1
+    fW = $aWidths[5] - 2
+    If s.Length <= 0 Then Return ("The tasks have no days.")
+    fScale = fW / s.Length
+    ' the months over the bars
+    d = s.DateOf(0)
+    For i = 0 To CInt(s.Length)
+        If i = 0 Or If Day(s.DateOf(i)) < Day(d) Then $hPdf.Text(fX0 + i * fScale, $fY - 5.2, Format(s.DateOf(i), "mm/yy"), 6, False, "l", &H606060)
+        d = s.DateOf(i)
+    Next
+    For Each iRubro In h.UsedRubros()
+        f = s.RubroSpan(h, iRubro)
+        Need(LINE_H * 2)
+        Row([CStr(iRubro), p.Prices.RubroName(iRubro), Format(f[1] - f[0], "0.#"), Format(s.DateOf(f[0]), "dd/mm/yy"), Format(s.DateOf(Max(f[0], f[1] - 1)), "dd/mm/yy"), ""], True, &HEEF1F5)
+        $hPdf.Box(fX0 + f[0] * fScale, $fY - LINE_H - 2.2, Max(0.4, (f[1] - f[0]) * fScale), 1.6, &H333333)
+        For Each b In h.Items
+            If b.Rubro <> iRubro Then Continue
+            t = s.Tasks[b.Id]
+            Row([b.Code, h.DescriptionOf(b), Format(t.Days, "0.#"), Format(s.DateOf(t.EarlyStart), "dd/mm/yy"), Format(s.DateOf(Max(t.EarlyStart, t.EarlyFinish - 1)), "dd/mm/yy"), ""])
+            $hPdf.Box(fX0 + t.EarlyStart * fScale, $fY - LINE_H - 3, Max(0.4, t.Days * fScale), 2.8, IIf(t.Critical(), &HD03030, &H4A7CC2))
+            If s.DoneOf(b) > 0 Then $hPdf.Box(fX0 + t.EarlyStart * fScale, $fY - LINE_H - 2, Max(0.3, t.Days * fScale * s.DoneOf(b)), 0.8, &H000000)
+        Next
+    Next
+    EndTable()
+    Gap()
+    Need(LINE_H * 2)
+    $hPdf.Text(MARGIN, $fY, Subst(("&1 working days, from &2 to &3. Red: the critical path. Black line: certified progress."), Format(s.Length, "0.#"), Format(s.DateOf(0), "dd/mm/yyyy"), Format(s.DateOf(Max(0, s.Length - 1)), "dd/mm/yyyy")), 8)
+    Return ""
+
+End
+
+'' A CERTIFICATE
+
+Private Function CertificateReport(sContract As String, sCert As String) As String
+
+    Dim p As Project = sumi.Project
+    Dim t As Contract = p.Contracts.Find(sContract)
+    Dim q As Certificate
+    Dim k As Contractor
+    Dim r As ContractPart
+    Dim b As BudgetItem
+    Dim f As Float[]
+    Dim fBefore, fAcc As Float
+    Dim sWho, sCode, sDesc, sUnit As String
+
+    If Not t Then Return Subst(("There is no contract &1."), sContract)
+    q = t.FindCert(sCert)
+    If Not q Then Return Subst(("Contract &1 has no certificate &2."), t.Code, sCert)
+    k = Company.FindContractor(t.Contractor)
+    f = t.Numbers(q)
+    Start(Subst(("Certificate &1 - &2"), q.Number, t.Code))
+    sWho = "?"
+    If k Then
+        sWho = k.Name
+        If k.TaxId Then sWho &= "  " & ("Tax id") & " " & k.TaxId
+    Endif
+    $hPdf.Text(MARGIN, $fY, ("Contractor") & ": " & sWho, 9, True)
+    Gap(LINE_H)
+    $hPdf.Text(MARGIN, $fY, Subst(("Contract &1: &2. Period &3, date &4. Kind: &5. &6"), t.Code, t.Title, q.Period, q.When, Tr(q.Kind), IIf(q.Status = "issued", ("Issued"), ("DRAFT"))), 8.5)
+    Gap(LINE_H * 1.5)
+    If q.Kind = Certificate.PROGRESS Then
+        Table([("Item"), ("Description"), ("Unit"), ("Contract"), ("Before"), ("This period"), ("Accumulated"), ("Price"), ("Amount")], [13, 0, 11, 20, 19, 19, 20, 22, 26], ["l", "l", "c", "r", "r", "r", "r", "r", "r"])
+        For Each r In t.Parts
+            b = p.Budget.Find(r.Item)
+            fBefore = t.Before(q, r.Id)
+            If q.Measures.Exist(r.Id) Then fAcc = q.Measures[r.Id] Else fAcc = fBefore
+            sCode = ""
+            sDesc = ("(the budget item is gone)")
+            sUnit = ""
+            If b Then
+                sCode = b.Code
+                sDesc = p.Budget.DescriptionOf(b)
+                sUnit = p.Budget.UnitOf(b)
+            Endif
+            Row([sCode, sDesc, sUnit, Format(r.Quantity, "#,##0.00"), Format(fBefore, "#,##0.00"), Format(fAcc - fBefore, "#,##0.00"), Format(fAcc, "#,##0.00"), Money(r.UnitPrice), Money((fAcc - fBefore) * r.UnitPrice)])
+        Next
+        EndTable()
+        Gap()
+    Endif
+    Need(LINE_H * 8)
+    Amount(("Work of the period"), f[0])
+    If t.BaseIndex > 0 And q.Index > 0 Then Amount(Subst(("Adjustment: &1 &2 / &3 - 1"), t.IndexName, q.Index, t.BaseIndex), f[1])
+    If f[2] Then Amount(Subst(("Advance recovered (&1%)"), t.AdvancePct), -f[2])
+    If f[3] Then Amount(Subst(("Guarantee retention (&1%)"), t.RetentionPct), -f[3])
+    $hPdf.Line($hPdf.PageW() - MARGIN - 70, $fY - 3.6, $hPdf.PageW() - MARGIN, $fY - 3.6, 0.3)
+    Amount(("Net to pay") & " (" & p.Currency & ")", f[4], True)
+    Gap(LINE_H * 4)
+    Need(LINE_H * 4)
+    $hPdf.Line(MARGIN, $fY, MARGIN + 60, $fY, 0.2)
+    $hPdf.Line($hPdf.PageW() - MARGIN - 60, $fY, $hPdf.PageW() - MARGIN, $fY, 0.2)
+    Gap(LINE_H)
+    $hPdf.Text(MARGIN + 30, $fY, ("Site direction"), 8, False, "c")
+    $hPdf.Text($hPdf.PageW() - MARGIN - 30, $fY, ("Contractor"), 8, False, "c")
+    Return ""
+
+End
+
+Private Sub Amount(sWhat As String, f As Float, Optional bBold As Boolean)
+
+    $hPdf.Text($hPdf.PageW() - MARGIN - 40, $fY, sWhat, 9, bBold, "r")
+    $hPdf.Text($hPdf.PageW() - MARGIN, $fY, Money(f), 9, bBold, "r")
+    Gap(LINE_H + 0.4)
+
+End

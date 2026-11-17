@@ -140,6 +140,8 @@ Private Function Dispatch(sCommand As String, c As Collection) As Collection
             Return CertCmd(sCommand, c)
         Case "payment.add", "payment.set", "payment.delete"
             Return PaymentCmd(sCommand, c)
+        Case "report.pdf"
+            Return ReportPdf(c)
         Case "schedule.get"
             Return ScheduleGet(c)
         Case "task.set"
@@ -209,6 +211,7 @@ Public Function Help() As Collection
     c["payment.add"] = "{contract, amount, date?, means? (transfer, cheque, cash, other), reference?, certificate? (number), invoice?, invoiceDate?, note?} -> its index"
     c["payment.set"] = "{contract, index, field: value...}"
     c["payment.delete"] = "{contract, index}"
+    c["report.pdf"] = "{kind (budget, summary, analyses, gantt, certificate), file (the .pdf to write), contract? and cert? (for a certificate)} writes a PDF report"
     c["rubro.coefs"] = "{rubro, coefs [{name, pct}...]} the coefficients of a rubro in the budget (on top of the project's)"
     Return c
 
@@ -1865,5 +1868,18 @@ Private Function PaymentCmd(sCommand As String, c As Collection) As Collection
     Touch("contracts")
     t.Payments[i].Apply(cSet)
     Return Ok()
+
+End
+
+'' REPORTS (nothing changes: not logged)
+
+Private Function ReportPdf(c As Collection) As Collection
+
+    Dim sWhy As String
+
+    If Not c["kind"] Or If Not c["file"] Then Return Fail(("It needs the kind of report and the file."))
+    sWhy = Reports.Make(c["kind"], c["file"], c["contract"], CStr(c["cert"]))
+    If sWhy Then Return Fail(sWhy)
+    Return Ok(["file": c["file"]])
 
 End

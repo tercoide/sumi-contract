@@ -40,6 +40,7 @@ Public Sub Run()
     HistoryTab = New FHistory(tabMain[TAB_HISTORY])
     tabMain.Index = TAB_PROJECT
 
+    MakePdfMenu()
     $mRecent = New Menu(Me, True)
     $mRecent.Name = "RecentFiles"
     mbOpen.Menu = "RecentFiles"     ' MenuButton.Menu is the menu's name
@@ -148,6 +149,55 @@ End
 Public Sub SettingsChanged()
 
     ProjectTab.ShowProject(sumi.Project)
+
+End
+
+'' The PDF menu: one entry for each report (the certificate's is in the Contracts tab)
+Private Sub MakePdfMenu()
+
+    Dim hMenu, hItem As Menu
+    Dim i As Integer
+    Dim aKinds As String[] = ["budget", "summary", "analyses", "gantt"]
+    Dim aTitles As String[] = [("Budget by rubro"), ("Budget summary"), ("Unit price analyses"), ("Gantt")]
+
+    hMenu = New Menu(Me, True)
+    hMenu.Name = "PdfMenu"
+    For i = 0 To aKinds.Max
+        hItem = New Menu(hMenu) As "PdfItem"
+        hItem.Text = aTitles[i] & "..."
+        hItem.Tag = aKinds[i]
+    Next
+    mbPdf.Menu = "PdfMenu"
+    Utils.SetIcon(mbPdf, "actions/document-export.svg")
+
+End
+
+Public Sub PdfItem_Click()
+
+    SavePdf(Last.Tag)
+
+End
+
+'' Asks where, writes the report and opens it
+Public Sub SavePdf(sKind As String, Optional sContract As String, sCert As String)
+
+    Dim sFile, sWhy As String
+
+    Dialog.Title = ("Save the PDF")
+    Dialog.Filter = ["*.pdf", ("PDF files")]
+    Dialog.Path = IIf(Config.FilesLastPath, Config.FilesLastPath, User.Home) &/ sumi.Project.Title() & " - " & sKind & IIf(sCert, " " & sCert, "") & ".pdf"
+    If Dialog.SaveFile() Then Return
+    sFile = Dialog.Path
+    If File.Ext(sFile) <> "pdf" Then sFile &= ".pdf"
+    Inc Application.Busy
+    sWhy = Reports.Make(sKind, sFile, sContract, sCert)
+    Dec Application.Busy
+    If sWhy Then
+        Message.Warning(sWhy)
+        Return
+    Endif
+    SetStatus(Subst(("Written &1"), sFile))
+    Try Desktop.Open(sFile)
 
 End
 

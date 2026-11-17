@@ -15,7 +15,7 @@ Public Function Run() As Integer
     ' the Spanish translation is there and loads; then the checks run in English, whatever the computer's language
     System.Language = "es_AR.UTF-8"
     Check(("Save") = "Guardar" And Tr("labor") = "mano de obra", "the Spanish translation: " & ("Save"))
-    System.Language = "en_US.UTF-8"
+    System.Language = "C"
     Check(("Save") = "Save", "back to English")
     sumi.Interactive = False
     Config.Root = $sTemp &/ "config"
@@ -732,6 +732,42 @@ Private Sub TestContracts()
     Cmd.Run("resource.set", ["key": "MAT-0001", "price": 9])
     Cmd.Run("prices.fromStandard")
     Check(p.Prices.ResourceByCode("MAT-0001").Price = 2, "the standard's prices taken again")
+
+    ' the PDF reports, of the project with contracts
+    sumi.Project = q
+    TestReports()
+
+End
+
+Private Sub TestReports()
+
+    Dim sKind, sFile, sText As String
+    Dim c As Collection
+    Dim h As PdfDoc
+    Dim sOut As String
+
+    For Each sKind In Reports.Kinds()
+        sFile = $sTemp &/ sKind & ".pdf"
+        c = Cmd.Run("report.pdf", ["kind": sKind, "file": sFile, "contract": "C-01", "cert": 3])
+        Check(c["ok"], "report " & sKind & ": " & JSON.Encode(c))
+        If Not Exist(sFile) Then Continue
+        If Env["SMOKE_PDF_DIR"] Then Try Copy sFile To Env["SMOKE_PDF_DIR"] &/ sKind & ".pdf"
+        sText = File.Load(sFile)
+        Check(sText Begins "%PDF-1.4" And InStr(sText, "%%EOF") > 0 And InStr(sText, "/Count ") > 0, "a PDF file: " & sKind)
+        ' a PDF tool reads it, if the computer has one
+        If Exist("/usr/bin/pdfinfo") Then
+            Shell "pdfinfo " & Shell$(sFile) & " 2>&1" To sOut
+            Check(InStr(sOut, "Pages:") > 0 And InStr(sOut, "Syntax Error") = 0, "pdfinfo reads " & sKind & ": " & Left(sOut, 120))
+        Endif
+    Next
+    Check(Cmd.Run("report.pdf", ["kind": "certificate", "file": $sTemp &/ "x.pdf", "contract": "C-09"]).Exist("error"), "a certificate of a contract that doesn't exist")
+
+    ' the writer: right alignment by Helvetica's widths, texts cut to fit, accents
+    h = New PdfDoc
+    Check(Abs(h.TextWidth("1000", 10) - 4 * 0.556 * 10 * 25.4 / 72) < 1e-6, "Helvetica widths")
+    Check(h.TextWidth(h.Fit(String(200, "M"), 50, 9), 9) <= 50, "a long text is cut to fit")
+    h.Text(10, 10, "Mampostería de ladrillo común, ñandú")
+    Check(Not h.Save($sTemp &/ "accents.pdf") And InStr(File.Load($sTemp &/ "accents.pdf"), "Mamposter" & Chr(237) & "a") > 0, "accents go as Windows-1252")
 
 End
 

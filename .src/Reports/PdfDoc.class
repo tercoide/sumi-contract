@@ -1,0 +1,214 @@
+' Gambas class file
+
+'' A small PDF writer for the reports: A4 pages (portrait or landscape), text in Helvetica and Helvetica-Bold
+'' (the PDF base fonts: nothing to embed), lines and filled rectangles, colors. Coordinates in millimetres from
+'' the top left of the page. Text goes as Windows-1252 (Spanish accents and ñ); text widths use Helvetica's
+'' metrics, so numbers can be aligned to the right and long texts cut.
+
+Public Const A4W As Float = 210
+Public Const A4H As Float = 297
+
+Public Landscape As Boolean
+Public Footer As String                         '' written at the foot of every page when saving: &1 the page, &2 how many
+Private $aPages As New String[]                 ' the content stream of each page
+Private $sPage As String                        ' the page being drawn
+Private $bOpen As Boolean
+Private $aWidths As Integer[]                   ' Helvetica widths, 1/1000 em, characters 32 to 126
+Private $aBoldWidths As Integer[]
+
+Public Sub _new(Optional bLandscape As Boolean)
+
+    Landscape = bLandscape
+    $aWidths = [278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, 1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556, 333, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584]
+    $aBoldWidths = [278, 333, 474, 556, 556, 889, 722, 238, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 333, 333, 584, 584, 584, 611, 975, 722, 722, 722, 722, 667, 611, 778, 722, 278, 556, 722, 611, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 333, 278, 333, 584, 556, 333, 556, 611, 556, 611, 556, 333, 611, 611, 278, 278, 556, 278, 889, 611, 611, 611, 611, 389, 556, 333, 611, 556, 778, 556, 556, 500, 389, 280, 389, 584]
+
+End
+
+Public Function PageW() As Float
+
+    Return IIf(Landscape, A4H, A4W)
+
+End
+
+Public Function PageH() As Float
+
+    Return IIf(Landscape, A4W, A4H)
+
+End
+
+Public Function PageCount() As Integer
+
+    Return $aPages.Count + IIf($bOpen, 1, 0)
+
+End
+
+Public Sub NewPage()
+
+    If $bOpen Then $aPages.Add($sPage)
+    $sPage = ""
+    $bOpen = True
+
+End
+
+Private Sub Emit(s As String)
+
+    If Not $bOpen Then NewPage()
+    $sPage &= s & "\n"
+
+End
+
+'' Millimetres to points; y from the top
+Private Function X(f As Float) As String
+
+    Return Num(f * 72 / 25.4)
+
+End
+
+Private Function Y(f As Float) As String
+
+    Return Num((PageH() - f) * 72 / 25.4)
+
+End
+
+Private Function Num(f As Float) As String
+
+    Return Replace(Format(f, "0.###"), ",", ".")
+
+End
+
+Private Function RGB(iColor As Integer) As String
+
+    Return Num(Color[iColor].Red / 255) & " " & Num(Color[iColor].Green / 255) & " " & Num(Color[iColor].Blue / 255)
+
+End
+
+'' The width of a text in mm at fSize points
+Public Function TextWidth(sText As String, fSize As Float, Optional bBold As Boolean) As Float
+
+    Dim i, iCode As Integer
+    Dim fUnits As Float
+    Dim s As String = Latin(sText)
+
+    For i = 1 To Len(s)
+        iCode = Asc(Mid$(s, i, 1))
+        If iCode >= 32 And If iCode <= 126 Then
+            fUnits += IIf(bBold, $aBoldWidths[iCode - 32], $aWidths[iCode - 32])
+        Else
+            fUnits += 556
+        Endif
+    Next
+    Return fUnits / 1000 * fSize * 25.4 / 72
+
+End
+
+'' The text cut to fit fWidth mm, with "..." when it doesn't
+Public Function Fit(sText As String, fWidth As Float, fSize As Float, Optional bBold As Boolean) As String
+
+    Dim s As String = sText
+
+    If TextWidth(s, fSize, bBold) <= fWidth Then Return s
+    While String.Len(s) > 1 And TextWidth(s & "...", fSize, bBold) > fWidth
+        s = String.Left(s, String.Len(s) - 1)
+    Wend
+    Return s & "..."
+
+End
+
+Private Function Latin(sText As String) As String
+
+    Dim s As String
+
+    Try s = Conv$(sText, "UTF-8", "WINDOWS-1252")
+    If Error Then s = sText
+    Return s
+
+End
+
+'' Text at x, y (the baseline, mm from the top). sAlign: "l", "r" (x is the right end) or "c" (x is the middle)
+Public Sub Text(fX As Float, fY As Float, sText As String, Optional fSize As Float = 9, bBold As Boolean, sAlign As String = "l", iColor As Integer = &H000000)
+
+    Dim s As String = Latin(sText)
+    Dim fW As Float
+
+    If sText = "" Then Return
+    If sAlign = "r" Then
+        fW = TextWidth(sText, fSize, bBold)
+        fX -= fW
+    Else If sAlign = "c" Then
+        fW = TextWidth(sText, fSize, bBold)
+        fX -= fW / 2
+    Endif
+    s = Replace(Replace(Replace(s, "\\", "\\\\"), "(", "\\("), ")", "\\)")
+    Emit("BT " & RGB(iColor) & " rg /" & IIf(bBold, "F2", "F1") & " " & Num(fSize) & " Tf " & X(fX) & " " & Y(fY) & " Td (" & s & ") Tj ET")
+
+End
+
+Public Sub Line(fX1 As Float, fY1 As Float, fX2 As Float, fY2 As Float, Optional fWidth As Float = 0.2, iColor As Integer = &H000000)
+
+    Emit(RGB(iColor) & " RG " & Num(fWidth * 72 / 25.4) & " w " & X(fX1) & " " & Y(fY1) & " m " & X(fX2) & " " & Y(fY2) & " l S")
+
+End
+
+'' A filled rectangle (fX, fY the top left corner)
+Public Sub Box(fX As Float, fY As Float, fW As Float, fH As Float, iColor As Integer)
+
+    Emit(RGB(iColor) & " rg " & X(fX) & " " & Y(fY + fH) & " " & Num(fW * 72 / 25.4) & " " & Num(fH * 72 / 25.4) & " re f")
+
+End
+
+'' Writes the file; True on error
+Public Function Save(sFile As String) As Boolean
+
+    Dim aObjects As New String[]
+    Dim aOffsets As New Integer[]
+    Dim sOut, sKids, sStream As String
+    Dim i, iPages, iFirstPage, iXref As Integer
+    Dim sBox As String
+
+    If $bOpen Then
+        $aPages.Add($sPage)
+        $bOpen = False
+    Endif
+    If $aPages.Count = 0 Then $aPages.Add("")
+    If Footer Then
+        For i = 0 To $aPages.Max
+            $sPage = ""
+            $bOpen = True
+            Text(PageW() - 15, PageH() - 8, Subst(Footer, i + 1, $aPages.Count), 7, False, "r", &H808080)
+            $aPages[i] &= $sPage
+            $bOpen = False
+        Next
+    Endif
+    sBox = "[0 0 " & Num(PageW() * 72 / 25.4) & " " & Num(PageH() * 72 / 25.4) & "]"
+
+    ' 1 catalog, 2 pages, 3 and 4 fonts, then each page and its content
+    iPages = $aPages.Count
+    iFirstPage = 5
+    For i = 0 To iPages - 1
+        sKids &= (iFirstPage + i * 2) & " 0 R "
+    Next
+    aObjects.Add("<< /Type /Catalog /Pages 2 0 R >>")
+    aObjects.Add("<< /Type /Pages /Kids [" & sKids & "] /Count " & iPages & " >>")
+    aObjects.Add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>")
+    aObjects.Add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>")
+    For i = 0 To iPages - 1
+        sStream = $aPages[i]
+        aObjects.Add("<< /Type /Page /Parent 2 0 R /MediaBox " & sBox & " /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " & (iFirstPage + i * 2 + 1) & " 0 R >>")
+        aObjects.Add("<< /Length " & Len(sStream) & " >>\nstream\n" & sStream & "endstream")
+    Next
+
+    sOut = "%PDF-1.4\n%" & Chr(226) & Chr(227) & Chr(207) & Chr(211) & "\n"
+    For i = 0 To aObjects.Max
+        aOffsets.Add(Len(sOut))
+        sOut &= (i + 1) & " 0 obj\n" & aObjects[i] & "\nendobj\n"
+    Next
+    iXref = Len(sOut)
+    sOut &= "xref\n0 " & (aObjects.Count + 1) & "\n0000000000 65535 f \n"
+    For i = 0 To aOffsets.Max
+        sOut &= Format(aOffsets[i], "0000000000") & " 00000 n \n"
+    Next
+    sOut &= "trailer\n<< /Size " & (aObjects.Count + 1) & " /Root 1 0 R >>\nstartxref\n" & iXref & "\n%%EOF\n"
+    Try File.Save(sFile, sOut)
+    Return Error
+
+End

@@ -64,6 +64,11 @@
       { Separator2 Separator
         MoveScaled(29,0,1,4)
       }
+      { mbPdf MenuButton
+        MoveScaled(28,0,9,5)
+        ToolTip = ("PDF reports")
+        Text = ("PDF")
+      }
       { tbAI ToolButton
         MoveScaled(29,0,5,5)
         ToolTip = ("AI assistant")

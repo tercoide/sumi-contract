@@ -33,7 +33,7 @@ Private $bOwn As Boolean
 
 Public Sub _new()
 
-    Dim hRow, hSplit As HBox
+    Dim hRow, hBoth As HBox
     Dim hLeft, hPage As VBox
 
     hRow = Ui.HBox(Me)
@@ -45,15 +45,15 @@ Public Sub _new()
     lblSummary.Alignment = Align.Right
     lblSummary.Font.Bold = True
 
-    hSplit = Ui.HBox(Me, 0, True)
-    hLeft = Ui.VBox(hSplit, False)
+    hBoth = Ui.HBox(Me, 0, True)
+    hLeft = Ui.VBox(hBoth, False)
     hLeft.W = Desktop.Scale * 60
     gvList = New GridView(hLeft) As "List"
     gvList.Expand = True
     gvList.Mode = Select.Single
     Ui.Columns(gvList, [("Code"), ("Contractor"), ("Amount"), ("Done"), ("Balance")], [7, 22, 12, 7, 12])
 
-    pnlRight = Ui.VBox(hSplit)
+    pnlRight = Ui.VBox(hBoth)
     hRow = Ui.HBox(pnlRight)
     Ui.Label(hRow, ("Contractor"))
     cmbContractor = New ComboBox(hRow) As "Field"
@@ -115,6 +115,7 @@ Public Sub _new()
     Ui.Button(hRow, ("Retention back"), "CertRetention", Me, ("Gives the guarantee retention back, at the final reception"))
     Ui.Button(hRow, ("Issue / draft"), "CertIssue", Me)
     Ui.Button(hRow, ("Delete last"), "CertDelete", Me)
+    Ui.Button(hRow, ("PDF..."), "CertPdf", Me, ("The selected certificate as a PDF, to sign"))
     lblCert = Ui.Label(hPage, "")
     tvMeasures = New TableView(hPage) As "Measures"
     tvMeasures.Expand = True
@@ -630,6 +631,18 @@ Public Sub CertDelete_Click()
     Run("cert.delete", ["contract": t.Id, "cert": t.Certs[t.Certs.Max].Id])
     $iCert = -1
     ShowContract(False)
+
+End
+
+Public Sub CertPdf_Click()
+
+    Dim t As Contract = Current()
+    Dim q As Certificate
+
+    If Not t Then Return
+    q = CurrentCert(t)
+    If Not q Then Return
+    fMain.SavePdf("certificate", t.Id, q.Id)
 
 End
 
