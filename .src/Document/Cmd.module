@@ -16,7 +16,8 @@
 '' charge.set, charge.delete, resource.list, resource.get, resource.add, resource.set, resource.delete,
 '' analysis.list, analysis.get, analysis.add, analysis.set, analysis.copy, analysis.delete, analysis.addline,
 '' analysis.setline, analysis.removeline, analysis.flatten, prices.import, budget.list, item.add, item.set,
-'' item.delete, item.move, rubro.coefs, schedule.get, task.set
+'' item.delete, item.move, rubro.coefs, schedule.get, task.set, contractor.*, standard.export, prices.fromStandard,
+'' contract.*, part.*, cert.*, payment.*
 
 Public Const ABSENT As String = "~absent~"      '' a snapshot of something that didn't exist
 Public Const COALESCE_SECONDS As Integer = 120  '' edits of the same field in a row become one change
@@ -125,6 +126,20 @@ Private Function Dispatch(sCommand As String, c As Collection) As Collection
             Return ItemMove(c)
         Case "rubro.coefs"
             Return RubroCoefs(c)
+        Case "contractor.list", "contractor.get", "contractor.add", "contractor.set", "contractor.delete"
+            Return ContractorCmd(sCommand, c)
+        Case "standard.export"
+            Return StandardExport(c)
+        Case "prices.fromstandard"
+            Return PricesFromStandard(c)
+        Case "contract.list", "contract.get", "contract.add", "contract.set", "contract.delete"
+            Return ContractCmd(sCommand, c)
+        Case "part.add", "part.set", "part.remove"
+            Return PartCmd(sCommand, c)
+        Case "cert.add", "cert.set", "cert.delete"
+            Return CertCmd(sCommand, c)
+        Case "payment.add", "payment.set", "payment.delete"
+            Return PaymentCmd(sCommand, c)
         Case "schedule.get"
             Return ScheduleGet(c)
         Case "task.set"
@@ -173,6 +188,27 @@ Public Function Help() As Collection
     c["item.move"] = "{key, by} moves an item up (by < 0) or down within its rubro"
     c["schedule.get"] = "{curve?} -> the Gantt: for each item its task (days, crew, after, lag, earlyStart, earlyFinish, slack, critical, start and end dates), the length in working days, the end date, and with curve the money spent each month"
     c["task.set"] = "{key (budget item id or code), days?, crew?, after? [item keys it waits for], lag?, startNotBefore?, done? (0 to 1), suggest? (true: days from the labor hours and the crew)}"
+    c["contractor.list"] = "{text?, trade?} -> the company's contractors (shared by all projects), with their documents due"
+    c["contractor.get"] = "{key (id or name)}"
+    c["contractor.add"] = "{name, trade?, taxId?, contact?, phone?, email?, address?, bank?, note?, docs? [{kind, number, expires (yyyy-mm-dd), file, note}...]} -> its id"
+    c["contractor.set"] = "{key, field: value...} the same fields (docs replaces the list)"
+    c["contractor.delete"] = "{key} refused while a contract of the open project uses it"
+    c["standard.export"] = "{} the project's prices (resources, analyses, rubros, labor charges) go to the company's standard library: new ones added, the same ones (by id) replaced"
+    c["prices.fromStandard"] = "{} the project takes the standard library's prices: new resources and analyses added, the same ones replaced"
+    c["contract.list"] = "{} -> the project's contracts with their contractor, amount, progress and balance"
+    c["contract.get"] = "{key (id or code C-01)} -> a contract: parts (item, qty, % of the item, agreed price, measured), certificates with their amounts [work, adjustment, advance recovered, retention, net] and payments"
+    c["contract.add"] = "{contractor (key), title?, code?, mode?, advancePct?, retentionPct?, period?, indexName?, baseIndex?, baseMonth?, signed?, note?} conditions default to the Project tab's -> its id and code"
+    c["contract.set"] = "{key, field: value...} the same fields"
+    c["contract.delete"] = "{key}"
+    c["part.add"] = "{contract, item (budget item key), qty? | pct? (of the item; default: what no contract takes yet), unitPrice? (default: the budget's unit price)}"
+    c["part.set"] = "{contract, part (part id or item key), qty? | pct?, unitPrice?}"
+    c["part.remove"] = "{contract, part}"
+    c["cert.add"] = "{contract, kind? (advance, progress, retention; default progress), period? (yyyy-mm), date?, index?} -> its number"
+    c["cert.set"] = "{contract, cert (number), period?, date?, index?, status? (draft, issued), note?, measures? [{part (part id or item key), acc? (accumulated quantity) | pct? (accumulated % of the part)}...]}"
+    c["cert.delete"] = "{contract, cert}"
+    c["payment.add"] = "{contract, amount, date?, means? (transfer, cheque, cash, other), reference?, certificate? (number), invoice?, invoiceDate?, note?} -> its index"
+    c["payment.set"] = "{contract, index, field: value...}"
+    c["payment.delete"] = "{contract, index}"
     c["rubro.coefs"] = "{rubro, coefs [{name, pct}...]} the coefficients of a rubro in the budget (on top of the project's)"
     Return c
 
@@ -236,6 +272,14 @@ Private Sub Finish()
         If sTarget <> "prices" Then h.After[sTarget] = Snapshot(sTarget)
     Next
 
+    ' the company's data has its own log
+    If IsCompany(h) Then
+        Company.Changes.Add(h)
+        Company.Save()
+        If sumi.Interactive Then fMain.DataChanged()
+        Return
+    Endif
+
     ' the same field edited again (typing in a box): one change
     If sumi.Project.Changes.Count Then
         hLast = sumi.Project.Changes[sumi.Project.Changes.Max]
@@ -251,6 +295,19 @@ Private Sub Finish()
 
     sumi.Project.Changes.Add(h)
     sumi.Changed()
+
+End
+
+'' Does a change touch only the company's data (contractors, the standard library)?
+Public Function IsCompany(h As Change) As Boolean
+
+    Dim sTarget As String
+
+    If h.Targets.Count = 0 Then Return False
+    For Each sTarget In h.Targets
+        If Not (sTarget Begins "contractor:") And If sTarget <> "standard" Then Return False
+    Next
+    Return True
 
 End
 
@@ -304,7 +361,19 @@ Public Function Snapshot(sTarget As String) As Variant
         If Not b.Analyses.Exist(sId) Then Return ABSENT
         Return b.Analyses[sId].ToJson()
     Endif
+    If sTarget Begins "contractor:" Then
+        Company.EnsureLoaded()
+        sId = Mid$(sTarget, 12)
+        If Not Company.Contractors.Exist(sId) Then Return ABSENT
+        Return Company.Contractors[sId].ToJson()
+    Endif
     Select Case sTarget
+        Case "standard"
+            Company.EnsureLoaded()
+            If Not Company.Standard Then Return ABSENT
+            Return Company.Standard.ToJson()
+        Case "contracts"
+            Return p.Contracts.ToJson()
         Case "budget"
             Return p.Budget.ToJson()
         Case "schedule"
@@ -314,6 +383,7 @@ Public Function Snapshot(sTarget As String) As Variant
             c.Remove("prices")
             c.Remove("budget")
             c.Remove("schedule")
+            c.Remove("contracts")
             c.Remove("changes")
             c.Remove("modified")
             Return c
@@ -364,7 +434,26 @@ Public Sub Restore(sTarget As String, v As Variant)
         Endif
         Return
     Endif
+    If sTarget Begins "contractor:" Then
+        sId = Mid$(sTarget, 12)
+        If IsAbsent(v) Then
+            If Company.Contractors.Exist(sId) Then Company.Contractors.Remove(sId)
+        Else
+            Company.Contractors[sId] = Contractor.FromJson(v)
+        Endif
+        Return
+    Endif
     Select Case sTarget
+        Case "standard"
+            If IsAbsent(v) Then
+                Company.Standard = Null
+            Else
+                Company.Standard = New PriceBook
+                Company.Standard.FromJson(v)
+            Endif
+        Case "contracts"
+            p.Contracts = New Contracts
+            p.Contracts.FromJson(v)
         Case "budget"
             p.Budget = New Budget
             p.Budget.FromJson(v)
@@ -408,30 +497,51 @@ Private Function SameSnapshot(v1 As Variant, v2 As Variant) As Boolean
 
 End
 
-'' Undo the caller's last action; or (bRedo) undo the caller's last undo, if nothing of theirs came after it
+'' Undo the caller's last action; or (bRedo) undo the caller's last undo, if nothing of theirs came after it.
+'' The project's log and the company's are searched, and the newest wins.
 Private Function Undo(bRedo As Boolean) As Collection
 
-    Dim aChanges As Change[] = sumi.Project.Changes
+    Dim hProject, hCompany As Change
+
+    Company.EnsureLoaded()
+    hProject = FindUndo(sumi.Project.Changes, bRedo)
+    hCompany = FindUndo(Company.Changes, bRedo)
+    If hCompany Then
+        If Not hProject Then Return UndoIn(Company.Changes, hCompany, bRedo, True)
+        If hCompany.Id > hProject.Id Then Return UndoIn(Company.Changes, hCompany, bRedo, True)     ' ids sort by creation
+    Endif
+    If hProject Then Return UndoIn(sumi.Project.Changes, hProject, bRedo, False)
+    Return Fail(IIf(bRedo, ("Nothing to redo."), ("Nothing to undo.")))
+
+End
+
+'' The caller's change to undo in a log (redo: their last undo still in force, if it is their last change)
+Private Function FindUndo(aChanges As Change[], bRedo As Boolean) As Change
+
     Dim i As Integer
-    Dim h, hFound As Change
-    Dim aGroup As New Change[]
-    Dim sTarget As String
+    Dim h As Change
     Dim sMe As String = Who.UserId()
-    Dim hNew As Change
 
     For i = aChanges.Max DownTo 0
         h = aChanges[i]
         If h.UserId <> sMe Then Continue
         If bRedo Then
-            ' the last thing I did must be an undo that is still in force
-            If h.Command = "undo" And If Not h.UndoneBy Then hFound = h
-            Break
+            If h.Command = "undo" And If Not h.UndoneBy Then Return h
+            Return Null
         Endif
         If h.UndoneBy Or If h.Command = "undo" Or If h.Command = "redo" Then Continue
-        hFound = h
-        Break
+        Return h
     Next
-    If Not hFound Then Return Fail(IIf(bRedo, ("Nothing to redo."), ("Nothing to undo.")))
+
+End
+
+Private Function UndoIn(aChanges As Change[], hFound As Change, bRedo As Boolean, bCompany As Boolean) As Collection
+
+    Dim i As Integer
+    Dim h As Change
+    Dim aGroup As New Change[]
+    Dim sTarget As String
+    Dim hNew As Change
 
     ' its whole group, newest first
     If hFound.Group Then
@@ -446,13 +556,13 @@ Private Function Undo(bRedo As Boolean) As Collection
     For Each h In aGroup
         For Each sTarget In h.Targets
             If Not h.After.Exist(sTarget) Then Continue
-            If Not SameSnapshot(Snapshot(sTarget), h.After[sTarget]) Then Return Fail(Subst(("&1 changed after that (&2): it can't be undone without losing that work."), sTarget, LastChangeOf(sTarget, h)))
+            If Not SameSnapshot(Snapshot(sTarget), h.After[sTarget]) Then Return Fail(Subst(("&1 changed after that (&2): it can't be undone without losing that work."), sTarget, LastChangeOf(aChanges, sTarget, h)))
         Next
     Next
 
     hNew = New Change
     hNew.Who = Who.Name()
-    hNew.UserId = sMe
+    hNew.UserId = Who.UserId()
     hNew.Via = Who.Via
     hNew.Model = Who.Model
     hNew.Command = IIf(bRedo, "redo", "undo")
@@ -484,20 +594,25 @@ Private Function Undo(bRedo As Boolean) As Collection
     For Each sTarget In hNew.Targets
         If sTarget <> "prices" Then hNew.After[sTarget] = Snapshot(sTarget)
     Next
-    sumi.Project.Changes.Add(hNew)
-    sumi.Changed()
+    aChanges.Add(hNew)
+    If bCompany Then
+        Company.Save()
+        If sumi.Interactive Then fMain.DataChanged()
+    Else
+        sumi.Changed()
+    Endif
     Return Ok(["summary": hNew.Summary])
 
 End
 
 '' Who changed a target after change h
-Private Function LastChangeOf(sTarget As String, hAfter As Change) As String
+Private Function LastChangeOf(aChanges As Change[], sTarget As String, hAfter As Change) As String
 
     Dim i As Integer
     Dim h As Change
 
-    For i = sumi.Project.Changes.Max DownTo 0
-        h = sumi.Project.Changes[i]
+    For i = aChanges.Max DownTo 0
+        h = aChanges[i]
         If h = hAfter Then Break
         If h.Targets.Exist(sTarget) Then Return h.Who & ", " & h.When
     Next
@@ -544,7 +659,7 @@ Private Function ProjectSet(c As Collection) As Collection
     Dim sKey As String
 
     aAllowed = KeysOf(sumi.Project.ToJson())
-    For Each sKey In ["prices", "budget", "schedule", "created", "modified", "changes"]
+    For Each sKey In ["prices", "budget", "schedule", "contracts", "created", "modified", "changes"]
         If aAllowed.Exist(sKey) Then aAllowed.Remove(aAllowed.Find(sKey))
     Next
     For Each v In c
@@ -1239,6 +1354,7 @@ Private Function ScheduleGet(c As Collection) As Collection
         cTask["start"] = Format(s.DateOf(t.EarlyStart), "yyyy-mm-dd")
         cTask["end"] = Format(s.DateOf(Max(t.EarlyStart, t.EarlyFinish - 1)), "yyyy-mm-dd")
         cTask["laborHoursPerUnit"] = s.LaborHours(b)
+        cTask["done"] = s.DoneOf(b)
         aTasks.Add(cTask)
     Next
     cOut = Ok(["tasks": aTasks, "length": s.Length, "end": Format(s.DateOf(Max(0, s.Length - 1)), "yyyy-mm-dd"), "available": p.DurationDays])
@@ -1287,5 +1403,467 @@ Private Function TaskSet(c As Collection) As Collection
     Touch("schedule")
     t.Apply(cSet)
     Return Ok(["days": t.Days])
+
+End
+
+'' THE COMPANY: CONTRACTORS AND THE STANDARD LIBRARY
+
+Private Function DescribeContractor(k As Contractor) As Collection
+
+    Dim c As Collection = k.ToJson()
+    Dim aDue As New String[]
+    Dim d As ContractorDoc
+
+    For Each d In k.DocsDue()
+        aDue.Add(d.Kind & " " & d.Expires)
+    Next
+    c["docsDue"] = aDue
+    Return c
+
+End
+
+Private Function ContractorCmd(sCommand As String, c As Collection) As Collection
+
+    Dim k As Contractor
+    Dim a As New Variant[]
+    Dim cSet As New Collection
+    Dim v As Variant
+    Dim sBad As String
+    Dim t As Contract
+
+    Company.EnsureLoaded()
+    If sCommand = "contractor.list" Then
+        For Each k In Company.SortedContractors()
+            If c["trade"] And If InStr(k.Trade, c["trade"], 1, gb.IgnoreCase) = 0 Then Continue
+            If c["text"] And If InStr(k.Name & " " & k.Trade & " " & k.Contact, c["text"], 1, gb.IgnoreCase) = 0 Then Continue
+            a.Add(DescribeContractor(k))
+        Next
+        Return Ok(["contractors": a])
+    Endif
+    If sCommand <> "contractor.add" Then
+        If c["key"] Then k = Company.FindContractor(CStr(c["key"]))
+        If Not k Then Return Fail(Subst(("There is no contractor &1."), c["key"]))
+    Endif
+    Select Case sCommand
+        Case "contractor.get"
+            Return Ok(["contractor": DescribeContractor(k)])
+        Case "contractor.add"
+            If Not Trim(c["name"]) Then Return Fail(("A contractor needs a name."))
+            If Company.FindContractor(Trim(c["name"])) Then Return Fail(Subst(("There is already a contractor &1."), c["name"]))
+            k = New Contractor
+            For Each v In c
+                If c.Key <> "id" Then cSet[c.Key] = v
+            Next
+            sBad = k.Apply(cSet)
+            If sBad Then Return Fail(Subst(("Contractors have no field &1."), sBad))
+            Start(sCommand, c, Subst(("Contractor added: &1"), k.Name))
+            Touch("contractor:" & k.Id)
+            Company.Contractors[k.Id] = k
+            Return Ok(["id": k.Id])
+        Case "contractor.set"
+            For Each v In c
+                If c.Key <> "key" Then cSet[c.Key] = v
+            Next
+            If cSet.Count = 0 Then Return Fail(("Nothing to set."))
+            sBad = Contractor.FromJson(k.ToJson()).Apply(cSet)
+            If sBad Then Return Fail(Subst(("Contractors have no field &1 (or a bad value)."), sBad))
+            Start(sCommand, c, Subst(("Contractor &1: &2"), k.Name, KeysOf(cSet).Join(", ")))
+            Touch("contractor:" & k.Id)
+            k.Apply(cSet)
+        Case "contractor.delete"
+            For Each t In sumi.Project.Contracts.Items
+                If t.Contractor = k.Id Then Return Fail(Subst(("Contract &1 is with &2."), t.Code, k.Name))
+            Next
+            Start(sCommand, c, Subst(("Contractor deleted: &1"), k.Name))
+            Touch("contractor:" & k.Id)
+            Company.Contractors.Remove(k.Id)
+    End Select
+    Return Ok()
+
+End
+
+'' Copies what hFrom has into hTo: resources and analyses by Id (replaced or added), rubros, and the labor charges
+Private Sub MergeBook(hFrom As PriceBook, hTo As PriceBook, bCharges As Boolean)
+
+    Dim r As Resource
+    Dim a As Analysis
+    Dim v As Variant
+    Dim h As LaborCharge
+
+    For Each r In hFrom.Resources
+        hTo.Resources[r.Id] = Resource.FromJson(r.ToJson())
+    Next
+    For Each a In hFrom.Analyses
+        hTo.Analyses[a.Id] = Analysis.FromJson(a.ToJson())
+    Next
+    For Each v In hFrom.Rubros
+        hTo.Rubros[hFrom.Rubros.Key] = v
+    Next
+    If bCharges Then
+        hTo.Charges.Clear
+        For Each h In hFrom.Charges
+            hTo.Charges.Add(LaborCharge.FromJson(h.ToJson()))
+        Next
+    Endif
+
+End
+
+Private Function StandardExport(c As Collection) As Collection
+
+    Dim b As PriceBook = sumi.Project.Prices
+
+    Company.EnsureLoaded()
+    Start("standard.export", c, Subst(("Standard library: the prices of &1 exported (&2 resources, &3 analyses)"), sumi.Project.Title(), b.Resources.Count, b.Analyses.Count))
+    Touch("standard")
+    If Not Company.Standard Then
+        Company.Standard = New PriceBook
+        Company.Standard.DefaultCharges()
+    Endif
+    MergeBook(b, Company.Standard, True)
+    Company.Standard.UpdateCoef = 1
+    Return Ok()
+
+End
+
+Private Function PricesFromStandard(c As Collection) As Collection
+
+    Company.EnsureLoaded()
+    If Not Company.Standard Then Return Fail(("The company has no standard library yet (export a project's prices to make it)."))
+    Start("prices.fromStandard", c, ("Prices taken from the standard library"))
+    Touch("prices")
+    MergeBook(Company.Standard, sumi.Project.Prices, True)
+    Return Ok()
+
+End
+
+'' CONTRACTS
+
+Private Function FindContract(c As Collection, Optional sField As String = "key") As Contract
+
+    If Not c[sField] Then Return Null
+    Return sumi.Project.Contracts.Find(CStr(c[sField]))
+
+End
+
+Private Function ContractorName(sId As String) As String
+
+    Dim k As Contractor = Company.FindContractor(sId)
+
+    If k Then Return k.Name
+    Return ("(unknown contractor)")
+
+End
+
+Public Function DescribeContract(t As Contract) As Collection
+
+    Dim h As Budget = sumi.Project.Budget
+    Dim c As Collection = t.ToJson()
+    Dim a As New Variant[]
+    Dim p As ContractPart
+    Dim b As BudgetItem
+    Dim q As Certificate
+    Dim cPart, cCert As Collection
+    Dim f As Float[]
+
+    c["contractorName"] = ContractorName(t.Contractor)
+    c["amount"] = t.Amount()
+    c["progress"] = t.Progress()
+    f = t.Balance()
+    c["certified"] = f[0]
+    c["paid"] = f[1]
+    c["balance"] = f[2]
+    For Each p In t.Parts
+        cPart = p.ToJson()
+        b = h.Find(p.Item)
+        If b Then
+            cPart["code"] = b.Code
+            cPart["description"] = h.DescriptionOf(b)
+            cPart["unit"] = h.UnitOf(b)
+            If b.Quantity Then cPart["pctOfItem"] = p.Quantity / b.Quantity
+            cPart["budgetUnitPrice"] = h.UnitPrice(b)
+        Else
+            cPart["description"] = ("(the budget item is gone)")
+        Endif
+        cPart["measured"] = t.Measured(p.Id)
+        a.Add(cPart)
+    Next
+    c["parts"] = a
+    a = New Variant[]
+    For Each q In t.Certs
+        cCert = q.ToJson()
+        f = t.Numbers(q)
+        cCert["work"] = f[0]
+        cCert["adjustment"] = f[1]
+        cCert["advanceRecovered"] = f[2]
+        cCert["retention"] = f[3]
+        cCert["net"] = f[4]
+        a.Add(cCert)
+    Next
+    c["certificates"] = a
+    Return c
+
+End
+
+Private Function ContractCmd(sCommand As String, c As Collection) As Collection
+
+    Dim p As Project = sumi.Project
+    Dim t As Contract
+    Dim a As New Variant[]
+    Dim cSet As New Collection
+    Dim v As Variant
+    Dim sBad As String
+    Dim k As Contractor
+    Dim f As Float[]
+
+    Company.EnsureLoaded()
+    If sCommand = "contract.list" Then
+        For Each t In p.Contracts.Items
+            f = t.Balance()
+            a.Add(["id": t.Id, "code": t.Code, "title": t.Title, "contractor": ContractorName(t.Contractor), "amount": t.Amount(), "progress": t.Progress(), "certified": f[0], "paid": f[1], "balance": f[2]])
+        Next
+        Return Ok(["contracts": a])
+    Endif
+    If sCommand <> "contract.add" Then
+        t = FindContract(c)
+        If Not t Then Return Fail(Subst(("There is no contract &1."), c["key"]))
+    Endif
+    For Each v In c
+        If c.Key <> "key" And If c.Key <> "id" Then cSet[c.Key] = v
+    Next
+    If cSet.Exist("contractor") Then
+        k = Company.FindContractor(CStr(cSet["contractor"]))
+        If Not k Then Return Fail(Subst(("There is no contractor &1."), cSet["contractor"]))
+        cSet["contractor"] = k.Id
+    Endif
+    Select Case sCommand
+        Case "contract.get"
+            Return Ok(["contract": DescribeContract(t)])
+        Case "contract.add"
+            If Not k Then Return Fail(("A contract needs a contractor."))
+            If cSet["code"] And If p.Contracts.Find(CStr(cSet["code"])) Then Return Fail(Subst(("There is already a contract &1."), cSet["code"]))
+            t = New Contract
+            ' the Project tab's conditions
+            t.Mode = p.ContractMode
+            t.AdvancePct = p.AdvancePct
+            t.RetentionPct = p.RetentionPct
+            t.Period = p.CertificatePeriod
+            t.IndexName = p.AdjustmentIndex
+            t.BaseMonth = p.AdjustmentBase
+            t.Signed = Format(Now, "yyyy-mm-dd")
+            sBad = t.Apply(cSet)
+            If sBad Then Return Fail(Subst(("Contracts have no field &1."), sBad))
+            If Not t.Code Then t.Code = p.Contracts.NextCode()
+            If Not t.Title Then t.Title = k.Trade
+            Start(sCommand, c, Subst(("Contract &1 with &2"), t.Code, k.Name))
+            Touch("contracts")
+            p.Contracts.Items.Add(t)
+            Return Ok(["id": t.Id, "code": t.Code])
+        Case "contract.set"
+            If cSet.Count = 0 Then Return Fail(("Nothing to set."))
+            sBad = Contract.FromJson(t.ToJson()).Apply(cSet)
+            If sBad Then Return Fail(Subst(("Contracts have no field &1 (or a bad value)."), sBad))
+            Start(sCommand, c, Subst(("Contract &1: &2"), t.Code, KeysOf(cSet).Join(", ")))
+            Touch("contracts")
+            t.Apply(cSet)
+        Case "contract.delete"
+            Start(sCommand, c, Subst(("Contract deleted: &1 &2"), t.Code, t.Title))
+            Touch("contracts")
+            p.Contracts.Items.Remove(p.Contracts.Items.Find(t))
+    End Select
+    Return Ok()
+
+End
+
+'' The quantity from {qty} or {pct} (of fWhole); bBad if neither is right
+Private Function QtyFrom(c As Collection, fWhole As Float, ByRef bGiven As Boolean) As Float
+
+    bGiven = True
+    If c.Exist("qty") Then Return c["qty"]
+    If c.Exist("pct") Then Return fWhole * c["pct"] / 100
+    bGiven = False
+
+End
+
+Private Function PartCmd(sCommand As String, c As Collection) As Collection
+
+    Dim p As Project = sumi.Project
+    Dim t As Contract = FindContract(c, "contract")
+    Dim b As BudgetItem
+    Dim r As ContractPart
+    Dim bGiven As Boolean
+    Dim f As Float
+
+    If Not t Then Return Fail(Subst(("There is no contract &1."), c["contract"]))
+    If sCommand = "part.add" Then
+        If c["item"] Then b = p.Budget.Find(CStr(c["item"]))
+        If Not b Then Return Fail(Subst(("There is no budget item &1."), c["item"]))
+        f = QtyFrom(c, b.Quantity, ByRef bGiven)
+        If Not bGiven Then f = b.Quantity - p.Contracts.Assigned(b.Id)
+        If f <= 0 Then Return Fail(Subst(("Item &1 is already taken by contracts: give the quantity."), b.Code))
+        r = New ContractPart
+        r.Item = b.Id
+        r.Quantity = f
+        If c.Exist("unitPrice") Then r.UnitPrice = c["unitPrice"] Else r.UnitPrice = p.Budget.UnitPrice(b)
+        Start(sCommand, c, Subst(("Contract &1: item &2 added, &3"), t.Code, b.Code, r.Quantity))
+        Touch("contracts")
+        t.Parts.Add(r)
+        Return Ok(["part": r.Id])
+    Endif
+    If c["part"] Then r = t.FindPart(CStr(c["part"]))
+    If Not r And If c["part"] Then
+        b = p.Budget.Find(CStr(c["part"]))
+        If b Then r = t.FindPart(b.Id)
+    Endif
+    If Not r Then Return Fail(Subst(("Contract &1 has no part &2."), t.Code, c["part"]))
+    b = p.Budget.Find(r.Item)
+    Select Case sCommand
+        Case "part.set"
+            f = QtyFrom(c, IIf(b, b.Quantity, 0.0), ByRef bGiven)
+            If Not bGiven And If Not c.Exist("unitPrice") Then Return Fail(("Nothing to set."))
+            Start(sCommand, c, Subst(("Contract &1: part changed"), t.Code))
+            Touch("contracts")
+            If bGiven Then r.Quantity = f
+            If c.Exist("unitPrice") Then r.UnitPrice = c["unitPrice"]
+        Case "part.remove"
+            If t.Measured(r.Id) > 0 Then Return Fail(("It has certified work: it can't be removed."))
+            Start(sCommand, c, Subst(("Contract &1: part removed"), t.Code))
+            Touch("contracts")
+            t.Parts.Remove(t.Parts.Find(r))
+    End Select
+    Return Ok()
+
+End
+
+Private Function CertCmd(sCommand As String, c As Collection) As Collection
+
+    Dim t As Contract = FindContract(c, "contract")
+    Dim q, h As Certificate
+    Dim v As Variant
+    Dim r As ContractPart
+    Dim b As BudgetItem
+    Dim cMeasures As New Collection
+    Dim f As Float
+    Dim n As Integer
+
+    If Not t Then Return Fail(Subst(("There is no contract &1."), c["contract"]))
+    Select Case sCommand
+        Case "cert.add"
+            q = New Certificate
+            If c["kind"] Then
+                If Not Certificate.Kinds().Exist(c["kind"]) Then Return Fail(Subst(("Unknown kind of certificate &1."), c["kind"]))
+                q.Kind = c["kind"]
+            Endif
+            For Each h In t.Certs
+                n = Max(n, h.Number)
+                If q.Kind <> Certificate.PROGRESS And If h.Kind = q.Kind Then Return Fail(Subst(("Contract &1 already has its &2 certificate."), t.Code, Tr(q.Kind)))
+            Next
+            q.Number = n + 1
+            q.Period = IIf(c["period"], c["period"], Format(Now, "yyyy-mm"))
+            q.When = IIf(c["date"], c["date"], Format(Now, "yyyy-mm-dd"))
+            If c.Exist("index") Then q.Index = c["index"]
+            ' a progress certificate starts where the last one ended
+            If q.Kind = Certificate.PROGRESS Then
+                For Each r In t.Parts
+                    f = t.Measured(r.Id)
+                    If f Then q.Measures[r.Id] = f
+                Next
+            Endif
+            Start(sCommand, c, Subst(("Contract &1: certificate &2 (&3)"), t.Code, q.Number, Tr(q.Kind)))
+            Touch("contracts")
+            t.Certs.Add(q)
+            Return Ok(["number": q.Number, "id": q.Id])
+    End Select
+
+    If c["cert"] Then q = t.FindCert(CStr(c["cert"]))
+    If Not q Then Return Fail(Subst(("Contract &1 has no certificate &2."), t.Code, c["cert"]))
+    If sCommand = "cert.delete" Then
+        If q <> t.Certs[t.Certs.Max] Then Return Fail(("Only the last certificate can be deleted."))
+        Start(sCommand, c, Subst(("Contract &1: certificate &2 deleted"), t.Code, q.Number))
+        Touch("contracts")
+        t.Certs.Remove(t.Certs.Max)
+        Return Ok()
+    Endif
+
+    ' cert.set: check everything first
+    If q.Status = "issued" And If c.Exist("measures") Then Return Fail(Subst(("Certificate &1 is issued: its measures can't change (set it back to draft first)."), q.Number))
+    If c.Exist("measures") Then
+        For Each v In c["measures"]
+            r = t.FindPart(CStr(v["part"]))
+            If Not r Then
+                b = sumi.Project.Budget.Find(CStr(v["part"]))
+                If b Then r = t.FindPart(b.Id)
+            Endif
+            If Not r Then Return Fail(Subst(("Contract &1 has no part &2."), t.Code, v["part"]))
+            If v.Exist("acc") Then
+                f = v["acc"]
+            Else If v.Exist("pct") Then
+                f = r.Quantity * v["pct"] / 100
+            Else
+                Return Fail(("A measure needs acc (the accumulated quantity) or pct."))
+            Endif
+            If f < t.Before(q, r.Id) - 1e-9 Then Return Fail(Subst(("The accumulated quantity can't go back (&1 before)."), t.Before(q, r.Id)))
+            If f > r.Quantity * 1.0000001 Then Return Fail(Subst(("&1 is more than the contract's &2."), f, r.Quantity))
+            cMeasures[r.Id] = f
+        Next
+    Endif
+    If c["status"] And If c["status"] <> "draft" And If c["status"] <> "issued" Then Return Fail(("The status is draft or issued."))
+    Start(sCommand, c, Subst(("Contract &1: certificate &2 changed"), t.Code, q.Number))
+    Touch("contracts")
+    For Each v In cMeasures
+        q.Measures[cMeasures.Key] = v
+    Next
+    If c.Exist("period") Then q.Period = c["period"]
+    If c.Exist("date") Then q.When = c["date"]
+    If c.Exist("index") Then q.Index = c["index"]
+    If c.Exist("status") Then q.Status = c["status"]
+    If c.Exist("note") Then q.Note = c["note"]
+    Return Ok(["net": t.Numbers(q)[4]])
+
+End
+
+Private Function PaymentCmd(sCommand As String, c As Collection) As Collection
+
+    Dim t As Contract = FindContract(c, "contract")
+    Dim y As Payment
+    Dim cSet As New Collection
+    Dim v As Variant
+    Dim sBad As String
+    Dim q As Certificate
+    Dim i As Integer
+
+    If Not t Then Return Fail(Subst(("There is no contract &1."), c["contract"]))
+    For Each v In c
+        If c.Key <> "contract" And If c.Key <> "index" Then cSet[c.Key] = v
+    Next
+    If cSet.Exist("certificate") And If cSet["certificate"] Then
+        q = t.FindCert(CStr(cSet["certificate"]))
+        If Not q Then Return Fail(Subst(("Contract &1 has no certificate &2."), t.Code, cSet["certificate"]))
+        cSet["certificate"] = q.Id
+    Endif
+    If sCommand = "payment.add" Then
+        If Not c.Exist("amount") Then Return Fail(("A payment needs its amount."))
+        y = New Payment
+        y.When = Format(Now, "yyyy-mm-dd")
+        sBad = y.Apply(cSet)
+        If sBad Then Return Fail(Subst(("Payments have no field &1."), sBad))
+        Start(sCommand, c, Subst(("Contract &1: payment of &2"), t.Code, Format(y.Amount, "#,##0.00")))
+        Touch("contracts")
+        t.Payments.Add(y)
+        Return Ok(["index": t.Payments.Max])
+    Endif
+    i = c["index"]
+    If i < 0 Or If i > t.Payments.Max Then Return Fail(Subst(("Contract &1 has no payment &2."), t.Code, i))
+    If sCommand = "payment.delete" Then
+        Start(sCommand, c, Subst(("Contract &1: payment deleted"), t.Code))
+        Touch("contracts")
+        t.Payments.Remove(i)
+        Return Ok()
+    Endif
+    sBad = Payment.FromJson(t.Payments[i].ToJson()).Apply(cSet)
+    If sBad Then Return Fail(Subst(("Payments have no field &1 (or a bad value)."), sBad))
+    Start(sCommand, c, Subst(("Contract &1: payment changed"), t.Code))
+    Touch("contracts")
+    t.Payments[i].Apply(cSet)
+    Return Ok()
 
 End

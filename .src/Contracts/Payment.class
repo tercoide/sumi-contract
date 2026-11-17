@@ -1,0 +1,66 @@
+' Gambas class file
+
+'' A payment to a contractor, with its invoice
+
+Public Id As String
+Public When As String = ""                      '' yyyy-mm-dd
+Public Amount As Float
+Public Means As String = "transfer"             '' "transfer", "cheque", "cash", "other"
+Public Reference As String = ""                 '' the transfer's or the cheque's number
+Public Certificate As String = ""               '' the certificate's Id it pays ("" = on account)
+Public Invoice As String = ""                   '' the invoice's number
+Public InvoiceDate As String = ""
+Public Note As String = ""
+
+Public Sub _new()
+
+    Id = Ids.Make("y")
+
+End
+
+Public Function ToJson() As Collection
+
+    Return ["id": Id, "date": When, "amount": Amount, "means": Means, "reference": Reference, "certificate": Certificate, "invoice": Invoice, "invoiceDate": InvoiceDate, "note": Note]
+
+End
+
+Static Public Function FromJson(c As Collection) As Payment
+
+    Dim y As New Payment
+
+    If c["id"] Then y.Id = c["id"]
+    y.Apply(c)
+    Return y
+
+End
+
+Public Function Apply(c As Collection) As String
+
+    Dim v As Variant
+
+    For Each v In c
+        Select Case c.Key
+            Case "id", "key", "contract"
+            Case "date"
+                When = v
+            Case "amount"
+                Amount = v
+            Case "means"
+                Means = v
+            Case "reference"
+                Reference = v
+            Case "certificate"
+                Certificate = v
+            Case "invoice"
+                Invoice = v
+            Case "invoiceDate"
+                InvoiceDate = v
+            Case "note"
+                Note = v
+            Default
+                Return c.Key
+        End Select
+    Next
+    Return ""
+
+End

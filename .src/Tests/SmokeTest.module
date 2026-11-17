@@ -26,6 +26,7 @@ Public Function Run() As Integer
     TestAssistant()
     TestBudget()
     TestSchedule2()
+    TestContracts()
     TestIcons()
 
     Shell "rm -rf " & Shell$($sTemp) Wait
@@ -627,6 +628,104 @@ Private Sub TestSchedule2()
     Check(Not sumi.Project.Schedule.Tasks.Exist(sE) And sumi.Project.Schedule.Tasks[sM].After.Count = 0 And sumi.Project.Schedule.Tasks[sM].EarlyStart = 0, "a deleted item leaves the Gantt")
     Check(Not JsonFile.SaveFile(sFile, sumi.Project), "save the Gantt")
     Check(JsonFile.LoadFile(sFile).Schedule.Tasks[sM].Days = 10, "the Gantt after load")
+
+End
+
+Private Sub TestContracts()
+
+    Dim p As New Project
+    Dim c As Collection
+    Dim t As Contract
+    Dim f As Float[]
+    Dim sFile As String = $sTemp &/ "contracts." & JsonFile.FileExtension
+    Dim sJuan As String
+    Dim q As Project
+
+    Company.SetFolder($sTemp &/ "company")
+    sumi.Project = p
+    Cmd.Run("resource.add", ["kind": "material", "name": "ladrillo", "unit": "u", "price": 2])
+    Cmd.Run("analysis.add", ["code": "50", "name": "muro", "unit": "m2", "rubro": 4, "lines": [["resource": "MAT-0001", "qty": 60]]])
+    Cmd.Run("item.add", ["analysis": "50", "qty": 100])
+
+    ' the company's contractors, with their documents
+    c = Cmd.Run("contractor.add", ["name": "Juan Pérez", "trade": "albañilería", "taxId": "20-1-3", "docs": [["kind": "ART", "number": "1", "expires": Format(DateAdd(Now, gb.Day, 5), "yyyy-mm-dd")], ["kind": "seguro", "expires": "2099-01-01"]]])
+    sJuan = c["id"]
+    Check(c["ok"] And Company.Contractors.Count = 1, "a contractor of the company")
+    Check(Cmd.Run("contractor.get", ["key": "juan pérez"])["contractor"]["docsDue"].Count = 1, "the documents about to expire")
+    Check(Company.Changes.Count = 1 And Company.Changes[0].Command = "contractor.add" And p.Changes.Count = 3, "the company's changes go to the company's log")
+    Check(Exist(Company.Folder() &/ "contractors.json"), "the company's data is saved at once")
+    Cmd.Run("contractor.add", ["name": "Pedro Gómez", "trade": "albañilería"])
+    Check(Cmd.Run("contractor.add", ["name": "juan pérez"]).Exist("error"), "no two contractors with one name")
+
+    ' a contract with the Project tab's conditions, an item split between two contractors
+    p.AdvancePct = 10
+    p.RetentionPct = 5
+    c = Cmd.Run("contract.add", ["contractor": "Juan Pérez", "baseIndex": 100, "indexName": "CAC"])
+    Check(c["ok"] And c["code"] = "C-01", "contract.add: " & JSON.Encode(c))
+    t = p.Contracts.Find("C-01")
+    Check(t.AdvancePct = 10 And t.RetentionPct = 5 And t.Title = "albañilería", "the contract takes the project's conditions")
+    Check(Cmd.Run("part.add", ["contract": "C-01", "item": "4.01", "pct": 60])["ok"] And t.Parts[0].Quantity = 60, "a part: 60% of an item")
+    Cmd.Run("part.set", ["contract": "C-01", "part": "4.01", "unitPrice": 100])
+    Cmd.Run("contract.add", ["contractor": "Pedro Gómez"])
+    Cmd.Run("part.add", ["contract": "C-02", "item": "4.01"])
+    Check(p.Contracts.Find("C-02").Parts[0].Quantity = 40, "the other contractor takes what is left of the item")
+    Check(Cmd.Run("part.add", ["contract": "C-02", "item": "4.01"]).Exist("error"), "nothing is left of it")
+    Check(Abs(t.Amount() - 6000) < 1e-9, "the contract's amount")
+
+    ' certificates
+    c = Cmd.Run("cert.add", ["contract": "C-01", "kind": "advance"])
+    Check(Abs(t.Numbers(t.Certs[0])[4] - 600) < 1e-9, "the advance certificate: 10%")
+    Check(Cmd.Run("cert.add", ["contract": "C-01", "kind": "advance"]).Exist("error"), "only one advance")
+    Cmd.Run("cert.add", ["contract": "C-01", "period": "2026-12", "index": 110])
+    Check(Cmd.Run("cert.set", ["contract": "C-01", "cert": 2, "measures": [["part": "4.01", "acc": 30]]])["ok"], "measure a certificate")
+    f = t.Numbers(t.Certs[1])
+    ' work 30 x 100 = 3000; index 110/100: +300; advance 10%: -300; retention 5% of 3300: -165
+    Check(Abs(f[0] - 3000) < 1e-9 And Abs(f[1] - 300) < 1e-9 And Abs(f[2] - 300) < 1e-9 And Abs(f[3] - 165) < 1e-9 And Abs(f[4] - 2835) < 1e-9, "certificate 2: " & Utils.JoinNumbers(f, " "))
+    Cmd.Run("cert.set", ["contract": "C-01", "cert": 2, "status": "issued"])
+    Check(Cmd.Run("cert.set", ["contract": "C-01", "cert": 2, "measures": [["part": "4.01", "acc": 31]]]).Exist("error"), "an issued certificate keeps its measures")
+    Cmd.Run("cert.add", ["contract": "C-01", "period": "2027-01", "index": 120])
+    Check(t.Certs[2].Measures[t.Parts[0].Id] = 30, "a new certificate starts where the last one ended")
+    Check(Cmd.Run("cert.set", ["contract": "C-01", "cert": 3, "measures": [["part": "4.01", "acc": 20]]]).Exist("error"), "the accumulated can't go back")
+    Check(Cmd.Run("cert.set", ["contract": "C-01", "cert": 3, "measures": [["part": "4.01", "acc": 61]]]).Exist("error"), "not more than the contract")
+    Cmd.Run("cert.set", ["contract": "C-01", "cert": 3, "measures": [["part": "4.01", "pct": 100]], "status": "issued"])
+    f = t.Numbers(t.Certs[2])
+    Check(Abs(f[0] - 3000) < 1e-9 And Abs(f[1] - 600) < 1e-9 And Abs(f[4] - 3120) < 1e-9, "certificate 3 by %: " & Utils.JoinNumbers(f, " "))
+    Cmd.Run("cert.add", ["contract": "C-01", "kind": "retention"])
+    Check(Abs(t.Numbers(t.Certs[3])[4] - 345) < 1e-9, "the retention given back: 165 + 180")
+    Check(Abs(t.Progress() - 1) < 1e-9 And p.Contracts.ItemMeasured(p.Budget.Items[0].Id) = 60, "progress of the contract and of the item")
+
+    ' payments
+    Cmd.Run("cert.set", ["contract": "C-01", "cert": 1, "status": "issued"])
+    Check(Cmd.Run("payment.add", ["contract": "C-01", "amount": 600, "certificate": 1, "means": "transfer", "invoice": "A-0001-1"])["ok"], "a payment")
+    f = t.Balance()
+    Check(Abs(f[0] - (600 + 2835 + 3120)) < 1e-9 And Abs(f[1] - 600) < 1e-9 And Abs(f[2] - 5955) < 1e-9, "balance: " & Utils.JoinNumbers(f, " "))
+    Check(t.Payments[0].Certificate = t.Certs[0].Id, "the payment points to its certificate")
+    Check(Cmd.Run("contractor.delete", ["key": sJuan]).Exist("error"), "a contractor with contracts can't be deleted")
+    Check(Cmd.Run("part.remove", ["contract": "C-01", "part": "4.01"]).Exist("error"), "a part with certified work can't be removed")
+
+    ' undo: the newest of the project's log and the company's
+    Cmd.Run("contractor.set", ["key": sJuan, "phone": "123"])
+    Cmd.Run("undo")
+    Check(Company.Contractors[sJuan].Phone = "" And t.Payments.Count = 1, "undo takes the company's change when it is the newest")
+    Cmd.Run("undo")
+    Check(sumi.Project.Contracts.Find("C-01").Payments.Count = 0, "then the project's")
+
+    ' the file, and the company's data read again
+    Check(Not JsonFile.SaveFile(sFile, sumi.Project), "save the contracts")
+    q = JsonFile.LoadFile(sFile)
+    sumi.Project = q
+    Check(q.Contracts.Items.Count = 2 And Abs(q.Contracts.Find("C-01").Numbers(q.Contracts.Find("C-01").Certs[2])[4] - 3120) < 1e-9, "the contracts after load")
+    Company.Load()
+    Check(Company.Contractors.Count = 2 And Company.Contractors[sJuan].Docs.Count = 2 And Company.Changes.Count >= 4, "the company's data after reading it again")
+
+    ' the standard library: export, and a new project starts with it
+    Check(Cmd.Run("standard.export")["ok"] And Company.Standard.Resources.Count = 1, "export the prices to the standard library")
+    p = New Project
+    Check(p.Prices.Resources.Count = 1 And p.Prices.Analyses.Count = 1, "a new project starts with the standard library")
+    sumi.Project = p
+    Cmd.Run("resource.set", ["key": "MAT-0001", "price": 9])
+    Cmd.Run("prices.fromStandard")
+    Check(p.Prices.ResourceByCode("MAT-0001").Price = 2, "the standard's prices taken again")
 
 End
 

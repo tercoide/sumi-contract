@@ -62,6 +62,9 @@ Public Budget As New Budget
 '' THE GANTT: a task for each budget item
 Public Schedule As New Schedule
 
+'' THE CONTRACTS with the contractors, their certificates and payments
+Public Contracts As New Contracts
+
 '' THE CHANGE LOG: every change made through Cmd (see Change), kept with the file
 Public Changes As New Change[]
 
@@ -101,6 +104,9 @@ Public Sub _new()
     StartDate = Date(Year(Now), Month(Now), Day(Now))
     Currency = Config.Currency
     Prices.DefaultCharges()
+    ' a new project starts with a copy of the company's standard library (as licita2003 did)
+    Company.EnsureLoaded()
+    If Company.Standard Then Prices.FromJson(Company.Standard.ToJson())
 
 End
 
@@ -226,6 +232,7 @@ Public Function ToJson() As Collection
     c["prices"] = Prices.ToJson()
     c["budget"] = Budget.ToJson()
     c["schedule"] = Schedule.ToJson()
+    c["contracts"] = Contracts.ToJson()
     aList = New Variant[]
     For Each hChange In Changes
         aList.Add(hChange.ToJson())
@@ -301,6 +308,10 @@ Public Sub FromJson(c As Collection)
     If c.Exist("schedule") Then
         Schedule = New Schedule
         Schedule.FromJson(c["schedule"])
+    Endif
+    If c.Exist("contracts") Then
+        Contracts = New Contracts
+        Contracts.FromJson(c["contracts"])
     Endif
     If c.Exist("changes") Then
         Changes.Clear

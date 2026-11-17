@@ -1,0 +1,250 @@
+' Gambas class file
+
+'' A contract with a contractor (starting.txt, item 4): parts of budget items at agreed prices, the conditions
+'' (from the Project tab by default: advance, guarantee retention, certificate period, adjustment index), its
+'' certificates and payments. Decided with the user 2026-11-17: the advance is recovered in proportion to each
+'' certificate; the retention is kept from each and given back at the final reception; each certificate is
+'' adjusted by its month's index over the base index.
+
+Public Id As String
+Public Code As String = ""                      '' "C-01"
+Public Contractor As String = ""                '' the contractor's Id (Company)
+Public Title As String = ""
+Public Mode As String = "Unit prices"
+Public AdvancePct As Float
+Public RetentionPct As Float = 5
+Public Period As String = "Monthly"
+Public IndexName As String = ""                 '' "CAC"... ("" = fixed prices)
+Public BaseIndex As Float
+Public BaseMonth As String = ""                 '' yyyy-mm
+Public Signed As String = ""                    '' yyyy-mm-dd
+Public Parts As New ContractPart[]
+Public Certs As New Certificate[]
+Public Payments As New Payment[]
+Public Note As String = ""
+
+Public Sub _new()
+
+    Id = Ids.Make("t")
+
+End
+
+'' The contract's amount: its parts at the agreed prices
+Public Function Amount() As Float
+
+    Dim p As ContractPart
+    Dim f As Float
+
+    For Each p In Parts
+        f += p.Quantity * p.UnitPrice
+    Next
+    Return f
+
+End
+
+Public Function FindPart(sKey As String) As ContractPart
+
+    Dim p As ContractPart
+
+    For Each p In Parts
+        If p.Id = sKey Or If p.Item = sKey Then Return p
+    Next
+
+End
+
+Public Function FindCert(sKey As String) As Certificate
+
+    Dim q As Certificate
+
+    For Each q In Certs
+        If q.Id = sKey Or If CStr(q.Number) = sKey Then Return q
+    Next
+
+End
+
+'' The accumulated quantity of a part measured by the progress certificates before q (all of them if q is Null)
+Public Function Before(q As Certificate, sPart As String) As Float
+
+    Dim h As Certificate
+    Dim f As Float
+
+    For Each h In Certs
+        If h = q Then Break
+        If h.Kind = Certificate.PROGRESS And If h.Measures.Exist(sPart) Then f = h.Measures[sPart]
+    Next
+    Return f
+
+End
+
+'' The accumulated quantity of a part after all the certificates
+Public Function Measured(sPart As String) As Float
+
+    Return Before(Null, sPart)
+
+End
+
+'' A certificate's amounts: [work, adjustment, advance recovered, retention, net]
+Public Function Numbers(q As Certificate) As Float[]
+
+    Dim p As ContractPart
+    Dim fWork, fAdj, fAdv, fRet As Float
+    Dim h As Certificate
+    Dim f As Float[]
+
+    Select Case q.Kind
+        Case Certificate.ADVANCE
+            Return [0.0, 0.0, 0.0, 0.0, Amount() * AdvancePct / 100]
+        Case Certificate.RETENTION
+            For Each h In Certs
+                If h.Kind = Certificate.PROGRESS Then
+                    f = Numbers(h)
+                    fRet += f[3]
+                Endif
+            Next
+            Return [0.0, 0.0, 0.0, 0.0, fRet]
+    End Select
+    For Each p In Parts
+        If q.Measures.Exist(p.Id) Then fWork += (q.Measures[p.Id] - Before(q, p.Id)) * p.UnitPrice
+    Next
+    If BaseIndex > 0 And If q.Index > 0 Then fAdj = fWork * (q.Index / BaseIndex - 1)
+    fAdv = fWork * AdvancePct / 100
+    fRet = (fWork + fAdj) * RetentionPct / 100
+    Return [fWork, fAdj, fAdv, fRet, fWork + fAdj - fAdv - fRet]
+
+End
+
+'' What the issued certificates are worth, what was paid, and the difference
+Public Function Balance() As Float[]
+
+    Dim q As Certificate
+    Dim y As Payment
+    Dim fDue, fPaid As Float
+
+    For Each q In Certs
+        If q.Status = "issued" Then fDue += Numbers(q)[4]
+    Next
+    For Each y In Payments
+        fPaid += y.Amount
+    Next
+    Return [fDue, fPaid, fDue - fPaid]
+
+End
+
+'' The work certified, as a part of the contract (0 to 1)
+Public Function Progress() As Float
+
+    Dim p As ContractPart
+    Dim fDone As Float
+    Dim fAll As Float = Amount()
+
+    If fAll <= 0 Then Return 0
+    For Each p In Parts
+        fDone += Measured(p.Id) * p.UnitPrice
+    Next
+    Return fDone / fAll
+
+End
+
+Public Function ToJson() As Collection
+
+    Dim c As New JSONCollection
+    Dim a As Variant[]
+    Dim o As Object
+
+    c["id"] = Id
+    c["code"] = Code
+    c["contractor"] = Contractor
+    c["title"] = Title
+    c["mode"] = Mode
+    c["advancePct"] = AdvancePct
+    c["retentionPct"] = RetentionPct
+    c["period"] = Period
+    c["indexName"] = IndexName
+    c["baseIndex"] = BaseIndex
+    c["baseMonth"] = BaseMonth
+    c["signed"] = Signed
+    c["note"] = Note
+    a = New Variant[]
+    For Each o In Parts
+        a.Add(o.ToJson())
+    Next
+    c["parts"] = a
+    a = New Variant[]
+    For Each o In Certs
+        a.Add(o.ToJson())
+    Next
+    c["certificates"] = a
+    a = New Variant[]
+    For Each o In Payments
+        a.Add(o.ToJson())
+    Next
+    c["payments"] = a
+    Return c
+
+End
+
+Static Public Function FromJson(c As Collection) As Contract
+
+    Dim k As New Contract
+    Dim v As Variant
+
+    If c["id"] Then k.Id = c["id"]
+    k.Apply(c)
+    If c.Exist("parts") Then
+        For Each v In c["parts"]
+            k.Parts.Add(ContractPart.FromJson(v))
+        Next
+    Endif
+    If c.Exist("certificates") Then
+        For Each v In c["certificates"]
+            k.Certs.Add(Certificate.FromJson(v))
+        Next
+    Endif
+    If c.Exist("payments") Then
+        For Each v In c["payments"]
+            k.Payments.Add(Payment.FromJson(v))
+        Next
+    Endif
+    Return k
+
+End
+
+'' Sets the fields present in c (not parts, certificates or payments); a field it doesn't know, or ""
+Public Function Apply(c As Collection) As String
+
+    Dim v As Variant
+
+    For Each v In c
+        Select Case c.Key
+            Case "id", "key", "parts", "certificates", "payments"
+            Case "code"
+                Code = CStr(v)
+            Case "contractor"
+                Contractor = v
+            Case "title"
+                Title = v
+            Case "mode"
+                Mode = v
+            Case "advancePct"
+                AdvancePct = v
+            Case "retentionPct"
+                RetentionPct = v
+            Case "period"
+                Period = v
+            Case "indexName"
+                IndexName = v
+            Case "baseIndex"
+                BaseIndex = v
+            Case "baseMonth"
+                BaseMonth = v
+            Case "signed"
+                Signed = v
+            Case "note"
+                Note = v
+            Default
+                Return c.Key
+        End Select
+    Next
+    Return ""
+
+End

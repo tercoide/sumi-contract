@@ -1,0 +1,33 @@
+' Gambas class file
+
+'' What a contract takes of a budget item: a quantity (all of it, or part: an item can be split among
+'' contractors) at the agreed unit price
+
+Public Id As String
+Public Item As String                           '' the budget item's Id
+Public Quantity As Float
+Public UnitPrice As Float                       '' agreed with the contractor
+
+Public Sub _new()
+
+    Id = Ids.Make("p")
+
+End
+
+Public Function ToJson() As Collection
+
+    Return ["id": Id, "item": Item, "qty": Quantity, "unitPrice": UnitPrice]
+
+End
+
+Static Public Function FromJson(c As Collection) As ContractPart
+
+    Dim p As New ContractPart
+
+    If c["id"] Then p.Id = c["id"]
+    p.Item = c["item"]
+    p.Quantity = c["qty"]
+    p.UnitPrice = c["unitPrice"]
+    Return p
+
+End

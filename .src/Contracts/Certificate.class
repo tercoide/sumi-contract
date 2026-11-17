@@ -1,0 +1,75 @@
+' Gambas class file
+
+'' A certificate of a contract: "advance" (the advance payment), "progress" (the work measured in a period:
+'' the accumulated quantity of each part) or "retention" (the guarantee retention given back at the final
+'' reception). Its amounts are worked out by Contract.Numbers.
+
+Public Const ADVANCE As String = "advance"
+Public Const PROGRESS As String = "progress"
+Public Const RETENTION As String = "retention"
+
+Public Id As String
+Public Number As Integer
+Public Kind As String = "progress"
+Public Period As String = ""                    '' yyyy-mm
+Public When As String = ""                      '' its date, yyyy-mm-dd
+Public Index As Float                           '' the adjustment index of its month (0 = no adjustment)
+Public Measures As New Collection               '' accumulated quantity measured, by part Id
+Public Status As String = "draft"               '' "draft", "issued"
+Public Note As String = ""
+
+Public Sub _new()
+
+    Id = Ids.Make("q")
+
+End
+
+Static Public Function Kinds() As String[]
+
+    Return [ADVANCE, PROGRESS, RETENTION]
+
+End
+
+Public Function ToJson() As Collection
+
+    Dim c As New JSONCollection
+    Dim m As New JSONCollection
+    Dim v As Variant
+
+    c["id"] = Id
+    c["number"] = Number
+    c["kind"] = Kind
+    c["period"] = Period
+    c["date"] = When
+    c["index"] = Index
+    For Each v In Measures
+        m[Measures.Key] = v
+    Next
+    c["measures"] = m
+    c["status"] = Status
+    If Note Then c["note"] = Note
+    Return c
+
+End
+
+Static Public Function FromJson(c As Collection) As Certificate
+
+    Dim q As New Certificate
+    Dim v As Variant
+
+    If c["id"] Then q.Id = c["id"]
+    q.Number = c["number"]
+    q.Kind = c["kind"]
+    q.Period = c["period"]
+    q.When = c["date"]
+    q.Index = c["index"]
+    If c.Exist("measures") Then
+        For Each v In c["measures"]
+            q.Measures[c["measures"].Key] = v
+        Next
+    Endif
+    q.Status = c["status"]
+    If c.Exist("note") Then q.Note = c["note"]
+    Return q
+
+End

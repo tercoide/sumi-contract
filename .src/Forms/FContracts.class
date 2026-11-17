@@ -1,0 +1,752 @@
+' Gambas class file
+
+'' The Contracts tab (starting.txt, item 4): the project's contracts with the company's contractors. Left: the
+'' list (amount, progress, balance). Right: the selected contract's conditions and three pages: its parts
+'' (budget items, the quantity and the agreed price), its certificates (amounts, and the measures of the selected
+'' one: the accumulated quantity of each part) and its payments. Every change goes through Cmd.
+
+Private gvList As GridView
+Private lblSummary As Label
+Private pnlRight As VBox
+Private cmbContractor As ComboBox
+Private txtTitle As TextBox
+Private txtSigned As TextBox
+Private spAdvance As SpinBox
+Private spRetention As SpinBox
+Private txtIndexName As TextBox
+Private spBaseIndex As SpinBox
+Private txtBaseMonth As TextBox
+Private lblContract As Label
+Private tabPages As TabPanel
+Private tvParts As TableView
+Private gvCerts As GridView
+Private tvMeasures As TableView
+Private lblCert As Label
+Private tvPays As TableView
+
+Private $aIds As New String[]                   ' list row -> contract id
+Private $aContractors As New String[]           ' combo index -> contractor id
+Private $sContract As String
+Private $iCert As Integer = -1                  ' the selected certificate (index)
+Private $bFilling As Boolean
+Private $bOwn As Boolean
+
+Public Sub _new()
+
+    Dim hRow, hSplit As HBox
+    Dim hLeft, hPage As VBox
+
+    hRow = Ui.HBox(Me)
+    Ui.Button(hRow, ("New contract"), "New", Me)
+    Ui.Button(hRow, ("Delete"), "Delete", Me)
+    Ui.Button(hRow, ("Contractors..."), "Contractors", Me, ("The company's contractors and their documents"))
+    lblSummary = Ui.Label(hRow, "")
+    lblSummary.Expand = True
+    lblSummary.Alignment = Align.Right
+    lblSummary.Font.Bold = True
+
+    hSplit = Ui.HBox(Me, 0, True)
+    hLeft = Ui.VBox(hSplit, False)
+    hLeft.W = Desktop.Scale * 60
+    gvList = New GridView(hLeft) As "List"
+    gvList.Expand = True
+    gvList.Mode = Select.Single
+    Ui.Columns(gvList, [("Code"), ("Contractor"), ("Amount"), ("Done"), ("Balance")], [7, 22, 12, 7, 12])
+
+    pnlRight = Ui.VBox(hSplit)
+    hRow = Ui.HBox(pnlRight)
+    Ui.Label(hRow, ("Contractor"))
+    cmbContractor = New ComboBox(hRow) As "Field"
+    cmbContractor.ReadOnly = True
+    cmbContractor.W = Desktop.Scale * 28
+    Ui.Label(hRow, ("Title"))
+    txtTitle = New TextBox(hRow) As "Field"
+    txtTitle.Expand = True
+    Ui.Label(hRow, ("Signed"))
+    txtSigned = New TextBox(hRow) As "Field"
+    txtSigned.W = Desktop.Scale * 12
+    txtSigned.Placeholder = "yyyy-mm-dd"
+    hRow = Ui.HBox(pnlRight)
+    Ui.Label(hRow, ("Advance %"))
+    spAdvance = MakeSpin(hRow, 100, 2)
+    Ui.Label(hRow, ("Retention %"))
+    spRetention = MakeSpin(hRow, 100, 2)
+    Ui.Label(hRow, ("Index"))
+    txtIndexName = New TextBox(hRow) As "Field"
+    txtIndexName.W = Desktop.Scale * 10
+    txtIndexName.Placeholder = "CAC"
+    Ui.Label(hRow, ("Base index"))
+    spBaseIndex = MakeSpin(hRow, 1e9, 2)
+    Ui.Label(hRow, ("of"))
+    txtBaseMonth = New TextBox(hRow) As "Field"
+    txtBaseMonth.W = Desktop.Scale * 10
+    txtBaseMonth.Placeholder = "yyyy-mm"
+    lblContract = Ui.Label(pnlRight, "")
+    lblContract.Font.Bold = True
+
+    tabPages = New TabPanel(pnlRight) As "Pages"
+    tabPages.Expand = True
+    tabPages.Arrangement = Arrange.Vertical
+    tabPages.Spacing = True
+    tabPages.Margin = True
+    tabPages.Count = 3
+    tabPages[0].Text = ("Items")
+    tabPages[1].Text = ("Certificates")
+    tabPages[2].Text = ("Payments")
+
+    ' items
+    tvParts = New TableView(tabPages[0]) As "Parts"
+    tvParts.Expand = True
+    tvParts.Mode = Select.Single
+    Ui.Columns(tvParts, [("Item"), ("Description"), ("Unit"), ("Quantity"), ("% of the item"), ("Agreed price"), ("Total"), ("Measured"), ("Done")], [7, 34, 5, 10, 9, 11, 12, 10, 7])
+    hRow = Ui.HBox(tabPages[0])
+    Ui.Button(hRow, ("Add item..."), "PartAdd", Me, ("An item of the budget: what no other contract takes of it"))
+    Ui.Button(hRow, ("Remove"), "PartRemove", Me)
+
+    ' certificates
+    hPage = Ui.VBox(tabPages[1])
+    gvCerts = New GridView(hPage) As "Certs"
+    gvCerts.H = Desktop.Scale * 18
+    gvCerts.Mode = Select.Single
+    Ui.Columns(gvCerts, [("No."), ("Kind"), ("Period"), ("Index"), ("Work"), ("Adjustment"), ("Advance"), ("Retention"), ("Net"), ("Status")], [5, 10, 8, 8, 11, 10, 10, 10, 11, 8])
+    hRow = Ui.HBox(hPage)
+    Ui.Button(hRow, ("New certificate"), "CertNew", Me, ("A progress certificate for this month, starting where the last one ended"))
+    Ui.Button(hRow, ("Advance"), "CertAdvance", Me, ("The advance payment's certificate"))
+    Ui.Button(hRow, ("Retention back"), "CertRetention", Me, ("Gives the guarantee retention back, at the final reception"))
+    Ui.Button(hRow, ("Issue / draft"), "CertIssue", Me)
+    Ui.Button(hRow, ("Delete last"), "CertDelete", Me)
+    lblCert = Ui.Label(hPage, "")
+    tvMeasures = New TableView(hPage) As "Measures"
+    tvMeasures.Expand = True
+    Ui.Columns(tvMeasures, [("Item"), ("Description"), ("Contract"), ("Before"), ("Accumulated"), ("This period"), ("Amount")], [7, 34, 10, 10, 11, 10, 12])
+
+    ' payments
+    tvPays = New TableView(tabPages[2]) As "Pays"
+    tvPays.Expand = True
+    tvPays.Mode = Select.Single
+    Ui.Columns(tvPays, [("Date"), ("Amount"), ("Means"), ("Reference"), ("Certificate"), ("Invoice"), ("Invoice date"), ("Note")], [11, 12, 10, 14, 8, 12, 11, 20])
+    hRow = Ui.HBox(tabPages[2])
+    Ui.Button(hRow, ("Add payment"), "PayAdd", Me)
+    Ui.Button(hRow, ("Delete"), "PayDelete", Me)
+
+End
+
+Private Function MakeSpin(hParent As Container, fMax As Float, iPrec As Integer) As SpinBox
+
+    Dim h As SpinBox
+
+    h = New SpinBox(hParent) As "Field"
+    h.W = Desktop.Scale * 11
+    h.MaxValue = fMax
+    h.Precision = iPrec
+    h.Alignment = Align.Right
+    Return h
+
+End
+
+Public Sub ShowProject(p As Project)
+
+    $sContract = ""
+    $iCert = -1
+    Reload()
+
+End
+
+Private Function Current() As Contract
+
+    If Not $sContract Then Return Null
+    Return sumi.Project.Contracts.Find($sContract)
+
+End
+
+Public Sub Reload()
+
+    Dim p As Project = sumi.Project
+    Dim t As Contract
+    Dim i As Integer
+    Dim f As Float[]
+    Dim fAmount, fBalance As Float
+    Dim k As Contractor
+
+    Company.EnsureLoaded()
+    $aIds.Clear
+    For Each t In p.Contracts.Items
+        $aIds.Add(t.Id)
+    Next
+    $bFilling = True
+    gvList.Rows.Count = $aIds.Count
+    For i = 0 To $aIds.Max
+        t = p.Contracts.Find($aIds[i])
+        f = t.Balance()
+        k = Company.FindContractor(t.Contractor)
+        gvList[i, 0].Text = t.Code
+        gvList[i, 1].Text = IIf(k, k.Name, ("(unknown)"))
+        gvList[i, 2].Text = Format(t.Amount(), "#,##0")
+        gvList[i, 3].Text = Format(t.Progress(), "0%")
+        gvList[i, 4].Text = Format(f[2], "#,##0")
+        gvList[i, 2].Alignment = Align.Right
+        gvList[i, 3].Alignment = Align.Right
+        gvList[i, 4].Alignment = Align.Right
+        If k And If k.DocsDue(15).Count Then gvList[i, 1].Foreground = Color.Red      ' documents expired or about to
+        fAmount += t.Amount()
+        fBalance += f[2]
+    Next
+    If Not p.Contracts.Find($sContract) Then $sContract = ""
+    If Not $sContract And If $aIds.Count Then $sContract = $aIds[0]
+    i = $aIds.Find($sContract)
+    If i >= 0 Then gvList.Row = i
+    $bFilling = False
+    lblSummary.Text = Subst(("&1 contracts, &2 &3; to pay &2 &4"), $aIds.Count, p.Currency, Format(fAmount, "#,##0"), Format(fBalance, "#,##0"))
+    ShowContract(Not $bOwn)
+
+End
+
+Public Sub List_Change()
+
+    If $bFilling Then Return
+    If gvList.Row < 0 Or If gvList.Row > $aIds.Max Then Return
+    If $aIds[gvList.Row] = $sContract Then Return
+    $sContract = $aIds[gvList.Row]
+    $iCert = -1
+    ShowContract(True)
+
+End
+
+Public Sub List_Click()
+
+    List_Change()
+
+End
+
+Private Sub ShowContract(bHeader As Boolean)
+
+    Dim t As Contract = Current()
+    Dim k As Contractor
+    Dim f As Float[]
+
+    pnlRight.Enabled = (t <> Null)
+    If Not t Then
+        lblContract.Text = ("No contract: make one with New contract.")
+        tvParts.Rows.Count = 0
+        gvCerts.Rows.Count = 0
+        tvMeasures.Rows.Count = 0
+        tvPays.Rows.Count = 0
+        Return
+    Endif
+    If bHeader Then
+        $bFilling = True
+        $aContractors.Clear
+        cmbContractor.Clear
+        For Each k In Company.SortedContractors()
+            $aContractors.Add(k.Id)
+            cmbContractor.Add(k.Name)
+        Next
+        cmbContractor.Index = $aContractors.Find(t.Contractor)
+        txtTitle.Text = t.Title
+        txtSigned.Text = t.Signed
+        spAdvance.Value = t.AdvancePct
+        spRetention.Value = t.RetentionPct
+        txtIndexName.Text = t.IndexName
+        spBaseIndex.Value = t.BaseIndex
+        txtBaseMonth.Text = t.BaseMonth
+        $bFilling = False
+    Endif
+    f = t.Balance()
+    lblContract.Text = Subst(("&1: &2 &3, &4 done. Certified &2 &5, paid &2 &6, to pay &2 &7"), t.Code, sumi.Project.Currency, Format(t.Amount(), "#,##0.00"), Format(t.Progress(), "0.0%"), Format(f[0], "#,##0.00"), Format(f[1], "#,##0.00"), Format(f[2], "#,##0.00"))
+    FillParts(t)
+    FillCerts(t)
+    FillPays(t)
+
+End
+
+'' THE HEADER
+
+Public Sub Field_Change()
+
+    Dim t As Contract = Current()
+    Dim c As Collection
+
+    If $bFilling Or If Not t Then Return
+    If Last = txtTitle Then
+        c = ["title": txtTitle.Text]
+    Else If Last = txtSigned Then
+        c = ["signed": Trim(txtSigned.Text)]
+    Else If Last = spAdvance Then
+        c = ["advancePct": spAdvance.Value]
+    Else If Last = spRetention Then
+        c = ["retentionPct": spRetention.Value]
+    Else If Last = txtIndexName Then
+        c = ["indexName": Trim(txtIndexName.Text)]
+    Else If Last = spBaseIndex Then
+        c = ["baseIndex": spBaseIndex.Value]
+    Else If Last = txtBaseMonth Then
+        c = ["baseMonth": Trim(txtBaseMonth.Text)]
+    Else
+        Return
+    Endif
+    c["key"] = t.Id
+    Run("contract.set", c)
+
+End
+
+Public Sub Field_Click()
+
+    Dim t As Contract = Current()
+
+    If $bFilling Or If Not t Or If Last <> cmbContractor Then Return
+    If cmbContractor.Index < 0 Then Return
+    Run("contract.set", ["key": t.Id, "contractor": $aContractors[cmbContractor.Index]])
+
+End
+
+Private Function Run(sCommand As String, c As Collection) As Boolean
+
+    Dim cOut As Collection
+
+    $bOwn = True
+    cOut = Cmd.Run(sCommand, c)
+    $bOwn = False
+    If Ui.Failed(cOut) Then
+        Reload()
+        Return False
+    Endif
+    Return True
+
+End
+
+Public Sub New_Click()
+
+    Dim aList As Contractor[] = Company.SortedContractors()
+    Dim c As Collection
+
+    If aList.Count = 0 Then
+        Message.Info(("There are no contractors yet: add them in Contractors..."))
+        FContractors.ShowModal()
+        aList = Company.SortedContractors()
+        If aList.Count = 0 Then Return
+    Endif
+    c = Cmd.Run("contract.add", ["contractor": aList[0].Id])
+    If Ui.Failed(c) Then Return
+    $sContract = c["id"]
+    $iCert = -1
+    Reload()
+
+End
+
+Public Sub Delete_Click()
+
+    Dim t As Contract = Current()
+
+    If Not t Then Return
+    If Message.Question(Subst(("Delete contract &1 with its certificates and payments?"), t.Code), ("Delete"), ("Cancel")) <> 1 Then Return
+    Ui.Failed(Cmd.Run("contract.delete", ["key": t.Id]))
+
+End
+
+Public Sub Contractors_Click()
+
+    FContractors.ShowModal()
+    Reload()
+
+End
+
+'' ITEMS
+
+Private Sub FillParts(t As Contract)
+
+    Dim h As Budget = sumi.Project.Budget
+    Dim i, j As Integer
+    Dim p As ContractPart
+    Dim b As BudgetItem
+
+    tvParts.Rows.Count = t.Parts.Count
+    For i = 0 To t.Parts.Max
+        p = t.Parts[i]
+        b = h.Find(p.Item)
+        If b Then
+            tvParts[i, 0].Text = b.Code
+            tvParts[i, 1].Text = h.DescriptionOf(b)
+            tvParts[i, 2].Text = h.UnitOf(b)
+            If b.Quantity Then tvParts[i, 4].Text = Format(p.Quantity / b.Quantity, "0.0%")
+        Else
+            tvParts[i, 1].Text = ("(the budget item is gone)")
+            tvParts[i, 1].Foreground = Color.Red
+        Endif
+        tvParts[i, 3].Text = Format(p.Quantity, "#,##0.00")
+        tvParts[i, 5].Text = Format(p.UnitPrice, "#,##0.00")
+        tvParts[i, 6].Text = Format(p.Quantity * p.UnitPrice, "#,##0.00")
+        tvParts[i, 7].Text = Format(t.Measured(p.Id), "#,##0.00")
+        If p.Quantity Then tvParts[i, 8].Text = Format(t.Measured(p.Id) / p.Quantity, "0%")
+        For j = 3 To 8
+            tvParts[i, j].Alignment = Align.Right
+        Next
+    Next
+
+End
+
+Public Sub Parts_Click()
+
+    If tvParts.Column = 3 Or If tvParts.Column = 4 Or If tvParts.Column = 5 Then tvParts.Edit()
+
+End
+
+Public Sub Parts_Save(Row As Integer, Column As Integer, Value As String)
+
+    Dim t As Contract = Current()
+    Dim f As Float
+    Dim bBad As Boolean
+    Dim c As New Collection
+
+    If Not t Or If Row > t.Parts.Max Then Return
+    f = Ui.ParseNumber(Replace(Value, "%", ""), ByRef bBad)
+    If bBad Then
+        Message.Warning(Subst(("&1 is not a number."), Value))
+        Return
+    Endif
+    Select Case Column
+        Case 3
+            c["qty"] = f
+        Case 4
+            c["pct"] = f
+        Case 5
+            c["unitPrice"] = f
+    End Select
+    c["contract"] = t.Id
+    c["part"] = t.Parts[Row].Id
+    Run("part.set", c)
+    ShowContract(False)
+
+End
+
+Public Sub PartAdd_Click()
+
+    Dim t As Contract = Current()
+    Dim sId As String
+
+    If Not t Then Return
+    sId = FPick.Choose("item", ("Add a budget item to ") & t.Code)
+    If Not sId Then Return
+    Run("part.add", ["contract": t.Id, "item": sId])
+    ShowContract(False)
+
+End
+
+Public Sub PartRemove_Click()
+
+    Dim t As Contract = Current()
+
+    If Not t Or If tvParts.Row < 0 Or If tvParts.Row > t.Parts.Max Then Return
+    Run("part.remove", ["contract": t.Id, "part": t.Parts[tvParts.Row].Id])
+    ShowContract(False)
+
+End
+
+'' CERTIFICATES
+
+Private Sub FillCerts(t As Contract)
+
+    Dim i, j As Integer
+    Dim q As Certificate
+    Dim f As Float[]
+
+    gvCerts.Rows.Count = t.Certs.Count
+    For i = 0 To t.Certs.Max
+        q = t.Certs[i]
+        f = t.Numbers(q)
+        gvCerts[i, 0].Text = CStr(q.Number)
+        gvCerts[i, 1].Text = Tr(q.Kind)
+        gvCerts[i, 2].Text = q.Period
+        gvCerts[i, 3].Text = Ui.Num(q.Index, "0.00")
+        For j = 0 To 4
+            gvCerts[i, 4 + j].Text = Ui.Num(f[j], "#,##0.00")
+            gvCerts[i, 4 + j].Alignment = Align.Right
+        Next
+        gvCerts[i, 9].Text = Tr(q.Status)
+        If q.Status = "issued" Then gvCerts[i, 8].Font = Font["Bold"]
+    Next
+    If $iCert > t.Certs.Max Then $iCert = t.Certs.Max
+    If $iCert < 0 Then $iCert = t.Certs.Max
+    If $iCert >= 0 Then gvCerts.Row = $iCert
+    FillMeasures(t)
+
+End
+
+Public Sub Certs_Change()
+
+    Dim t As Contract = Current()
+
+    If Not t Then Return
+    $iCert = gvCerts.Row
+    FillMeasures(t)
+
+End
+
+Public Sub Certs_Click()
+
+    Certs_Change()
+
+End
+
+Private Function CurrentCert(t As Contract) As Certificate
+
+    If $iCert < 0 Or If $iCert > t.Certs.Max Then Return Null
+    Return t.Certs[$iCert]
+
+End
+
+Private Sub FillMeasures(t As Contract)
+
+    Dim h As Budget = sumi.Project.Budget
+    Dim q As Certificate = CurrentCert(t)
+    Dim i, j As Integer
+    Dim p As ContractPart
+    Dim b As BudgetItem
+    Dim fBefore, fAcc As Float
+
+    If Not q Or If q.Kind <> Certificate.PROGRESS Then
+        tvMeasures.Rows.Count = 0
+        If q Then
+            lblCert.Text = Subst(("Certificate &1: &2 (nothing to measure)"), q.Number, Tr(q.Kind))
+        Else
+            lblCert.Text = ""
+        Endif
+        Return
+    Endif
+    lblCert.Text = Subst(("Certificate &1, &2: the accumulated quantity of each item (click to change it)"), q.Number, q.Period) & IIf(q.Status = "issued", " - " & ("issued: set it back to draft to change it"), "")
+    tvMeasures.Rows.Count = t.Parts.Count
+    For i = 0 To t.Parts.Max
+        p = t.Parts[i]
+        b = h.Find(p.Item)
+        fBefore = t.Before(q, p.Id)
+        If q.Measures.Exist(p.Id) Then fAcc = q.Measures[p.Id] Else fAcc = fBefore
+        If b Then
+            tvMeasures[i, 0].Text = b.Code
+            tvMeasures[i, 1].Text = h.DescriptionOf(b)
+        Endif
+        tvMeasures[i, 2].Text = Format(p.Quantity, "#,##0.00")
+        tvMeasures[i, 3].Text = Format(fBefore, "#,##0.00")
+        tvMeasures[i, 4].Text = Format(fAcc, "#,##0.00")
+        tvMeasures[i, 5].Text = Format(fAcc - fBefore, "#,##0.00")
+        tvMeasures[i, 6].Text = Format((fAcc - fBefore) * p.UnitPrice, "#,##0.00")
+        For j = 2 To 6
+            tvMeasures[i, j].Alignment = Align.Right
+        Next
+        tvMeasures[i, 4].Font = Font["Bold"]
+    Next
+
+End
+
+Public Sub Measures_Click()
+
+    Dim t As Contract = Current()
+    Dim q As Certificate
+
+    If Not t Then Return
+    q = CurrentCert(t)
+    If q And If q.Status <> "issued" And If tvMeasures.Column = 4 Then tvMeasures.Edit()
+
+End
+
+Public Sub Measures_Save(Row As Integer, Column As Integer, Value As String)
+
+    Dim t As Contract = Current()
+    Dim q As Certificate
+    Dim f As Float
+    Dim bBad As Boolean
+    Dim cMeasure As Collection
+
+    If Not t Or If Row > t.Parts.Max Then Return
+    q = CurrentCert(t)
+    If Not q Then Return
+    ' "50%" is a percentage of the contract's quantity, a number is the accumulated quantity
+    If InStr(Value, "%") Then
+        f = Ui.ParseNumber(Replace(Value, "%", ""), ByRef bBad)
+        cMeasure = ["part": t.Parts[Row].Id, "pct": f]
+    Else
+        f = Ui.ParseNumber(Value, ByRef bBad)
+        cMeasure = ["part": t.Parts[Row].Id, "acc": f]
+    Endif
+    If bBad Then
+        Message.Warning(Subst(("&1 is not a number."), Value))
+        Return
+    Endif
+    Run("cert.set", ["contract": t.Id, "cert": q.Id, "measures": [cMeasure]])
+    ShowContract(False)
+
+End
+
+Private Sub NewCert(sKind As String)
+
+    Dim t As Contract = Current()
+    Dim c As Collection
+
+    If Not t Then Return
+    $bOwn = True
+    c = Cmd.Run("cert.add", ["contract": t.Id, "kind": sKind])
+    $bOwn = False
+    If Ui.Failed(c) Then Return
+    $iCert = t.Certs.Max
+    ShowContract(False)
+
+End
+
+Public Sub CertNew_Click()
+
+    NewCert(Certificate.PROGRESS)
+
+End
+
+Public Sub CertAdvance_Click()
+
+    NewCert(Certificate.ADVANCE)
+
+End
+
+Public Sub CertRetention_Click()
+
+    NewCert(Certificate.RETENTION)
+
+End
+
+Public Sub CertIssue_Click()
+
+    Dim t As Contract = Current()
+    Dim q As Certificate
+
+    If Not t Then Return
+    q = CurrentCert(t)
+    If Not q Then Return
+    Run("cert.set", ["contract": t.Id, "cert": q.Id, "status": IIf(q.Status = "issued", "draft", "issued")])
+    ShowContract(False)
+
+End
+
+Public Sub CertDelete_Click()
+
+    Dim t As Contract = Current()
+
+    If Not t Or If t.Certs.Count = 0 Then Return
+    If Message.Question(Subst(("Delete certificate &1?"), t.Certs[t.Certs.Max].Number), ("Delete"), ("Cancel")) <> 1 Then Return
+    Run("cert.delete", ["contract": t.Id, "cert": t.Certs[t.Certs.Max].Id])
+    $iCert = -1
+    ShowContract(False)
+
+End
+
+'' PAYMENTS
+
+Private Sub FillPays(t As Contract)
+
+    Dim i As Integer
+    Dim y As Payment
+    Dim q As Certificate
+
+    tvPays.Rows.Count = t.Payments.Count
+    For i = 0 To t.Payments.Max
+        y = t.Payments[i]
+        q = t.FindCert(y.Certificate)
+        tvPays[i, 0].Text = y.When
+        tvPays[i, 1].Text = Format(y.Amount, "#,##0.00")
+        tvPays[i, 1].Alignment = Align.Right
+        tvPays[i, 2].Text = Tr(y.Means)
+        tvPays[i, 3].Text = y.Reference
+        If q Then tvPays[i, 4].Text = CStr(q.Number)
+        tvPays[i, 5].Text = y.Invoice
+        tvPays[i, 6].Text = y.InvoiceDate
+        tvPays[i, 7].Text = y.Note
+    Next
+
+End
+
+Public Sub Pays_Click()
+
+    If tvPays.Column = 2 Then
+        tvPays.Edit(["transfer", "cheque", "cash", "other"], True)
+    Else
+        tvPays.Edit()
+    Endif
+
+End
+
+Public Sub Pays_Save(Row As Integer, Column As Integer, Value As String)
+
+    Dim t As Contract = Current()
+    Dim c As New Collection
+    Dim bBad As Boolean
+
+    If Not t Or If Row > t.Payments.Max Then Return
+    Select Case Column
+        Case 0
+            c["date"] = Trim(Value)
+        Case 1
+            c["amount"] = Ui.ParseNumber(Value, ByRef bBad)
+        Case 2
+            c["means"] = Value
+        Case 3
+            c["reference"] = Trim(Value)
+        Case 4
+            c["certificate"] = Trim(Value)
+        Case 5
+            c["invoice"] = Trim(Value)
+        Case 6
+            c["invoiceDate"] = Trim(Value)
+        Case 7
+            c["note"] = Trim(Value)
+    End Select
+    If bBad Then
+        Message.Warning(Subst(("&1 is not a number."), Value))
+        Return
+    Endif
+    c["contract"] = t.Id
+    c["index"] = Row
+    Run("payment.set", c)
+    ShowContract(False)
+
+End
+
+Public Sub PayAdd_Click()
+
+    Dim t As Contract = Current()
+    Dim q As Certificate
+    Dim fDue As Float
+    Dim c As New Collection
+
+    If Not t Then Return
+    ' by default: what the last issued certificate is worth
+    For Each q In t.Certs
+        If q.Status = "issued" Then
+            fDue = t.Numbers(q)[4]
+            c["certificate"] = q.Number
+        Endif
+    Next
+    c["contract"] = t.Id
+    c["amount"] = fDue
+    Run("payment.add", c)
+    tabPages.Index = 2
+    ShowContract(False)
+
+End
+
+Public Sub PayDelete_Click()
+
+    Dim t As Contract = Current()
+
+    If Not t Or If tvPays.Row < 0 Or If tvPays.Row > t.Payments.Max Then Return
+    If Message.Question(("Delete this payment?"), ("Delete"), ("Cancel")) <> 1 Then Return
+    Run("payment.delete", ["contract": t.Id, "index": tvPays.Row])
+    ShowContract(False)
+
+End
+
+'' For GuiTest: every page
+Public Sub TestPages()
+
+    Dim i As Integer
+
+    For i = 0 To 2
+        tabPages.Index = i
+        Wait 0.05
+    Next
+    tabPages.Index = 1
+
+End

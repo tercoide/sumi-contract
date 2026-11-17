@@ -1,0 +1,139 @@
+' Gambas module file
+
+'' The company's data, shared by all its projects (decided with the user 2026-11-17: in ~/.config until there is
+'' a server): its contractors, and its standard price library ("the main database": every new project starts
+'' with a copy of it, as licita2003 made a new xls for each contract; a project can export its prices back).
+'' Saved at once after every change (there is no "save" for the company), with its own change log (Changes,
+'' the same records as a project's; see Cmd).
+
+Public Contractors As New Collection            '' Contractor by Id
+Public Standard As PriceBook                    '' the standard library (Null = there is none yet)
+Public Changes As New Change[]
+
+Private $sDir As String
+Private $bLoaded As Boolean
+
+'' Where it lives (the smoke test points it elsewhere)
+Public Function Folder() As String
+
+    If $sDir Then Return $sDir
+    Return Config.Root &/ "company"
+
+End
+
+Public Sub SetFolder(sDir As String)
+
+    $sDir = sDir
+    $bLoaded = False
+    Load()
+
+End
+
+Public Sub Load()
+
+    Dim c As Collection
+    Dim v As Variant
+    Dim k As Contractor
+
+    Contractors.Clear
+    Changes.Clear
+    Standard = Null
+    $bLoaded = True
+    Try c = JSON.Decode(File.Load(Folder() &/ "contractors.json"))
+    If c Then
+        For Each v In c["contractors"]
+            k = Contractor.FromJson(v)
+            Contractors[k.Id] = k
+        Next
+    Endif
+    c = Null
+    Try c = JSON.Decode(File.Load(Folder() &/ "standard.json"))
+    If c Then
+        Standard = New PriceBook
+        Standard.FromJson(c)
+    Endif
+    c = Null
+    Try c = JSON.Decode(File.Load(Folder() &/ "log.json"), True)
+    If c Then
+        For Each v In c["changes"]
+            Changes.Add(Change.FromJson(v))
+        Next
+    Endif
+
+End
+
+Public Sub EnsureLoaded()
+
+    If Not $bLoaded Then Load()
+
+End
+
+Public Sub Save()
+
+    Dim a As New Variant[]
+    Dim k As Contractor
+    Dim h As Change
+
+    Try Shell "mkdir -p " & Shell$(Folder()) Wait
+    For Each k In Contractors
+        a.Add(k.ToJson())
+    Next
+    SaveJson("contractors.json", ["contractors": a])
+    If Standard Then SaveJson("standard.json", Standard.ToJson())
+    a = New Variant[]
+    For Each h In Changes
+        a.Add(h.ToJson())
+    Next
+    SaveJson("log.json", ["changes": a])
+
+End
+
+Private Sub SaveJson(sName As String, c As Collection)
+
+    Dim sFile As String = Folder() &/ sName
+
+    Try File.Save(sFile & ".saving", JSON.Encode(c))
+    If Error Then
+        AppLog.Error("Can't save " & sFile & ": " & Error.Text, "Company.Save")
+        Return
+    Endif
+    Try Kill sFile
+    Try Move sFile & ".saving" To sFile
+
+End
+
+'' The contractor with this id or name
+Public Function FindContractor(sKey As String) As Contractor
+
+    Dim k As Contractor
+
+    EnsureLoaded()
+    If Contractors.Exist(sKey) Then Return Contractors[sKey]
+    For Each k In Contractors
+        If LCase(k.Name) = LCase(sKey) Then Return k
+    Next
+
+End
+
+'' The contractors sorted by name
+Public Function SortedContractors() As Contractor[]
+
+    Dim a As New Contractor[]
+    Dim aNames As New String[]
+    Dim c As New Collection
+    Dim k As Contractor
+    Dim s As String
+
+    EnsureLoaded()
+    For Each k In Contractors
+        s = LCase(k.Name) & Chr(1) & k.Id
+        aNames.Add(s)
+        c[s] = k
+    Next
+    aNames.Sort()
+    For Each s In aNames
+        a.Add(c[s])
+    Next
+    Return a
+
+End

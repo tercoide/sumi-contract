@@ -2,7 +2,8 @@
 
 '' The Gantt tab (starting.txt, item 2): a task for each budget item, by rubro, with its working days, crew, what
 '' it waits for and the lag; the dates and slack from the critical path; the bars drawn in the last column
-'' (critical ones in red); and the investment curve by month. Days, crew, "after" (codes, comma separated) and
+'' (critical ones in red, progress from the certificates as a dark line), each rubro condensed in one bar
+'' (its span, its progress weighted by the items' totals); and the investment curve by month. Days, crew, "after" (codes, comma separated) and
 '' lag are edited in the grid. Every change goes through Cmd (task.set).
 
 Private Const C_CODE As Integer = 0
@@ -19,7 +20,8 @@ Private Const C_BARS As Integer = 9
 Private tvTasks As TableView
 Private gvCurve As GridView
 Private lblInfo As Label
-Private $aRows As New String[]                  ' row -> item id
+Private $aRows As New String[]                  ' row -> item id ("" = a rubro condensed)
+Private $aRowRubro As New Integer[]             ' row -> rubro
 Private $fLength As Float
 
 Public Sub _new()
@@ -63,6 +65,8 @@ Public Sub Reload()
     Dim sId As String
     Dim aCurve As Variant[]
     Dim fTotal As Float
+    Dim iRubro As Integer
+    Dim f As Float[]
 
     If s.Compute(h) Then
         lblInfo.Text = s.Problem
@@ -71,28 +75,46 @@ Public Sub Reload()
     Endif
     $fLength = s.Length
     $aRows.Clear
-    tvTasks.Rows.Count = h.Items.Count
-    For Each b In h.Items
-        t = s.Tasks[b.Id]
-        $aRows.Add(b.Id)
-        iRow = $aRows.Max
-        aCodes = New String[]
-        For Each sId In t.After
-            If h.IndexOf(sId) >= 0 Then aCodes.Add(h.Items[h.IndexOf(sId)].Code)
+    $aRowRubro.Clear
+    tvTasks.Rows.Count = 0
+    For Each iRubro In h.UsedRubros()
+        ' the rubro condensed: from its first start to its last end
+        f = s.RubroSpan(h, iRubro)
+        iRow = AddRow("", iRubro)
+        tvTasks[iRow, C_CODE].Text = CStr(iRubro)
+        tvTasks[iRow, C_DESC].Text = p.Prices.RubroName(iRubro)
+        tvTasks[iRow, C_DAYS].Text = Format(f[1] - f[0], "0.#")
+        tvTasks[iRow, C_START].Text = Format(s.DateOf(f[0]), "dd/mm/yy")
+        tvTasks[iRow, C_END].Text = Format(s.DateOf(Max(f[0], f[1] - 1)), "dd/mm/yy")
+        tvTasks[iRow, C_SLACK].Text = Format(f[2], "0%")
+        For i = 0 To C_SLACK
+            tvTasks[iRow, i].Font = Font["Bold"]
+            tvTasks[iRow, i].Background = Color.LightBackground
         Next
-        tvTasks[iRow, C_CODE].Text = b.Code
-        tvTasks[iRow, C_DESC].Text = h.DescriptionOf(b)
-        tvTasks[iRow, C_DAYS].Text = Format(t.Days, "0.#")
-        tvTasks[iRow, C_CREW].Text = Ui.Num(t.Crew, "0.#")
-        tvTasks[iRow, C_AFTER].Text = aCodes.Join(", ")
-        tvTasks[iRow, C_LAG].Text = IIf(t.Lag, CStr(t.Lag), "")
-        tvTasks[iRow, C_START].Text = Format(s.DateOf(t.EarlyStart), "dd/mm/yy")
-        tvTasks[iRow, C_END].Text = Format(s.DateOf(Max(t.EarlyStart, t.EarlyFinish - 1)), "dd/mm/yy")
-        tvTasks[iRow, C_SLACK].Text = Format(t.Slack(), "0.#")
+        For Each b In h.Items
+            If b.Rubro <> iRubro Then Continue
+            t = s.Tasks[b.Id]
+            iRow = AddRow(b.Id, iRubro)
+            aCodes = New String[]
+            For Each sId In t.After
+                If h.IndexOf(sId) >= 0 Then aCodes.Add(h.Items[h.IndexOf(sId)].Code)
+            Next
+            tvTasks[iRow, C_CODE].Text = b.Code
+            tvTasks[iRow, C_DESC].Text = h.DescriptionOf(b)
+            tvTasks[iRow, C_DAYS].Text = Format(t.Days, "0.#")
+            tvTasks[iRow, C_CREW].Text = Ui.Num(t.Crew, "0.#")
+            tvTasks[iRow, C_AFTER].Text = aCodes.Join(", ")
+            tvTasks[iRow, C_LAG].Text = IIf(t.Lag, CStr(t.Lag), "")
+            tvTasks[iRow, C_START].Text = Format(s.DateOf(t.EarlyStart), "dd/mm/yy")
+            tvTasks[iRow, C_END].Text = Format(s.DateOf(Max(t.EarlyStart, t.EarlyFinish - 1)), "dd/mm/yy")
+            tvTasks[iRow, C_SLACK].Text = Format(t.Slack(), "0.#")
+            If t.Critical() Then tvTasks[iRow, C_CODE].Foreground = Color.Red
+        Next
+    Next
+    For iRow = 0 To tvTasks.Rows.Max
         For Each i In [C_DAYS, C_CREW, C_LAG, C_SLACK]
             tvTasks[iRow, i].Alignment = Align.Right
         Next
-        If t.Critical() Then tvTasks[iRow, C_CODE].Foreground = Color.Red
     Next
 
     lblInfo.Foreground = Color.Foreground
@@ -115,6 +137,15 @@ Public Sub Reload()
 
 End
 
+Private Function AddRow(sId As String, iRubro As Integer) As Integer
+
+    tvTasks.Rows.Count += 1
+    $aRows.Add(sId)
+    $aRowRubro.Add(iRubro)
+    Return tvTasks.Rows.Max
+
+End
+
 '' The bars: the task from its early start to its early finish over the whole length; critical in red, the
 '' slack as a thin line after it
 Public Sub Tasks_Draw(X As Integer, Y As Integer, Width As Integer, Height As Integer, Row As Integer, Column As Integer)
@@ -122,11 +153,28 @@ Public Sub Tasks_Draw(X As Integer, Y As Integer, Width As Integer, Height As In
     Dim t As GanttTask
     Dim fScale As Float
     Dim x1, x2, xs As Integer
+    Dim f As Float[]
+    Dim fDone As Float
 
     If Column <> C_BARS Or If Row > $aRows.Max Or If $fLength <= 0 Then Return
+    fScale = (Width - 4) / $fLength
+    If Not $aRows[Row] Then
+        ' a rubro: a dark bar over its span, its progress inside
+        f = sumi.Project.Schedule.RubroSpan(sumi.Project.Budget, $aRowRubro[Row])
+        x1 = X + 2 + f[0] * fScale
+        x2 = X + 2 + f[1] * fScale
+        Paint.Rectangle(x1, Y + Height / 2 - 3, Max(2, x2 - x1), 6)
+        Paint.Background = Color.Foreground
+        Paint.Fill()
+        If f[2] > 0 Then
+            Paint.Rectangle(x1, Y + Height / 2 - 3, Max(1, (x2 - x1) * f[2]), 6)
+            Paint.Background = Color.Green
+            Paint.Fill()
+        Endif
+        Return
+    Endif
     t = sumi.Project.Schedule.Tasks[$aRows[Row]]
     If Not t Then Return
-    fScale = (Width - 4) / $fLength
     x1 = X + 2 + t.EarlyStart * fScale
     x2 = X + 2 + t.EarlyFinish * fScale
     xs = X + 2 + t.LateFinish * fScale
@@ -144,8 +192,9 @@ Public Sub Tasks_Draw(X As Integer, Y As Integer, Width As Integer, Height As In
     Paint.Rectangle(x1, Y + 3, Max(2, x2 - x1), Height - 6)
     Paint.Background = IIf(t.Critical(), Color.Red, Color.SelectedBackground)
     Paint.Fill()
-    If t.Done > 0 Then
-        Paint.Rectangle(x1, Y + Height / 2 - 1, Max(1, (x2 - x1) * t.Done), 3)
+    fDone = sumi.Project.Schedule.DoneOf(sumi.Project.Budget.Find($aRows[Row]))
+    If fDone > 0 Then
+        Paint.Rectangle(x1, Y + Height / 2 - 1, Max(1, (x2 - x1) * fDone), 3)
         Paint.Background = Color.Foreground
         Paint.Fill()
     Endif
@@ -161,7 +210,8 @@ End
 
 Public Sub Tasks_Click()
 
-    If tvTasks.Row < 0 Then Return
+    If tvTasks.Row < 0 Or If tvTasks.Row > $aRows.Max Then Return
+    If Not $aRows[tvTasks.Row] Then Return
     If [C_DAYS, C_CREW, C_AFTER, C_LAG].Exist(tvTasks.Column) Then tvTasks.Edit()
 
 End
@@ -173,7 +223,7 @@ Public Sub Tasks_Save(Row As Integer, Column As Integer, Value As String)
     Dim a As New String[]
     Dim s As String
 
-    If Row < 0 Or If Row > $aRows.Max Then Return
+    If Row < 0 Or If Row > $aRows.Max Or If Not $aRows[Row] Then Return
     Select Case Column
         Case C_DAYS
             c["days"] = Ui.ParseNumber(Value, ByRef bBad)
@@ -205,11 +255,12 @@ Public Sub Suggest_Click()
     If Message.Question(("Every task's days will be worked out from its labor hours and its crew (2 people where it has none). Go on?"), ("Suggest"), ("Cancel")) <> 1 Then Return
     Cmd.BeginGroup()
     For Each sId In $aRows
+        If Not sId Then Continue
         c = Cmd.Run("task.set", ["key": sId, "suggest": True])
         If c.Exist("error") Then Break
     Next
     Cmd.EndGroup()
-    Ui.Failed(c)
+    If c Then Ui.Failed(c)
     Reload()
 
 End

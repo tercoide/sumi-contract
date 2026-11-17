@@ -108,11 +108,7 @@ Public Sub Reload()
             tvItems[iRow, C_TOTAL].Text = Format(h.Total(b), "#,##0.00")
             tvItems[iRow, C_PCT].Text = Share(h.Total(b), fAll[1])
             If b.Overridden() Then tvItems[iRow, C_QTY].Foreground = Color.Orange
-            If b.QtySource = "design" Then tvItems[iRow, C_QTY].ToolTip = Subst(("From the design: &1 &2"), b.DesignQty, b.DesignRef)
-            If h.Problem(b) Then
-                tvItems[iRow, C_DESC].Foreground = IIf(b.Overridden(), Color.Orange, Color.Red)
-                tvItems[iRow, C_DESC].ToolTip = h.Problem(b)
-            Endif
+            If h.Problem(b) Then tvItems[iRow, C_DESC].Foreground = IIf(b.Overridden(), Color.Orange, Color.Red)
             If Not b.Analysis Then tvItems[iRow, C_DESC].Font = Font["Italic"]
         Next
     Next

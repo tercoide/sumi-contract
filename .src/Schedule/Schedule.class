@@ -49,6 +49,44 @@ Public Sub Sync(h As Budget)
 
 End
 
+'' How much of an item is done (0 to 1): what the certificates measured, or the task's Done if no contract takes it
+Public Function DoneOf(b As BudgetItem) As Float
+
+    Dim f As Float = sumi.Project.Contracts.ItemMeasured(b.Id)
+
+    If f >= 0 Then
+        If b.Quantity <= 0 Then Return 0
+        Return Min(1, f / b.Quantity)
+    Endif
+    If Tasks.Exist(b.Id) Then Return Tasks[b.Id].Done
+    Return 0
+
+End
+
+'' A rubro condensed: [first start, last end, progress weighted by the items' totals]
+Public Function RubroSpan(h As Budget, iRubro As Integer) As Float[]
+
+    Dim b As BudgetItem
+    Dim t As GanttTask
+    Dim fStart As Float = 1e12
+    Dim fEnd, fDone, fAll, fTotal As Float
+
+    For Each b In h.Items
+        If b.Rubro <> iRubro Then Continue
+        t = Tasks[b.Id]
+        If Not t Then Continue
+        fStart = Min(fStart, t.EarlyStart)
+        fEnd = Max(fEnd, t.EarlyFinish)
+        fTotal = h.Total(b)
+        fAll += fTotal
+        fDone += fTotal * DoneOf(b)
+    Next
+    If fStart > fEnd Then fStart = 0
+    If fAll > 0 Then fDone /= fAll
+    Return [fStart, fEnd, fDone]
+
+End
+
 '' Labor hours of one unit of an item (its analysis's labor lines, sub-analyses included, over its labor yield)
 Public Function LaborHours(b As BudgetItem) As Float
 

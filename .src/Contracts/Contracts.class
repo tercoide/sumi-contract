@@ -1,0 +1,88 @@
+' Gambas class file
+
+'' A project's contracts
+
+Public Items As New Contract[]
+
+Public Function Find(sKey As String) As Contract
+
+    Dim k As Contract
+
+    For Each k In Items
+        If k.Id = sKey Or If k.Code = sKey Then Return k
+    Next
+
+End
+
+Public Function NextCode() As String
+
+    Dim k As Contract
+    Dim i As Integer
+
+    For Each k In Items
+        If k.Code Begins "C-" Then Try i = Max(i, CInt(Mid$(k.Code, 3)))
+    Next
+    Return "C-" & Format(i + 1, "00")
+
+End
+
+'' How much of a budget item the contracts take
+Public Function Assigned(sItem As String) As Float
+
+    Dim k As Contract
+    Dim p As ContractPart
+    Dim f As Float
+
+    For Each k In Items
+        For Each p In k.Parts
+            If p.Item = sItem Then f += p.Quantity
+        Next
+    Next
+    Return f
+
+End
+
+'' How much of a budget item has been measured in the certificates (-1 if no contract takes it)
+Public Function ItemMeasured(sItem As String) As Float
+
+    Dim k As Contract
+    Dim p As ContractPart
+    Dim f As Float
+    Dim bAny As Boolean
+
+    For Each k In Items
+        For Each p In k.Parts
+            If p.Item = sItem Then
+                f += k.Measured(p.Id)
+                bAny = True
+            Endif
+        Next
+    Next
+    If Not bAny Then Return -1
+    Return f
+
+End
+
+Public Function ToJson() As Collection
+
+    Dim a As New Variant[]
+    Dim k As Contract
+
+    For Each k In Items
+        a.Add(k.ToJson())
+    Next
+    Return ["contracts": a]
+
+End
+
+Public Sub FromJson(c As Collection)
+
+    Dim v As Variant
+
+    Items.Clear
+    If Not c Or If Not c.Exist("contracts") Then Return
+    For Each v In c["contracts"]
+        Items.Add(Contract.FromJson(v))
+    Next
+
+End

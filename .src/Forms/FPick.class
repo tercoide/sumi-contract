@@ -30,7 +30,11 @@ Public Sub Setup(sMode As String, sTitle As String, sExclude As String)
 
     $sMode = sMode
     $sExclude = sExclude
-    Me.Text = IIf(sTitle, sTitle, IIf(sMode = "analysis", ("Choose an analysis"), ("Choose a resource")))
+    If sTitle Then
+        Me.Text = sTitle
+    Else
+        Me.Text = IIf(sMode = "analysis", ("Choose an analysis"), ("Choose a resource"))
+    Endif
 
     hTop = Ui.HBox(Me)
     txtFind = New TextBox(hTop) As "Find"
@@ -99,6 +103,10 @@ Private Sub Fill()
     If cmbKind And If cmbKind.Index > 0 Then sKind = Resource.Kinds()[cmbKind.Index - 1]
     $aIds.Clear
     gvList.Rows.Count = 0
+    If $sMode = "item" Then
+        FillItems(sText)
+        Return
+    Endif
     For Each o In PriceBook.SortedByCode(IIf($sMode = "analysis", b.Analyses, b.Resources))
         If o.Id = $sExclude Then Continue
         If sText And If InStr(o.Code & " " & o.Name, sText, 1, gb.IgnoreCase) = 0 Then Continue
@@ -117,6 +125,29 @@ Private Sub Fill()
         gvList[i, 0].Text = o.Code
         gvList[i, 1].Text = o.Name
         gvList[i, 2].Text = o.Unit
+    Next
+    If $aIds.Count Then gvList.Row = 0
+
+End
+
+'' Budget items: code, description, unit, unit price
+Private Sub FillItems(sText As String)
+
+    Dim h As Budget = sumi.Project.Budget
+    Dim b As BudgetItem
+    Dim i As Integer
+
+    For Each b In h.Items
+        If sText And If InStr(b.Code & " " & h.DescriptionOf(b), sText, 1, gb.IgnoreCase) = 0 Then Continue
+        $aIds.Add(b.Id)
+    Next
+    gvList.Rows.Count = $aIds.Count
+    For i = 0 To $aIds.Max
+        b = h.Find($aIds[i])
+        gvList[i, 0].Text = b.Code
+        gvList[i, 1].Text = h.DescriptionOf(b)
+        gvList[i, 2].Text = h.UnitOf(b)
+        gvList[i, 3].Text = Format(h.UnitPrice(b), "#,##0.00")
     Next
     If $aIds.Count Then gvList.Row = 0
 

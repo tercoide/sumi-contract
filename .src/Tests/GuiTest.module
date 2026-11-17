@@ -72,8 +72,22 @@ Public Sub Step_Timer()
             Cmd.Run("task.set", ["key": sumi.Project.Budget.Items[1].Id, "days": 0, "after": [sumi.Project.Budget.Items[0].Id]])
             fMain.tabMain.Index = fMain.TAB_GANTT
         Case 11
-            FAssistant.Show()
+            Company.SetFolder(Temp$("company"))
+            Cmd.Run("contractor.add", ["name": "Juan", "trade": "albañilería", "docs": [["kind": "ART", "expires": "2000-01-01"]]])
+            Cmd.Run("contract.add", ["contractor": "Juan", "baseIndex": 100])
+            Cmd.Run("part.add", ["contract": "C-01", "item": sumi.Project.Budget.Items[0].Id])
+            Cmd.Run("cert.add", ["contract": "C-01", "index": 110])
+            Cmd.Run("cert.set", ["contract": "C-01", "cert": 1, "measures": [["part": sumi.Project.Budget.Items[0].Id, "pct": 50]]])
+            fMain.tabMain.Index = fMain.TAB_CONTRACTS
+            fMain.ContractsTab.TestPages()
         Case 12
+            fMain.tabMain.Index = fMain.TAB_GANTT
+        Case 13
+            FContractors.Show()
+        Case 14
+            FContractors.Close()
+            FAssistant.Show()
+        Case 15
             FAssistant.Close()
             $hTimer.Stop
             Print "gui-test: OK"

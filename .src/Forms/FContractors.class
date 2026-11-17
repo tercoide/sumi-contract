@@ -1,0 +1,212 @@
+' Gambas class file
+
+'' The company's contractors (shared by all projects: see Company), with their documents and when they expire.
+'' Edited in the grids; every change goes through Cmd (it is in the company's log).
+
+Private Const DUE_DAYS As Integer = 15
+
+Private tvList As TableView
+Private tvDocs As TableView
+Private lblDocs As Label
+Private $aIds As New String[]
+Private $aFields As String[] = ["name", "trade", "taxId", "contact", "phone", "email", "address", "bank", "note"]
+Private $aDocFields As String[] = ["kind", "number", "expires", "file", "note"]
+
+Public Sub _new()
+
+    Dim hRow As HBox
+
+    hRow = Ui.HBox(Me)
+    Ui.Button(hRow, ("Add"), "Add", Me)
+    Ui.Button(hRow, ("Delete"), "Delete", Me)
+    Ui.Label(hRow, ("Shared by all the projects of the company. Red: documents expired or expiring within 15 days.")).Expand = True
+    tvList = New TableView(Me) As "List"
+    tvList.Expand = True
+    tvList.Mode = Select.Single
+    Ui.Columns(tvList, [("Name"), ("Trade"), ("Tax id"), ("Contact"), ("Phone"), ("Email"), ("Address"), ("Bank (CBU)"), ("Note")], [26, 16, 13, 16, 13, 20, 20, 20, 20])
+    lblDocs = Ui.Label(Me, ("Documents"))
+    tvDocs = New TableView(Me) As "Docs"
+    tvDocs.H = Desktop.Scale * 20
+    Ui.Columns(tvDocs, [("Kind"), ("Number"), ("Expires (yyyy-mm-dd)"), ("File"), ("Note")], [18, 16, 18, 40, 30])
+    hRow = Ui.HBox(Me)
+    Ui.Button(hRow, ("Add document"), "DocAdd", Me)
+    Ui.Button(hRow, ("Remove document"), "DocRemove", Me)
+    Ui.Label(hRow, "").Expand = True
+    Ui.Button(hRow, ("Close"), "Close", Me)
+    Reload()
+
+End
+
+Public Sub Reload()
+
+    Dim k As Contractor
+    Dim i, j As Integer
+    Dim sKeep As String
+
+    If tvList.Row >= 0 And If tvList.Row <= $aIds.Max Then sKeep = $aIds[tvList.Row]
+    $aIds.Clear
+    For Each k In Company.SortedContractors()
+        $aIds.Add(k.Id)
+    Next
+    tvList.Rows.Count = $aIds.Count
+    For i = 0 To $aIds.Max
+        k = Company.Contractors[$aIds[i]]
+        For j = 0 To $aFields.Max
+            tvList[i, j].Text = Object.GetProperty(k, UCase(Left($aFields[j])) & Mid($aFields[j], 2))
+        Next
+        If k.DocsDue(DUE_DAYS).Count Then tvList[i, 0].Foreground = Color.Red
+    Next
+    i = $aIds.Find(sKeep)
+    If i >= 0 Then tvList.Row = i
+    ShowDocs()
+
+End
+
+Private Function Current() As Contractor
+
+    If tvList.Row < 0 Or If tvList.Row > $aIds.Max Then Return Null
+    Return Company.Contractors[$aIds[tvList.Row]]
+
+End
+
+Private Sub ShowDocs()
+
+    Dim k As Contractor = Current()
+    Dim i As Integer
+    Dim d As ContractorDoc
+
+    If Not k Then
+        tvDocs.Rows.Count = 0
+        lblDocs.Text = ("Documents")
+        Return
+    Endif
+    lblDocs.Text = ("Documents of") & " " & k.Name
+    tvDocs.Rows.Count = k.Docs.Count
+    For i = 0 To k.Docs.Max
+        d = k.Docs[i]
+        tvDocs[i, 0].Text = d.Kind
+        tvDocs[i, 1].Text = d.Number
+        tvDocs[i, 2].Text = d.Expires
+        tvDocs[i, 3].Text = d.FilePath
+        tvDocs[i, 4].Text = d.Note
+        If d.ExpiresWithin(DUE_DAYS) Then tvDocs[i, 2].Foreground = Color.Red
+    Next
+
+End
+
+Public Sub List_Change()
+
+    ShowDocs()
+
+End
+
+Public Sub List_Click()
+
+    ShowDocs()
+    If Current() Then tvList.Edit()
+
+End
+
+Public Sub List_Save(Row As Integer, Column As Integer, Value As String)
+
+    Dim c As New Collection
+
+    If Row > $aIds.Max Then Return
+    If Column = 0 And If Not Trim(Value) Then Return
+    c[$aFields[Column]] = Trim(Value)
+    c["key"] = $aIds[Row]
+    Ui.Failed(Cmd.Run("contractor.set", c))
+    Reload()
+
+End
+
+Public Sub Add_Click()
+
+    Dim c As Collection
+    Dim n As Integer = 1
+
+    While Company.FindContractor(("New contractor") & " " & n)
+        Inc n
+    Wend
+    c = Cmd.Run("contractor.add", ["name": ("New contractor") & " " & n])
+    If Ui.Failed(c) Then Return
+    Reload()
+    tvList.Row = $aIds.Find(c["id"])
+
+End
+
+Public Sub Delete_Click()
+
+    Dim k As Contractor = Current()
+
+    If Not k Then Return
+    If Message.Question(Subst(("Delete contractor &1 for all the projects?"), k.Name), ("Delete"), ("Cancel")) <> 1 Then Return
+    Ui.Failed(Cmd.Run("contractor.delete", ["key": k.Id]))
+    Reload()
+
+End
+
+'' The documents as the file has them, changed
+Private Function DocsJson(k As Contractor, Optional iSkip As Integer = -1) As Variant[]
+
+    Dim a As New Variant[]
+    Dim i As Integer
+
+    For i = 0 To k.Docs.Max
+        If i <> iSkip Then a.Add(k.Docs[i].ToJson())
+    Next
+    Return a
+
+End
+
+Public Sub Docs_Click()
+
+    If Current() Then tvDocs.Edit()
+
+End
+
+Public Sub Docs_Save(Row As Integer, Column As Integer, Value As String)
+
+    Dim k As Contractor = Current()
+    Dim a As Variant[]
+
+    If Not k Or If Row > k.Docs.Max Then Return
+    If Column = 2 And If Trim(Value) And If Not Project.ReadDate(Trim(Value), Null) Then
+        Message.Warning(("The date is written yyyy-mm-dd."))
+        Return
+    Endif
+    a = DocsJson(k)
+    a[Row][$aDocFields[Column]] = Trim(Value)
+    Ui.Failed(Cmd.Run("contractor.set", ["key": k.Id, "docs": a]))
+    ShowDocs()
+
+End
+
+Public Sub DocAdd_Click()
+
+    Dim k As Contractor = Current()
+    Dim a As Variant[]
+
+    If Not k Then Return
+    a = DocsJson(k)
+    a.Add(["kind": "ART", "number": "", "expires": Format(DateAdd(Now, gb.Month, 1), "yyyy-mm-dd"), "file": "", "note": ""])
+    Ui.Failed(Cmd.Run("contractor.set", ["key": k.Id, "docs": a]))
+    Reload()
+
+End
+
+Public Sub DocRemove_Click()
+
+    Dim k As Contractor = Current()
+
+    If Not k Or If tvDocs.Row < 0 Then Return
+    Ui.Failed(Cmd.Run("contractor.set", ["key": k.Id, "docs": DocsJson(k, tvDocs.Row)]))
+    Reload()
+
+End
+
+Public Sub Close_Click()
+
+    Me.Close
+
+End

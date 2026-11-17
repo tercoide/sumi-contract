@@ -1,0 +1,106 @@
+' Gambas class file
+
+'' A contractor of the company (shared by all projects, see Company): who does a speciality of the work
+
+Public Id As String
+Public Name As String = ""
+Public Trade As String = ""                     '' the speciality: "masonry", "electrical", "plumbing"...
+Public TaxId As String = ""                     '' CUIT
+Public Contact As String = ""                   '' the person
+Public Phone As String = ""
+Public Email As String = ""
+Public Address As String = ""
+Public Bank As String = ""                      '' CBU / alias, for payments
+Public Docs As New ContractorDoc[]
+Public Note As String = ""
+
+Public Sub _new()
+
+    Id = Ids.Make("k")
+
+End
+
+'' Documents expired or expiring within iDays
+Public Function DocsDue(Optional iDays As Integer = 15) As ContractorDoc[]
+
+    Dim a As New ContractorDoc[]
+    Dim d As ContractorDoc
+
+    For Each d In Docs
+        If d.ExpiresWithin(iDays) Then a.Add(d)
+    Next
+    Return a
+
+End
+
+Public Function ToJson() As Collection
+
+    Dim c As New JSONCollection
+    Dim a As New Variant[]
+    Dim d As ContractorDoc
+
+    c["id"] = Id
+    c["name"] = Name
+    c["trade"] = Trade
+    c["taxId"] = TaxId
+    c["contact"] = Contact
+    c["phone"] = Phone
+    c["email"] = Email
+    c["address"] = Address
+    c["bank"] = Bank
+    For Each d In Docs
+        a.Add(d.ToJson())
+    Next
+    c["docs"] = a
+    c["note"] = Note
+    Return c
+
+End
+
+Static Public Function FromJson(c As Collection) As Contractor
+
+    Dim k As New Contractor
+
+    If c["id"] Then k.Id = c["id"]
+    k.Apply(c)
+    Return k
+
+End
+
+Public Function Apply(c As Collection) As String
+
+    Dim v, w As Variant
+
+    For Each v In c
+        Select Case c.Key
+            Case "id", "key"
+            Case "name"
+                Name = v
+            Case "trade"
+                Trade = v
+            Case "taxId"
+                TaxId = v
+            Case "contact"
+                Contact = v
+            Case "phone"
+                Phone = v
+            Case "email"
+                Email = v
+            Case "address"
+                Address = v
+            Case "bank"
+                Bank = v
+            Case "note"
+                Note = v
+            Case "docs"
+                Docs.Clear
+                For Each w In v
+                    Docs.Add(ContractorDoc.FromJson(w))
+                Next
+            Default
+                Return c.Key
+        End Select
+    Next
+    Return ""
+
+End

@@ -1,0 +1,40 @@
+' Gambas class file
+
+'' A document a contractor must keep valid: insurance, ART, tax certificates (AFIP), the union's... with its expiry
+
+Public Kind As String = ""                      '' "insurance", "ART", "AFIP", "union", "other"...
+Public Number As String = ""
+Public Expires As String = ""                   '' yyyy-mm-dd ("" = doesn't expire)
+Public FilePath As String = ""                  '' where its copy is
+Public Note As String = ""
+
+'' Expired, or expiring within iDays
+Public Function ExpiresWithin(iDays As Integer) As Boolean
+
+    Dim d As Date
+
+    If Not Expires Then Return False
+    d = Project.ReadDate(Expires, Null)
+    If Not d Then Return False
+    Return DateDiff(Date(Year(Now), Month(Now), Day(Now)), d, gb.Day) <= iDays
+
+End
+
+Public Function ToJson() As Collection
+
+    Return ["kind": Kind, "number": Number, "expires": Expires, "file": FilePath, "note": Note]
+
+End
+
+Static Public Function FromJson(c As Collection) As ContractorDoc
+
+    Dim d As New ContractorDoc
+
+    If c.Exist("kind") Then d.Kind = c["kind"]
+    If c.Exist("number") Then d.Number = c["number"]
+    If c.Exist("expires") Then d.Expires = c["expires"]
+    If c.Exist("file") Then d.FilePath = c["file"]
+    If c.Exist("note") Then d.Note = c["note"]
+    Return d
+
+End

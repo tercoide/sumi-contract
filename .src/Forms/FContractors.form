@@ -1,0 +1,9 @@
+# Gambas Form File 3.0
+
+{ Form Form
+  MoveScaled(0,0,150,90)
+  Text = ("Contractors")
+  Arrangement = Arrange.Vertical
+  Spacing = True
+  Margin = True
+}
