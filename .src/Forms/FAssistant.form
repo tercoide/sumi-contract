@@ -1,0 +1,9 @@
+# Gambas Form File 3.0
+
+{ Form Form
+  MoveScaled(0,0,90,90)
+  Text = ("AI assistant")
+  Arrangement = Arrange.Vertical
+  Spacing = True
+  Margin = True
+}

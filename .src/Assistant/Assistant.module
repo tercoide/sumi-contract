@@ -1,0 +1,284 @@
+' Gambas module file
+
+'' The AI assistant: Claude working on the open project for the person at the screen (decided with the user
+'' 2026-11-17: the AI should help with everything, from searching prices on the web to applying them).
+''
+'' It has one tool, "sumi", which runs a Cmd command (the same ones the screens use), so whatever it changes is
+'' logged as the AI with its model (Who), and everything one request changes is one group that undo takes
+'' back at once. With Config.AIWebSearch it also has Claude's web search, for prices, suppliers and norms.
+''
+'' The conversation is kept (append-only: the API's thinking blocks must go back unchanged) until NewChat.
+'' This module builds the requests and reads the replies; FAssistant sends them (HTTP, or files when
+'' Config.AIOffline). The loop: Ask(prompt) -> RequestBody -> (send) -> Reply(code, body) says whether to send
+'' again (a tool ran, or the server paused a long web search) or the turn is done.
+
+Public Const ApiUrl As String = "https://api.anthropic.com/v1/messages"
+Public Const MAX_TOKENS As Integer = 16000
+Public Const MAX_ROUNDS As Integer = 40         '' requests in one turn: a guard against loops
+Public Const MAX_RESULT As Integer = 30000      '' characters of a tool result sent back
+
+Public Text As String                           '' what the assistant said in the last turn
+Public Failure As String                        '' why the last turn failed
+Public Steps As New String[]                    '' what it did in the last turn, for the person
+Public Rounds As Integer                        '' requests made in this turn
+
+Private $aMessages As New Variant[]             ' the conversation, as the API takes it
+Private $bTurn As Boolean                       ' a turn is going on
+Private $iTurnStart As Integer                  ' where the turn began in $aMessages
+
+'' Models that take server-side fallbacks (if the model declines, the API retries with another)
+Private Function TakesFallbacks() As Boolean
+
+    Return ["claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-2", "claude-fable-5-1", "claude-opus-5"].Exist(Config.AIModel)
+
+End
+
+Public Function ApiKey() As String
+
+    If Config.AIApiKey Then Return Config.AIApiKey
+    Return Env["ANTHROPIC_API_KEY"]
+
+End
+
+Public Function Headers() As String[]
+
+    Dim a As String[] = ["x-api-key: " & ApiKey(), "anthropic-version: 2023-06-01"]
+
+    If TakesFallbacks() Then a.Add("anthropic-beta: server-side-fallback-2026-07-01")
+    Return a
+
+End
+
+Public Sub NewChat()
+
+    $aMessages.Clear
+    $bTurn = False
+
+End
+
+Public Function Busy() As Boolean
+
+    Return $bTurn
+
+End
+
+'' A new turn: the person's request, with the project's summary
+Public Sub Ask(sPrompt As String)
+
+    Dim cMessage As New JSONCollection
+
+    Text = ""
+    Failure = ""
+    Steps.Clear
+    Rounds = 0
+    $iTurnStart = $aMessages.Count
+    cMessage["role"] = "user"
+    cMessage["content"] = "Project now (JSON): " & JSON.Encode(Cmd.Run("info")) & "\n\nRequest from " & Who.Name() & ":\n" & sPrompt
+    $aMessages.Add(cMessage)
+    $bTurn = True
+    Cmd.BeginGroup()
+
+End
+
+'' Gives up the turn (the person pressed Stop, or the connection failed). What ran stays, and can be undone.
+Public Sub Cancel(Optional sWhy As String)
+
+    If Not $bTurn Then Return
+    $bTurn = False
+    Cmd.EndGroup()
+    If sWhy Then Failure = sWhy
+    ' the conversation must stay valid: drop the unfinished turn
+    While $aMessages.Count > $iTurnStart
+        $aMessages.Remove($aMessages.Max)
+    Wend
+
+End
+
+'' The body of the next request
+Public Function RequestBody() As String
+
+    Dim c As New JSONCollection
+    Dim aTools As New Variant[]
+    Dim cTool As JSONCollection
+
+    cTool = New JSONCollection
+    cTool["name"] = "sumi"
+    cTool["description"] = "Runs one command on the open sumi-contract project and returns its result as JSON ({ok: true, ...} or {error: why}). Commands that change the project are logged under your name and can be undone. Query first (info, resource.list, analysis.get...), then change. The commands and their arguments:\n" & JSON.Encode(Cmd.Help())
+    cTool["input_schema"] = ["type": "object", "properties": ["command": ["type": "string", "description": "the command, e.g. resource.set"], "args": ["type": "object", "description": "its arguments"]], "required": ["command"]]
+    aTools.Add(cTool)
+    If Config.AIWebSearch Then aTools.Add(["type": "web_search_20260209", "name": "web_search", "max_uses": 20, "user_location": ["type": "approximate", "country": "AR"]])
+
+    c["model"] = Config.AIModel
+    c["max_tokens"] = MAX_TOKENS
+    c["system"] = SystemPrompt()
+    c["tools"] = aTools
+    c["output_config"] = ["effort": Config.AIEffort]
+    c["cache_control"] = ["type": "ephemeral"]
+    If TakesFallbacks() Then c["fallbacks"] = "default"
+    c["messages"] = $aMessages
+    Return JSON.Encode(c)
+
+End
+
+Public Function SystemPrompt() As String
+
+    Dim a As New String[]
+
+    a.Add("You are the assistant inside sumi-contract, the paperwork program of the sumi suite for building works (GambasCAD and sumi-e draw, sumi-designer models the building, sumi-contract makes the budget, the schedule and the contracts). The users are an Argentine construction company's team; answer in the language they write in (usually Spanish), briefly.")
+    a.Add("You work on the open project only through the tool `sumi`, which runs the program's commands. Everything you change is logged under your name and the person's, and they can undo your whole turn at once, so act: do what is asked without asking for confirmation, unless the request is unclear or would delete a lot. Look before you change (info, resource.list, analysis.get). When you are done, say in a few lines what you did and what is left.")
+    a.Add("Prices: a resource's unit price is (typed price or its calculation + freight) × (1 + loss%) × the book's update coefficient. Labor prices come from the wage plus the labor charges unless `override` is true; equipment from its machine calculation (depreciation, interest, repairs, fuel, lubricants) unless `override`. An analysis (análisis de precios) costs A materials + B equipment / its equipment yield + C labor / its labor yield, sub-analyses included; the price is that direct cost × the project's coefficients (general expenses, profit, taxes). Codes are what people see; ids never change. Argentina has high inflation: prices go stale fast.")
+    a.Add("When you search the web for a price: prefer recent sources from Argentina (suppliers, Revista Vivienda, Cámara Argentina de la Construcción, union wage tables UOCRA), convert to the resource's unit, and set `price`, `source` (the site and the URL) and `updated` (the date of the source, yyyy-mm-dd) together. Say when a price is an estimate. Never invent a source.")
+    Return a.Join("\n\n")
+
+End
+
+'' Reads a reply. Returns True if another request must be sent (the turn goes on); False when the turn is over
+'' (Text has the answer, or Failure why it failed).
+Public Function Reply(iCode As Integer, sBody As String) As Boolean
+
+    Dim v As Variant
+    Dim c As Collection
+    Dim cMessage As JSONCollection
+    Dim vBlock As Variant
+    Dim aResults As New Variant[]
+    Dim sStop As String
+
+    If Not $bTurn Then Return False
+    Inc Rounds
+    Try v = JSON.Decode(sBody, True)
+    If Error Or If TypeOf(v) <> gb.Object Or If Not (v Is Collection) Then
+        Cancel(Subst(("Unexpected answer from the server (HTTP &1)."), iCode))
+        Return False
+    Endif
+    c = v
+    If iCode <> 200 Or If c["type"] = "error" Then
+        If c["error"] Then
+            Cancel(c["error"]["message"])
+        Else
+            Cancel(Subst(("HTTP error &1."), iCode))
+        Endif
+        Return False
+    Endif
+
+    sStop = c["stop_reason"]
+    If sStop = "refusal" Then
+        Cancel(("The model declined this request."))
+        Return False
+    Endif
+
+    ' the answer goes back as it came (thinking blocks included)
+    cMessage = New JSONCollection
+    cMessage["role"] = "assistant"
+    cMessage["content"] = c["content"]
+    $aMessages.Add(cMessage)
+
+    For Each vBlock In c["content"]
+        Select Case vBlock["type"]
+            Case "text"
+                If Trim(vBlock["text"]) Then Text &= vBlock["text"]
+            Case "server_tool_use"
+                If vBlock["name"] = "web_search" Then Steps.Add(("Searched the web") & ": " & vBlock["input"]["query"])
+            Case "tool_use"
+                aResults.Add(RunTool(vBlock))
+        End Select
+    Next
+
+    Select Case sStop
+        Case "tool_use"
+            cMessage = New JSONCollection
+            cMessage["role"] = "user"
+            cMessage["content"] = aResults
+            $aMessages.Add(cMessage)
+            If Rounds >= MAX_ROUNDS Then Return Finish(("It took too many steps; it stopped here. Ask it to go on if needed."))
+            Return True
+        Case "pause_turn"
+            ' a long web search: sent again as it is, the server goes on
+            If Rounds >= MAX_ROUNDS Then Return Finish(("It took too many steps; it stopped here."))
+            Return True
+        Case "max_tokens"
+            Return Finish(("The answer was cut (too long)."))
+    End Select
+    Return Finish("")
+
+End
+
+Private Function Finish(sNote As String) As Boolean
+
+    If sNote Then Text = Trim(Text & "\n\n" & sNote)
+    $bTurn = False
+    Cmd.EndGroup()
+    Return False
+
+End
+
+'' Runs a call of the tool "sumi" as the AI; its tool_result block
+Private Function RunTool(vBlock As Variant) As Collection
+
+    Dim cResult As New JSONCollection
+    Dim cOut As Collection
+    Dim sCommand As String
+    Dim cArgs As Collection
+    Dim sOut As String
+
+    cResult["type"] = "tool_result"
+    cResult["tool_use_id"] = vBlock["id"]
+    If vBlock["name"] <> "sumi" Then
+        cResult["content"] = "Unknown tool " & vBlock["name"]
+        cResult["is_error"] = True
+        Return cResult
+    Endif
+    sCommand = vBlock["input"]["command"]
+    If vBlock["input"]["args"] Then cArgs = vBlock["input"]["args"] Else cArgs = New JSONCollection
+    Who.Begin(Who.AI, Config.AIModel)
+    cOut = Cmd.Run(sCommand, cArgs)
+    Who.Done()
+    sOut = JSON.Encode(cOut)
+    If Len(sOut) > MAX_RESULT Then sOut = Left(sOut, MAX_RESULT) & "... (cut: ask for less, with limit or text)"
+    cResult["content"] = sOut
+    If cOut.Exist("error") Then
+        cResult["is_error"] = True
+        Steps.Add("✗ " & sCommand & ": " & cOut["error"])
+    Else If sCommand Like "*.list" Or sCommand Like "*.get" Or sCommand = "info" Or sCommand = "log" Or sCommand = "help" Then
+        ' only looking
+    Else
+        Steps.Add("✓ " & sCommand & " " & Left(JSON.Encode(cArgs), 160))
+    Endif
+    Return cResult
+
+End
+
+'' OFFLINE TEST MODE: request.json is written, reply.json is read (a whole API response), then renamed
+
+Public Function OfflineDir() As String
+
+    Return Config.Root &/ "ai"
+
+End
+
+Public Sub WriteOfflineRequest()
+
+    Try Mkdir OfflineDir()
+    File.Save(OfflineDir() &/ "request.json", RequestBody())
+
+End
+
+'' The reply, if it is there ("" if not yet)
+Public Function ReadOfflineReply() As String
+
+    Dim sFile As String = OfflineDir() &/ "reply.json"
+    Dim s As String
+
+    If Not Exist(sFile) Then Return ""
+    s = File.Load(sFile)
+    Try Kill OfflineDir() &/ "reply.done.json"
+    Try Move sFile To OfflineDir() &/ "reply.done.json"
+    Return s
+
+End
+
+'' For the smoke test: the conversation's length
+Public Function MessageCount() As Integer
+
+    Return $aMessages.Count
+
+End

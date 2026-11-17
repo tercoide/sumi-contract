@@ -23,6 +23,7 @@ Public Function Run() As Integer
     TestPrices()
     TestImport()
     TestCmd()
+    TestAssistant()
     TestIcons()
 
     Shell "rm -rf " & Shell$($sTemp) Wait
@@ -439,6 +440,61 @@ Private Sub TestCmd()
     Check(c["changes"].Count = 3 And c["changes"][0]["who"] <> "", "log lists the last changes")
     Check(Cmd.Run("nonsense").Exist("error"), "an unknown command")
     Check(Cmd.Help().Count >= 25, "help lists the commands")
+    Config.UserName = ""
+
+End
+
+Private Sub TestAssistant()
+
+    Dim p As New Project
+    Dim sMat As String
+    Dim sBody As String
+    Dim n As Integer
+    Dim c As Collection
+
+    sumi.Project = p
+    Config.UserName = "Tester"
+    Config.AIModel = "claude-opus-5-5"
+    Config.AIEffort = "high"
+    Config.AIWebSearch = True
+    sMat = Cmd.Run("resource.add", ["kind": "material", "name": "cemento", "unit": "kg", "price": 0.25])["id"]
+    n = p.Changes.Count
+
+    Assistant.NewChat()
+    Assistant.Ask("subí el cemento a 0,30")
+    sBody = Assistant.RequestBody()
+    c = JSON.Decode(sBody)
+    Check(c["model"] = "claude-opus-5-5" And c["output_config"]["effort"] = "high" And c["fallbacks"] = "default", "the request: model, effort, fallbacks")
+    Check(c["tools"].Count = 2 And c["tools"][0]["name"] = "sumi" And c["tools"][1]["type"] = "web_search_20260209", "the request: the sumi tool and web search")
+    Check(InStr(c["messages"][0]["content"], "Tester") > 0 And InStr(c["messages"][0]["content"], "subí el cemento") > 0, "the request: who asks and what")
+    Check(Assistant.Headers().Join() Like "*server-side-fallback-2026-07-01*", "the fallback beta header")
+
+    ' 1: it thinks, says something and calls the tool
+    Check(Assistant.Reply(200, "{\"type\":\"message\",\"stop_reason\":\"tool_use\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"abc\"},{\"type\":\"text\",\"text\":\"Lo cambio. \"},{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"sumi\",\"input\":{\"command\":\"resource.set\",\"args\":{\"key\":\"MAT-0001\",\"price\":0.3}}}]}"), "a tool call asks for another request")
+    Check(p.Prices.Resources[sMat].Price = 0.3, "the AI's command ran")
+    Check(p.Changes[p.Changes.Max].Via = Who.AI And p.Changes[p.Changes.Max].Model = "claude-opus-5-5" And p.Changes[p.Changes.Max].Who = "Tester", "logged as the AI, for the person")
+    c = JSON.Decode(Assistant.RequestBody())
+    Check(c["messages"].Count = 3 And c["messages"][1]["content"][0]["signature"] = "abc", "the answer goes back unchanged (thinking block)")
+    Check(c["messages"][2]["content"][0]["type"] = "tool_result" And c["messages"][2]["content"][0]["tool_use_id"] = "t1" And InStr(c["messages"][2]["content"][0]["content"], "\"ok\"") > 0, "the tool result goes back")
+    ' 2: a long web search pauses
+    Check(Assistant.Reply(200, "{\"type\":\"message\",\"stop_reason\":\"pause_turn\",\"content\":[{\"type\":\"server_tool_use\",\"id\":\"s1\",\"name\":\"web_search\",\"input\":{\"query\":\"precio cemento\"}}]}"), "pause_turn asks for another request")
+    ' 3: done
+    Check(Not Assistant.Reply(200, "{\"type\":\"message\",\"stop_reason\":\"end_turn\",\"content\":[{\"type\":\"text\",\"text\":\"Listo.\"}]}"), "end_turn ends the turn")
+    Check(Assistant.Text = "Lo cambio. Listo." And Not Assistant.Busy(), "what it said: " & Assistant.Text)
+    Check(Assistant.Steps.Count = 2, "what it did: " & Assistant.Steps.Join(" | "))
+    ' the whole turn is undone at once, by the person
+    Cmd.Run("undo")
+    Check(p.Prices.Resources[sMat].Price = 0.25, "undo takes back the AI's turn")
+
+    ' a refusal and an HTTP error: the turn is dropped, the conversation stays valid
+    n = Assistant.MessageCount()
+    Assistant.Ask("otra cosa")
+    Check(Not Assistant.Reply(200, "{\"type\":\"message\",\"stop_reason\":\"refusal\",\"content\":[]}") And Assistant.Failure <> "" And Assistant.MessageCount() = n, "a refusal drops the turn")
+    Assistant.Ask("otra más")
+    Check(Not Assistant.Reply(401, "{\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}") And Assistant.Failure = "invalid x-api-key", "an API error says why")
+    Assistant.Ask("y otra")
+    Check(Not Assistant.Reply(500, "<html>"), "a reply that isn't JSON")
+    Check(Assistant.MessageCount() = n And Not Assistant.Busy(), "the conversation is as before the failed turns")
     Config.UserName = ""
 
 End

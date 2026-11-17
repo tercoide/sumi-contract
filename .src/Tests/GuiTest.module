@@ -65,6 +65,9 @@ Public Sub Step_Timer()
             fMain.HistoryTab.Reload()
             fMain.tabMain.Index = fMain.TAB_BUDGET
         Case 10
+            FAssistant.Show()
+        Case 11
+            FAssistant.Close()
             $hTimer.Stop
             Print "gui-test: OK"
             sumi.Project.RequiresSaving = False

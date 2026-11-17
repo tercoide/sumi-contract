@@ -5,6 +5,10 @@
     Text = "About this program"
     Picture = "$ToolButton"
   }
+  { Action assistant
+    Text = "AI assistant"
+    Picture = "icon:/medium/speed"
+  }
   { Action config
     Text = "Preferences"
     Picture = "$ToolButton"

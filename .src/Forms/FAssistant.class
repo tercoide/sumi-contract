@@ -1,0 +1,179 @@
+' Gambas class file
+
+'' The assistant's window: the conversation above, what you write below. Enter sends, Shift+Enter is a new line.
+'' It stays open beside the main window (not modal) while the assistant works. See Assistant.
+
+Private txtChat As TextArea
+Private txtPrompt As TextArea
+Private btnSend As Button
+Private lblState As Label
+Private $hHttp As HttpClient
+Private $sReply As String
+Private $hOffline As Timer
+Private $sLog As String
+
+Public Sub _new()
+
+    Dim hRow As HBox
+
+    txtChat = New TextArea(Me)
+    txtChat.Expand = True
+    txtChat.ReadOnly = True
+    txtChat.Wrap = True
+    txtPrompt = New TextArea(Me) As "Prompt"
+    txtPrompt.H = Desktop.Scale * 10
+    txtPrompt.Wrap = True
+    hRow = Ui.HBox(Me)
+    lblState = Ui.Label(hRow, "")
+    lblState.Expand = True
+    lblState.Foreground = Color.Gray
+    Ui.Button(hRow, ("New chat"), "NewChat", Me, ("The assistant forgets this conversation"))
+    btnSend = Ui.Button(hRow, ("Send"), "Send", Me)
+    Write(("Ask for anything about this project: find prices on the web and update them, make or fix analyses, change the project's data... Everything it changes is in the History tab, and Undo takes back its whole answer."))
+    If Not Assistant.ApiKey() And If Not Config.AIOffline Then Write(("There is no API key: set it in Preferences > AI assistant, or in the ANTHROPIC_API_KEY variable."))
+
+End
+
+Public Sub Form_Open()
+
+    txtPrompt.SetFocus
+
+End
+
+Private Sub Write(sText As String)
+
+    $sLog &= IIf($sLog, "\n\n", "") & sText
+    txtChat.Text = $sLog
+    txtChat.Pos = Len(txtChat.Text)
+
+End
+
+Public Sub Prompt_KeyPress()
+
+    If (Key.Code = Key.Return Or Key.Code = Key.Enter) And Not Key.Shift Then
+        Stop Event
+        Send_Click()
+    Endif
+
+End
+
+Public Sub NewChat_Click()
+
+    If Assistant.Busy() Then Return
+    Assistant.NewChat()
+    $sLog = ""
+    Write(("New conversation."))
+    txtPrompt.SetFocus
+
+End
+
+Public Sub Send_Click()
+
+    Dim sPrompt As String = Trim(txtPrompt.Text)
+
+    If Assistant.Busy() Then
+        StopTurn(("Stopped."))
+        Return
+    Endif
+    If Not sPrompt Then Return
+    If Not Assistant.ApiKey() And If Not Config.AIOffline Then
+        Write(("There is no API key: set it in Preferences > AI assistant."))
+        Return
+    Endif
+    Write(Who.Name() & ": " & sPrompt)
+    txtPrompt.Text = ""
+    Assistant.Ask(sPrompt)
+    btnSend.Text = ("Stop")
+    SendRequest()
+
+End
+
+Private Sub SendRequest()
+
+    lblState.Text = Subst(("&1 is working... (step &2)"), Config.AIModel, Assistant.Rounds + 1)
+    If Config.AIOffline Then
+        Assistant.WriteOfflineRequest()
+        lblState.Text = Subst(("Offline: waiting for &1"), Assistant.OfflineDir() &/ "reply.json")
+        $hOffline = New Timer As "Offline"
+        $hOffline.Delay = 500
+        $hOffline.Start
+        Return
+    Endif
+    $sReply = ""
+    $hHttp = New HttpClient As "Http"
+    $hHttp.URL = Assistant.ApiUrl
+    $hHttp.Async = True
+    $hHttp.Timeout = 600
+    $hHttp.Post("application/json", Assistant.RequestBody(), Assistant.Headers())
+
+End
+
+Public Sub Http_Read()
+
+    If Lof($hHttp) Then $sReply &= Read #$hHttp, Lof($hHttp)
+
+End
+
+Public Sub Http_Finished()
+
+    Http_Read()
+    Received($hHttp.Code, $sReply)
+
+End
+
+Public Sub Http_Error()
+
+    StopTurn(("Connection error") & ": " & $hHttp.ErrorText)
+
+End
+
+Public Sub Offline_Timer()
+
+    Dim s As String = Assistant.ReadOfflineReply()
+
+    If Not s Then Return
+    $hOffline.Stop
+    Received(200, s)
+
+End
+
+Private Sub Received(iCode As Integer, sBody As String)
+
+    If Not Assistant.Busy() Then Return
+    If Assistant.Reply(iCode, sBody) Then
+        SendRequest()
+        Return
+    Endif
+    EndTurn()
+
+End
+
+Private Sub StopTurn(sWhy As String)
+
+    If $hHttp Then Try $hHttp.Stop
+    If $hOffline Then $hOffline.Stop
+    Assistant.Cancel(sWhy)
+    EndTurn()
+
+End
+
+Private Sub EndTurn()
+
+    If Assistant.Steps.Count Then Write(Assistant.Steps.Join("\n"))
+    If Assistant.Failure Then
+        Write("✗ " & Assistant.Failure)
+    Else
+        Write(("Assistant") & ": " & Assistant.Text)
+    Endif
+    btnSend.Text = ("Send")
+    lblState.Text = ""
+    fMain.DataChanged()
+    txtPrompt.SetFocus
+
+End
+
+Public Sub Form_Close()
+
+    If Assistant.Busy() Then StopTurn(("Closed."))
+
+End

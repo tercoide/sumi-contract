@@ -14,6 +14,13 @@ Public LogLevel As String = "info"              '' debug, info, warning, error (
 Public UserName As String = ""                  '' the person at this computer, for the change log
 Public UserId As String = ""                    '' permanent, made the first time (Ids)
 
+'' AI ASSISTANT (see Assistant)
+Public AIApiKey As String = ""                  '' Claude API key; empty: the ANTHROPIC_API_KEY environment variable
+Public AIModel As String = "claude-opus-5-5"
+Public AIEffort As String = "high"              '' low, medium, high, xhigh, max
+Public AIWebSearch As Boolean = True            '' the assistant may search the web (prices, norms, suppliers)
+Public AIOffline As Boolean = False             '' tests: requests and replies go through files in Root/ai
+
 '' INTERFACE
 Public ButtonSize As Integer = 32
 Public IconFamily As String
@@ -47,6 +54,11 @@ Static Public Function Behaviour() As Collection
     o.Add(["Formats", ("Decimals for amounts"), "integer", [0, 4], ("Digits after the decimal point in prices and totals.")], "DigitsMoney")
     o.Add(["Formats", ("Decimals for quantities"), "integer", [0, 6], ("Digits after the decimal point in quantities.")], "DigitsQuantity")
     o.Add(["Display", ("Icon set"), "list", "@icons", ("Takes effect after restarting sumi-contract.")], "IconFamily")
+    o.Add(["AI assistant", ("API key"), "text", Null, ("Your Claude API key. Empty: the ANTHROPIC_API_KEY environment variable is used.")], "AIApiKey")
+    o.Add(["AI assistant", ("Model"), "list", ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-2"], ("The Claude model that does what you ask in the project.")], "AIModel")
+    o.Add(["AI assistant", ("Effort"), "list", ["low", "medium", "high", "xhigh", "max"], ("Higher effort thinks longer: better for complex requests, slower and more expensive.")], "AIEffort")
+    o.Add(["AI assistant", ("Search the web"), "switch", Null, ("The assistant may search the web, for prices, suppliers and norms. It writes where each price came from.")], "AIWebSearch")
+    o.Add(["AI assistant", ("Offline test mode"), "switch", Null, ("Don't call the API: the request is written to ~/.config/sumi-contract/ai/request.json and the reply is read from reply.json there.")], "AIOffline")
     o.Add(["Reports", ("Log level"), "list", ["debug", "info", "warning", "error"], ("How much sumi-contract writes to its log (~/.config/sumi-contract/logs, one file per day, the last 7 kept). Warnings and errors are always written.")], "LogLevel")
 
     Return o

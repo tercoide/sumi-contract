@@ -64,6 +64,15 @@
       { Separator2 Separator
         MoveScaled(29,0,1,4)
       }
+      { tbAI ToolButton
+        MoveScaled(29,0,5,5)
+        ToolTip = ("AI assistant")
+        Action = "assistant"
+        Picture = Picture["icon:/medium/speed"]
+      }
+      { Separator4 Separator
+        MoveScaled(30,0,1,4)
+      }
       { tbAbout ToolButton
         MoveScaled(31,0,5,5)
         ToolTip = ("About this program")
@@ -120,6 +129,10 @@
   { Action about
     Text = "About this program"
     Picture = "$ToolButton"
+  }
+  { Action assistant
+    Text = "AI assistant"
+    Picture = "icon:/medium/speed"
   }
   { Action config
     Text = "Preferences"

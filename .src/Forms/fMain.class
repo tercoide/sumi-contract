@@ -194,6 +194,8 @@ Public Function Action_Activate(sAction As String) As Boolean
             Undo()
         Case "redo"
             Undo(True)
+        Case "assistant"
+            FAssistant.Show()
         Case "config"
             fSettings.ShowModal()
         Case "about"
