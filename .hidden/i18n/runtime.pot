@@ -1,0 +1,122 @@
+# Strings translated at run time with Tr(): the compiler can't see them (constants, choice lists).
+# Add here every value shown with Tr(). See update.sh.
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "material"
+msgstr ""
+
+msgid "labor"
+msgstr ""
+
+msgid "equipment"
+msgstr ""
+
+msgid "person"
+msgstr ""
+
+msgid "ai"
+msgstr ""
+
+msgid "import"
+msgstr ""
+
+msgid "system"
+msgstr ""
+
+msgid "advance"
+msgstr ""
+
+msgid "progress"
+msgstr ""
+
+msgid "retention"
+msgstr ""
+
+msgid "draft"
+msgstr ""
+
+msgid "issued"
+msgstr ""
+
+msgid "transfer"
+msgstr ""
+
+msgid "cheque"
+msgstr ""
+
+msgid "cash"
+msgstr ""
+
+msgid "other"
+msgstr ""
+
+msgid "New building"
+msgstr ""
+
+msgid "Extension"
+msgstr ""
+
+msgid "Renovation"
+msgstr ""
+
+msgid "Extension and renovation"
+msgstr ""
+
+msgid "Demolition"
+msgstr ""
+
+msgid "Infrastructure"
+msgstr ""
+
+msgid "Housing"
+msgstr ""
+
+msgid "Multi-family housing"
+msgstr ""
+
+msgid "Commercial"
+msgstr ""
+
+msgid "Offices"
+msgstr ""
+
+msgid "Industrial"
+msgstr ""
+
+msgid "Educational"
+msgstr ""
+
+msgid "Health"
+msgstr ""
+
+msgid "Mixed"
+msgstr ""
+
+msgid "Other"
+msgstr ""
+
+msgid "Unit prices"
+msgstr ""
+
+msgid "Lump sum"
+msgstr ""
+
+msgid "Cost plus fee"
+msgstr ""
+
+msgid "Labor only"
+msgstr ""
+
+msgid "Weekly"
+msgstr ""
+
+msgid "Biweekly"
+msgstr ""
+
+msgid "Monthly"
+msgstr ""
+
+msgid "By milestone"
+msgstr ""

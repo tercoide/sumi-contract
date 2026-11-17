@@ -11,6 +11,12 @@ Public Function Run() As Integer
 
     $sTemp = Temp$("smoke")
     Mkdir $sTemp
+
+    ' the Spanish translation is there and loads; then the checks run in English, whatever the computer's language
+    System.Language = "es_AR.UTF-8"
+    Check(("Save") = "Guardar" And Tr("labor") = "mano de obra", "the Spanish translation: " & ("Save"))
+    System.Language = "en_US.UTF-8"
+    Check(("Save") = "Save", "back to English")
     sumi.Interactive = False
     Config.Root = $sTemp &/ "config"
     Config.Depot = Config.Root &/ "config.json"
