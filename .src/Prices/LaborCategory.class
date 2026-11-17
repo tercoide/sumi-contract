@@ -1,0 +1,30 @@
+' Gambas class file
+
+'' A labor category (oficial, ayudante...): its hourly wage. The cost an hour adds the book's labor charges
+'' (PriceBook.Charges, percentages and fixed amounts), see PriceBook.LaborCost.
+
+Public Code As Integer                          '' the labor resource it prices (900xx)
+Public Name As String = ""
+Public Wage As Float                            '' $ an hour
+
+Public Function ToJson() As Collection
+
+    Dim c As New JSONCollection
+
+    c["code"] = Code
+    c["name"] = Name
+    c["wage"] = Wage
+    Return c
+
+End
+
+Static Public Function FromJson(c As Collection) As LaborCategory
+
+    Dim l As New LaborCategory
+
+    l.Code = c["code"]
+    If c.Exist("name") Then l.Name = c["name"]
+    If c.Exist("wage") Then l.Wage = c["wage"]
+    Return l
+
+End

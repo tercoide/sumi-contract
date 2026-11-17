@@ -1,0 +1,14 @@
+' Gambas class file
+
+Public Sub Form_Open()
+
+    lblVersion.Text = ("Version") & " " & Application.Version
+    Icons.Apply(Me)
+
+End
+
+Public Sub btnClose_Click()
+
+    Me.Close
+
+End

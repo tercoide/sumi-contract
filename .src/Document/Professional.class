@@ -1,0 +1,59 @@
+' Gambas class file
+
+'' Someone who signs or runs a part of the work: the designer, the structural engineer, the site director...
+
+Public Role As String = ""
+Public Name As String = ""
+Public Registration As String = ""              '' professional registration number
+Public Phone As String = ""
+Public Email As String = ""
+
+Public Function ToJson() As Collection
+
+    Dim c As New JSONCollection
+
+    c["role"] = Role
+    c["name"] = Name
+    c["registration"] = Registration
+    c["phone"] = Phone
+    c["email"] = Email
+    Return c
+
+End
+
+Static Public Function FromJson(c As Collection) As Professional
+
+    Dim p As New Professional
+
+    If c.Exist("role") Then p.Role = c["role"]
+    If c.Exist("name") Then p.Name = c["name"]
+    If c.Exist("registration") Then p.Registration = c["registration"]
+    If c.Exist("phone") Then p.Phone = c["phone"]
+    If c.Exist("email") Then p.Email = c["email"]
+    Return p
+
+End
+
+'' The field of column i (see FProject's table)
+Public Function GetField(i As Integer) As String
+
+    Return [Role, Name, Registration, Phone, Email][i]
+
+End
+
+Public Sub SetField(i As Integer, sValue As String)
+
+    Select Case i
+        Case 0
+            Role = sValue
+        Case 1
+            Name = sValue
+        Case 2
+            Registration = sValue
+        Case 3
+            Phone = sValue
+        Case 4
+            Email = sValue
+    End Select
+
+End

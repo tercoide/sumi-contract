@@ -21,3 +21,11 @@ vgcore.*
 .app.png
 .icon.png
 #----
+
+#---- sumi-contract: reference material kept out of the repository
+licita2003.xls
+licita-macros.txt
+frm*.txt
+starting.txt
+answers.txt
+questions-next-stages.txt

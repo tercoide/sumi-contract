@@ -1,0 +1,409 @@
+' Gambas class file
+
+'' A project's prices: its resources, unit price analyses, rubros, and the labor and equipment calculations.
+'' Each project keeps its own copy (a bid keeps the prices it was made with, as licita2003's budgets did); a
+'' library is brought in with LibraryImport.
+''
+'' The cost of an analysis (Parts): its resources' unit prices times their quantities, split by kind:
+''   A materials, B equipment / EquipmentYield, C labor / LaborYield; a sub-analysis adds its own A, B and C
+''   times its quantity. D = A + B + C is the direct cost; the price is D * Project.PriceFactor().
+'' A unit price (UnitPrice) is the typed price, or the calculation for labor and equipment marked Calculated,
+'' raised by the loss %, times UpdateCoef (licita2003's "coeficiente interno": to bring old prices up to date).
+'' A missing resource or analysis costs 0 and is listed by Problems: never silently.
+
+Public Resources As New Collection              '' Resource by CStr(code)
+Public Analyses As New Collection               '' Analysis by CStr(code)
+Public Rubros As New Collection                 '' name by CStr(number)
+Public Labor As New Collection                  '' LaborCategory by CStr(resource code)
+Public Charges As New LaborCharge[]             '' what an hour of labor costs besides the wage
+Public Machines As New Collection               '' Machine by CStr(resource code)
+Public UpdateCoef As Float = 1                  '' every unit price is multiplied by it
+Public Source As String = ""                    '' where the prices came from (the imported library)
+
+Public Const MAX_DEPTH As Integer = 16          '' sub-analyses nested deeper are taken as a loop
+
+'' THE COST
+
+'' Unit price of a resource: 0 if it does not exist
+Public Function UnitPrice(iCode As Integer) As Float
+
+    Dim r As Resource = Resources[CStr(iCode)]
+    Dim f As Float
+
+    If Not r Then Return 0
+    f = BasePrice(r)
+    Return f * (1 + r.LossPct / 100) * UpdateCoef
+
+End
+
+'' The price before losses and the update coefficient: typed, or calculated
+Public Function BasePrice(r As Resource) As Float
+
+    If r.Calculated Then
+        Select Case r.Kind
+            Case Resource.LABOR
+                If Labor.Exist(CStr(r.Code)) Then Return LaborCost(Labor[CStr(r.Code)])
+            Case Resource.EQUIPMENT
+                If Machines.Exist(CStr(r.Code)) Then Return Machines[CStr(r.Code)].PerHour()
+        End Select
+    Endif
+    Return r.Price
+
+End
+
+'' Can r's price be calculated? (it has a labor category or a machine with its code)
+Public Function HasCalculation(r As Resource) As Boolean
+
+    Select Case r.Kind
+        Case Resource.LABOR
+            Return Labor.Exist(CStr(r.Code))
+        Case Resource.EQUIPMENT
+            Return Machines.Exist(CStr(r.Code))
+    End Select
+
+End
+
+'' $ an hour of a labor category: wage plus every charge
+Public Function LaborCost(l As LaborCategory) As Float
+
+    Dim f As Float = l.Wage
+    Dim c As LaborCharge
+
+    For Each c In Charges
+        f += c.PerHour(l.Wage)
+    Next
+    Return f
+
+End
+
+'' The charges alone: [percentages, fixed amounts], $ an hour
+Public Function LaborChargesSplit(l As LaborCategory) As Float[]
+
+    Dim c As LaborCharge
+    Dim fPct, fFixed As Float
+
+    For Each c In Charges
+        fPct += l.Wage * c.Pct / 100
+        If c.Amount And If c.Hours > 0 Then fFixed += c.Amount / c.Hours
+    Next
+    Return [fPct, fFixed]
+
+End
+
+'' [A materials, B equipment, C labor] of one unit of analysis a, yields applied
+Public Function Parts(a As Analysis, Optional iDepth As Integer) As Float[]
+
+    Dim fMat, fEq, fLab As Float
+    Dim l As AnalysisLine
+    Dim r As Resource
+    Dim aSub As Float[]
+    Dim fEqYield As Float = IIf(a.EquipmentYield > 0, a.EquipmentYield, 1)
+    Dim fLabYield As Float = IIf(a.LaborYield > 0, a.LaborYield, 1)
+
+    If iDepth > MAX_DEPTH Then Return [0.0, 0.0, 0.0]
+
+    For Each l In a.Lines
+        If l.IsAnalysis Then
+            If Not Analyses.Exist(CStr(l.Code)) Then Continue
+            aSub = Parts(Analyses[CStr(l.Code)], iDepth + 1)
+            fMat += l.Quantity * aSub[0]
+            fEq += l.Quantity * aSub[1]
+            fLab += l.Quantity * aSub[2]
+        Else
+            r = Resources[CStr(l.Code)]
+            If Not r Then Continue
+            Select Case r.Kind
+                Case Resource.LABOR
+                    fLab += l.Quantity * UnitPrice(l.Code) / fLabYield
+                Case Resource.EQUIPMENT
+                    fEq += l.Quantity * UnitPrice(l.Code) / fEqYield
+                Default
+                    fMat += l.Quantity * UnitPrice(l.Code)
+            End Select
+        Endif
+    Next
+    Return [fMat, fEq, fLab]
+
+End
+
+'' The direct cost of one unit (D = A + B + C)
+Public Function Direct(a As Analysis) As Float
+
+    Dim f As Float[] = Parts(a)
+
+    Return f[0] + f[1] + f[2]
+
+End
+
+'' What is wrong with an analysis: missing resources or sub-analyses, zero prices, loops. "" if nothing.
+Public Function Problems(a As Analysis) As String[]
+
+    Dim aOut As New String[]
+    Dim l As AnalysisLine
+
+    For Each l In a.Lines
+        If l.IsAnalysis Then
+            If Not Analyses.Exist(CStr(l.Code)) Then
+                aOut.Add(Subst(("Analysis &1 does not exist"), l.Code))
+            Else If Contains(Analyses[CStr(l.Code)], a.Code, 0) Then
+                aOut.Add(Subst(("Analysis &1 includes this one: a loop"), l.Code))
+            Endif
+        Else
+            If Not Resources.Exist(CStr(l.Code)) Then
+                aOut.Add(Subst(("Resource &1 does not exist"), l.Code))
+            Else If UnitPrice(l.Code) = 0 Then
+                aOut.Add(Subst(("Resource &1 has no price"), l.Code))
+            Endif
+        Endif
+        If l.Quantity = 0 Then aOut.Add(Subst(("Line &1 has no quantity"), l.Code))
+    Next
+    If a.Lines.Count = 0 Then aOut.Add(("It has no lines"))
+    Return aOut
+
+End
+
+'' Does a use analysis iCode, directly or inside its sub-analyses? (a = iCode counts)
+Public Function Contains(a As Analysis, iCode As Integer, Optional iDepth As Integer) As Boolean
+
+    Dim l As AnalysisLine
+
+    If a.Code = iCode Then Return True
+    If iDepth > MAX_DEPTH Then Return True
+    For Each l In a.Lines
+        If l.IsAnalysis And If Analyses.Exist(CStr(l.Code)) Then
+            If Contains(Analyses[CStr(l.Code)], iCode, iDepth + 1) Then Return True
+        Endif
+    Next
+
+End
+
+'' Replaces sub-analysis lines by their resources times the quantity, merging repeated ones (licita2003's
+'' "Insertar analisis": the link is lost)
+Public Sub Flatten(a As Analysis)
+
+    Dim cQty As New Collection
+    Dim aOrder As New Integer[]
+    Dim l As AnalysisLine
+    Dim iCode As Integer
+
+    Collect(a, 1, cQty, aOrder, 0)
+    a.Lines.Clear
+    For Each iCode In aOrder
+        l = New AnalysisLine
+        l.Code = iCode
+        l.Quantity = cQty[CStr(iCode)]
+        a.Lines.Add(l)
+    Next
+
+End
+
+Private Sub Collect(a As Analysis, fFactor As Float, cQty As Collection, aOrder As Integer[], iDepth As Integer)
+
+    Dim l As AnalysisLine
+
+    If iDepth > MAX_DEPTH Then Return
+    For Each l In a.Lines
+        If l.IsAnalysis Then
+            If Analyses.Exist(CStr(l.Code)) Then Collect(Analyses[CStr(l.Code)], fFactor * l.Quantity, cQty, aOrder, iDepth + 1)
+        Else
+            If Not cQty.Exist(CStr(l.Code)) Then
+                cQty[CStr(l.Code)] = 0.0
+                aOrder.Add(l.Code)
+            Endif
+            cQty[CStr(l.Code)] += fFactor * l.Quantity
+        Endif
+    Next
+
+End
+
+'' LOOKUPS
+
+'' The codes of a Collection keyed by code, sorted
+Static Public Function SortedCodes(c As Collection) As Integer[]
+
+    Dim a As New Integer[]
+    Dim v As Variant
+
+    For Each v In c
+        a.Add(CInt(c.Key))
+    Next
+    Return a.Sort()
+
+End
+
+'' The analyses that use resource or analysis iCode in a line
+Public Function UsedBy(iCode As Integer, bAnalysis As Boolean) As Integer[]
+
+    Dim aOut As New Integer[]
+    Dim a As Analysis
+    Dim l As AnalysisLine
+
+    For Each a In Analyses
+        For Each l In a.Lines
+            If l.IsAnalysis = bAnalysis And If l.Code = iCode Then
+                aOut.Add(a.Code)
+                Break
+            Endif
+        Next
+    Next
+    Return aOut.Sort()
+
+End
+
+'' A free analysis code: one more than the highest
+Public Function NextAnalysisCode() As Integer
+
+    Dim a As Analysis
+    Dim i As Integer
+
+    For Each a In Analyses
+        i = Max(i, a.Code)
+    Next
+    Return i + 1
+
+End
+
+'' A free resource code for a kind, in its range (materials < 90000, labor 90000..99999, equipment 100000..)
+Public Function NextResourceCode(sKind As String) As Integer
+
+    Dim r As Resource
+    Dim iFrom, iTo, i As Integer
+
+    Select Case sKind
+        Case Resource.LABOR
+            iFrom = 90001
+            iTo = 99999
+        Case Resource.EQUIPMENT
+            iFrom = 100001
+            iTo = 199999
+        Default
+            iFrom = 1
+            iTo = 89999
+    End Select
+    i = iFrom - 1
+    For Each r In Resources
+        If r.Code >= iFrom And If r.Code <= iTo Then i = Max(i, r.Code)
+    Next
+    Return i + 1
+
+End
+
+Public Function RubroName(iRubro As Integer) As String
+
+    Return Rubros[CStr(iRubro)]
+
+End
+
+'' THE LABOR CHARGES OF LICITA2003 (its "mdo" sheet), for a new book
+Public Sub DefaultCharges()
+
+    Charges.Clear
+    Charges.Add(LaborCharge.Make(("Presentismo"), 20))
+    Charges.Add(LaborCharge.Make(("Law 19032"), 3))
+    Charges.Add(LaborCharge.Make(("Health insurance"), 3))
+    Charges.Add(LaborCharge.Make(("Union"), 2.5))
+    Charges.Add(LaborCharge.Make(("ISSPIC"), 0.5))
+    Charges.Add(LaborCharge.Make(("Retirement"), 7))
+    Charges.Add(LaborCharge.Make(("Others"), 3))
+    Charges.Add(LaborCharge.Make(("Vacations"), 4.2))
+    Charges.Add(LaborCharge.Make(("Decree (monthly)"), 0, 200, 176))
+    Charges.Add(LaborCharge.Make(("Work clothes (semester)"), 0, 60, 1056))
+
+End
+
+'' THE FILE
+
+Public Function ToJson() As Collection
+
+    Dim c As New JSONCollection
+    Dim a As Variant[]
+    Dim v As Variant
+    Dim cRub As JSONCollection
+
+    c["updateCoef"] = UpdateCoef
+    c["source"] = Source
+    a = New Variant[]
+    For Each v In Resources
+        a.Add(v.ToJson())
+    Next
+    c["resources"] = a
+    a = New Variant[]
+    For Each v In Analyses
+        a.Add(v.ToJson())
+    Next
+    c["analyses"] = a
+    a = New Variant[]
+    For Each v In Rubros
+        cRub = New JSONCollection
+        cRub["number"] = CInt(Rubros.Key)
+        cRub["name"] = v
+        a.Add(cRub)
+    Next
+    c["rubros"] = a
+    a = New Variant[]
+    For Each v In Labor
+        a.Add(v.ToJson())
+    Next
+    c["labor"] = a
+    a = New Variant[]
+    For Each v In Charges
+        a.Add(v.ToJson())
+    Next
+    c["charges"] = a
+    a = New Variant[]
+    For Each v In Machines
+        a.Add(v.ToJson())
+    Next
+    c["machines"] = a
+    Return c
+
+End
+
+Public Sub FromJson(c As Collection)
+
+    Dim v As Variant
+    Dim r As Resource
+    Dim a As Analysis
+    Dim l As LaborCategory
+    Dim m As Machine
+
+    If Not c Then Return
+    If c.Exist("updateCoef") Then UpdateCoef = c["updateCoef"]
+    If c.Exist("source") Then Source = c["source"]
+    If c.Exist("resources") Then
+        For Each v In c["resources"]
+            r = Resource.FromJson(v)
+            Resources[CStr(r.Code)] = r
+        Next
+    Endif
+    If c.Exist("analyses") Then
+        For Each v In c["analyses"]
+            a = Analysis.FromJson(v)
+            Analyses[CStr(a.Code)] = a
+        Next
+    Endif
+    If c.Exist("rubros") Then
+        For Each v In c["rubros"]
+            If v["name"] Then Rubros[CStr(v["number"])] = v["name"]
+        Next
+    Endif
+    If c.Exist("labor") Then
+        For Each v In c["labor"]
+            l = LaborCategory.FromJson(v)
+            Labor[CStr(l.Code)] = l
+        Next
+    Endif
+    If c.Exist("charges") Then
+        Charges.Clear
+        For Each v In c["charges"]
+            Charges.Add(LaborCharge.FromJson(v))
+        Next
+    Endif
+    If c.Exist("machines") Then
+        For Each v In c["machines"]
+            m = Machine.FromJson(v)
+            Machines[CStr(m.Code)] = m
+        Next
+    Endif
+
+End

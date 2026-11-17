@@ -1,0 +1,62 @@
+' Gambas class file
+
+'' A resource an analysis uses: a material, a labor category (hours) or a piece of equipment (hours).
+'' Labor and equipment can take their price from their calculation (PriceBook.Labor / Machines, same code)
+'' instead of the typed one: Calculated.
+
+Public Const MATERIAL As String = "material"
+Public Const LABOR As String = "labor"
+Public Const EQUIPMENT As String = "equipment"
+
+Public Code As Integer
+Public Name As String = ""
+Public Unit As String = ""
+Public Kind As String = "material"              '' MATERIAL, LABOR or EQUIPMENT
+Public Price As Float                           '' typed unit price (before the book's update coefficient)
+Public Calculated As Boolean                    '' labor / equipment: the price comes from its calculation
+Public LossPct As Float                         '' waste: the price is raised by this
+Public Origin As String = ""                    '' where it is bought
+Public Updated As String = ""                   '' when the price was last set (yyyy-mm-dd)
+Public Source As String = ""                    '' where the price came from (a list, a supplier...)
+
+Static Public Function Kinds() As String[]
+
+    Return [MATERIAL, LABOR, EQUIPMENT]
+
+End
+
+Public Function ToJson() As Collection
+
+    Dim c As New JSONCollection
+
+    c["code"] = Code
+    c["name"] = Name
+    c["unit"] = Unit
+    c["kind"] = Kind
+    c["price"] = Price
+    If Calculated Then c["calculated"] = True
+    If LossPct Then c["loss"] = LossPct
+    If Origin Then c["origin"] = Origin
+    If Updated Then c["updated"] = Updated
+    If Source Then c["source"] = Source
+    Return c
+
+End
+
+Static Public Function FromJson(c As Collection) As Resource
+
+    Dim r As New Resource
+
+    r.Code = c["code"]
+    If c.Exist("name") Then r.Name = c["name"]
+    If c.Exist("unit") Then r.Unit = c["unit"]
+    If c.Exist("kind") Then r.Kind = c["kind"]
+    If c.Exist("price") Then r.Price = c["price"]
+    If c.Exist("calculated") Then r.Calculated = c["calculated"]
+    If c.Exist("loss") Then r.LossPct = c["loss"]
+    If c.Exist("origin") Then r.Origin = c["origin"]
+    If c.Exist("updated") Then r.Updated = c["updated"]
+    If c.Exist("source") Then r.Source = c["source"]
+    Return r
+
+End

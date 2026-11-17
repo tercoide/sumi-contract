@@ -1,0 +1,111 @@
+' Gambas module file
+
+'' File actions of the top bar: New, Open, Save, Save as. One project at a time (sumi.Project).
+
+'' If the project has unsaved changes, asks to save them. Returns True if the user cancelled.
+Public Function AskSave() As Boolean
+
+    If Not sumi.Project Or If Not sumi.Project.RequiresSaving Then Return False
+    If Not sumi.Interactive Then Return False
+    Select Message.Warning(Subst(("Save the changes to &1?"), sumi.Project.Title()), ("Save"), ("Don't save"), ("Cancel"))
+        Case 1
+            Return FileSave()
+        Case 2
+            Return False
+        Case Else
+            Return True
+    End Select
+
+End
+
+Public Sub FileNew()
+
+    If AskSave() Then Return
+    sumi.Project = New Project
+    fMain.ProjectChanged()
+    sumi.Status(("New project"))
+
+End
+
+'' Opens sFile, or asks for one. Returns True on error or cancel.
+Public Function FileOpen(Optional sFile As String) As Boolean
+
+    Dim p As Project
+
+    If AskSave() Then Return True
+    If Not sFile Then
+        Dialog.Title = ("Open a project")
+        Dialog.Filter = ["*." & JsonFile.FileExtension, ("sumi-contract projects"), "*", ("All files")]
+        Dialog.Path = IIf(Config.FilesLastPath, Config.FilesLastPath, User.Home) & "/"
+        If Dialog.OpenFile() Then Return True
+        sFile = Dialog.Path
+    Endif
+
+    p = JsonFile.LoadFile(sFile)
+    If Not p Then
+        AppLog.Warning("Can't open " & sFile & ": " & JsonFile.LastError, "actions.FileOpen")
+        If sumi.Interactive Then Message.Error(Subst(("Can't open &1."), File.Name(sFile)) & "\n\n" & JsonFile.LastError)
+        Return True
+    Endif
+
+    sumi.Project = p
+    Remember(sFile)
+    fMain.ProjectChanged()
+    sumi.Status(Subst(("Opened &1"), sFile))
+    AppLog.Info("Opened " & sFile, "actions.FileOpen")
+
+End
+
+'' Returns True on error or cancel
+Public Function FileSave() As Boolean
+
+    If Not sumi.Project.FileName Then Return FileSaveAs()
+    Return SaveTo(sumi.Project.FileName)
+
+End
+
+'' Returns True on error or cancel
+Public Function FileSaveAs() As Boolean
+
+    Dim sFile As String
+
+    Dialog.Title = ("Save the project as")
+    Dialog.Filter = ["*." & JsonFile.FileExtension, ("sumi-contract projects")]
+    If sumi.Project.FileName Then
+        Dialog.Path = sumi.Project.FileName
+    Else
+        Dialog.Path = IIf(Config.FilesLastPath, Config.FilesLastPath, User.Home) &/ IIf(sumi.Project.Name, sumi.Project.Name, ("project")) & "." & JsonFile.FileExtension
+    Endif
+    If Dialog.SaveFile() Then Return True
+    sFile = Dialog.Path
+    If File.Ext(sFile) <> JsonFile.FileExtension Then sFile &= "." & JsonFile.FileExtension
+    If Exist(sFile) And If sFile <> sumi.Project.FileName Then
+        If Message.Warning(Subst(("&1 already exists. Replace it?"), File.Name(sFile)), ("Replace"), ("Cancel")) <> 1 Then Return True
+    Endif
+    Return SaveTo(sFile)
+
+End
+
+Private Function SaveTo(sFile As String) As Boolean
+
+    If JsonFile.SaveFile(sFile, sumi.Project) Then
+        AppLog.Error("Can't save " & sFile & ": " & JsonFile.LastError, "actions.SaveTo")
+        If sumi.Interactive Then Message.Error(Subst(("Can't save &1."), File.Name(sFile)) & "\n\n" & JsonFile.LastError)
+        Return True
+    Endif
+    sumi.Project.FileName = sFile
+    sumi.Project.RequiresSaving = False
+    Remember(sFile)
+    If sumi.Interactive Then fMain.UpdateTitle()
+    sumi.Status(Subst(("Saved &1"), sFile))
+    AppLog.Info("Saved " & sFile, "actions.SaveTo")
+
+End
+
+Private Sub Remember(sFile As String)
+
+    Config.FilesLastPath = File.Dir(sFile)
+    Config.AddRecent(sFile)
+    If Config.Depot Then Config.Save(Config.Depot)
+
+End

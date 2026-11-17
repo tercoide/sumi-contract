@@ -1,0 +1,32 @@
+' Gambas module file
+
+'' Small helpers shared by the forms
+
+'' Puts on a button (ToolButton, MenuButton, Button...) the icon sPicFile: a file of the resources' svg folder
+'' (e.g. "actions/document-new.svg"), the button's size less a margin. With an icon set chosen in the settings
+'' (Config.IconFamily), its file is used when it has one.
+Public Sub SetIcon(hButton As Object, sPicFile As String)
+
+    Dim hImg As Image
+    Dim iPic As Integer
+
+    If Config.IconFamily Then Try hImg = Image.Load(sumi.dirResources &/ "svg" &/ Config.IconFamily &/ sPicFile)
+    If Not hImg Then Try hImg = Image.Load(sumi.dirResources &/ "svg" &/ sPicFile)
+    If Not hImg Then Return
+    iPic = Max(12, Min(hButton.W, hButton.H) - 8)
+    hButton.Picture = hImg.Stretch(iPic, iPic).Picture
+
+End
+
+'' A number array (Integer[], Float[]...) as text: "1, 2, 3"
+Public Function JoinNumbers(aList As Object, Optional sSep As String = ", ") As String
+
+    Dim a As New String[]
+    Dim v As Variant
+
+    For Each v In aList
+        a.Add(Str(v))
+    Next
+    Return a.Join(sSep)
+
+End

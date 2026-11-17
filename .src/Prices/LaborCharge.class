@@ -1,0 +1,57 @@
+' Gambas class file
+
+'' What an hour of labor costs besides the wage: a percentage of it (social charges, presentismo, vacations...)
+'' or a fixed amount spread over some hours (a monthly bonus over 176 h, work clothes over a semester...)
+
+Public Name As String = ""
+Public Pct As Float                             '' % of the wage
+Public Amount As Float                          '' a fixed amount...
+Public Hours As Float = 176                     '' ...over this many hours
+
+'' $ an hour for a wage
+Public Function PerHour(fWage As Float) As Float
+
+    Dim f As Float = fWage * Pct / 100
+
+    If Amount And If Hours > 0 Then f += Amount / Hours
+    Return f
+
+End
+
+Public Function ToJson() As Collection
+
+    Dim c As New JSONCollection
+
+    c["name"] = Name
+    If Pct Then c["pct"] = Pct
+    If Amount Then
+        c["amount"] = Amount
+        c["hours"] = Hours
+    Endif
+    Return c
+
+End
+
+Static Public Function FromJson(c As Collection) As LaborCharge
+
+    Dim l As New LaborCharge
+
+    If c.Exist("name") Then l.Name = c["name"]
+    If c.Exist("pct") Then l.Pct = c["pct"]
+    If c.Exist("amount") Then l.Amount = c["amount"]
+    If c.Exist("hours") Then l.Hours = c["hours"]
+    Return l
+
+End
+
+Static Public Function Make(sName As String, fPct As Float, Optional fAmount As Float, fHours As Float = 176) As LaborCharge
+
+    Dim l As New LaborCharge
+
+    l.Name = sName
+    l.Pct = fPct
+    l.Amount = fAmount
+    l.Hours = fHours
+    Return l
+
+End

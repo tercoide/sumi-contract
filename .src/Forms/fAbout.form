@@ -1,0 +1,48 @@
+# Gambas Form File 3.0
+
+{ Form Form
+  MoveScaled(0,0,64,40)
+  Text = ("About sumi-contract")
+  Resizable = False
+  Arrangement = Arrange.Vertical
+  Spacing = True
+  Margin = True
+  { Label1 Label
+    MoveScaled(1,1,60,5)
+    Font = Font["Bold,+4"]
+    Text = ("sumi-contract")
+  }
+  { lblVersion Label
+    MoveScaled(1,7,60,3)
+  }
+  { Label5 TextLabel
+    MoveScaled(1,11,60,8)
+    Text = ("The paperwork of a building: the tasks to build it, its budget, the contractors by speciality, the progress of the work and the payments.")
+    Alignment = Align.TopNormal
+  }
+  { Label12 TextLabel
+    MoveScaled(1,20,60,6)
+    Text = ("Part of the sumi suite, with GambasCAD (2D), sumi-e (3D and rendering) and sumi-designer (BIM).")
+    Alignment = Align.TopNormal
+  }
+  { Label7 TextLabel
+    MoveScaled(1,27,60,5)
+    Text = ("Many thanks to Benoit for Gambas, everyone at gambas-es.org and all the Linux community.")
+    Alignment = Align.TopNormal
+  }
+  { Spring1 Spring
+    MoveScaled(1,33,10,1)
+  }
+  { pButtons HBox
+    MoveScaled(1,34,60,4)
+    { Spring2 Spring
+      MoveScaled(0,0,40,4)
+    }
+    { btnClose Button
+      MoveScaled(44,0,16,4)
+      Text = ("Close")
+      Default = True
+      Cancel = True
+    }
+  }
+}

@@ -1,0 +1,44 @@
+' Gambas class file
+
+'' One line of an analysis: a quantity of a resource, or of another analysis (a sub-analysis, kept linked:
+'' when it changes, every analysis using it follows)
+
+Public IsAnalysis As Boolean
+Public Code As Integer
+Public Quantity As Float
+
+Public Function ToJson() As Collection
+
+    Dim c As New JSONCollection
+
+    If IsAnalysis Then c["analysis"] = Code Else c["resource"] = Code
+    c["qty"] = Quantity
+    Return c
+
+End
+
+Static Public Function FromJson(c As Collection) As AnalysisLine
+
+    Dim l As New AnalysisLine
+
+    If c.Exist("analysis") Then
+        l.IsAnalysis = True
+        l.Code = c["analysis"]
+    Else
+        l.Code = c["resource"]
+    Endif
+    l.Quantity = c["qty"]
+    Return l
+
+End
+
+Public Function Copy() As AnalysisLine
+
+    Dim l As New AnalysisLine
+
+    l.IsAnalysis = IsAnalysis
+    l.Code = Code
+    l.Quantity = Quantity
+    Return l
+
+End

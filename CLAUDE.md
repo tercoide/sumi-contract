@@ -1,0 +1,41 @@
+# sumi-contract
+
+The paperwork part of the **sumi suite** (GambasCAD for 2D plans, sumi-e for 3D and rendering, sumi-designer for the BIM model). It gathers the tasks needed to build a design, to make the budget, split it among speciality contractors, and track progress and payments. Written in **Gambas 3** (runtime 3.19+, tested with 3.22). Comments may be in English or Spanish, as in the rest of the suite.
+
+Started 2026-11-17 as a fresh skeleton modeled on sumi-designer (not a fork: none of the CAD/OpenGL code came along). Pieces copied from sumi-designer: `AppLog`, `Icons`, `fSettings` (with its `Config.Behaviour()` pattern), the `actions` svg icon set and the program icon. sumi-designer's notes call the suite's quantities and costs program **sumi-sheets**; this is that program, now named sumi-contract.
+
+The user writes the work to do in task lists (`starting.txt`: 0 project data, 1 budget from sumi-designer's quantities, 2 Gantt, 3 unit price analysis of each task, 4 contracts with their work and payment progress). The user's lists are the bare minimum: add what a real work's paperwork needs (said 2026-11-17).
+
+## What it does (so far)
+- **One project at a time:** `sumi.Project` (class `Project`). New and Open replace it, asking first if `RequiresSaving` is set (`actions.AskSave`).
+- **Main window** (`fMain`), like the rest of the suite: a top button bar (New, Open with the recent files under its arrow, Save, Save as, Preferences, About), the central tab strip `tabMain` and a status bar (`lblStatus` messages, `lblFile` the open file, `*` when unsaved).
+- **Tabs:** Project, Budget, Gantt, Pricing, Contracts. Only Project is made; the others are placeholders (`fMain.Placeholder`).
+- **Prices (`.src/Prices/`, `Project.Prices`, model and import done, no screen yet; the Pricing tab is next):** each project keeps its own `PriceBook` (a bid keeps its prices): `Resource` (material / labor / equipment, typed price or `Calculated` from `LaborCategory` + the book's `LaborCharge`s, or `Machine`: depreciation + interest + repairs + fuel + lubricants, as licita2003's mdo/equ sheets), `Analysis` (rubro, unit, yields, `AnalysisLine`s of resources or linked sub-analyses), rubros. `PriceBook.Parts` = [A materials, B equipment / EquipmentYield, C labor / LaborYield]; `UnitPrice` = price × (1 + loss) × `UpdateCoef` (licita's "coeficiente interno"); price of an analysis = direct × `Project.PriceFactor()` (the "coeficiente resumen"). Missing things cost 0 and are listed by `Problems`, never silent; loops are cut at `MAX_DEPTH`. `Flatten` merges sub-analyses into resources (licita's "insertar análisis").
+- **The licita2003 library:** `LibraryImport.ImportFolder` reads Tincho's CSVs (`~/.config/s64sketch/costs/licita2003` and `../added`), made from the user's `licita2003.xls` (in the project folder with its VBA as .txt; `licita2003modelo.xxx`, the budget template, is lost). Labor and equipment keep the typed prices; the report lists how far their calculations are. The xls's mdo sheet multiplies the charges by the wage twice (F3 = E3*D3 + D3); `PriceBook.LaborCost` uses wage + charges.
+- **Open questions** for the next stages (team, AI, change log, sumi-communications, prices, budget, Gantt, contracts) are in `questions-next-stages.txt`. Proposed: every change through a `Cmd` layer (like sumi-designer's) that both the screens and the AI use, writing a change log (who, when, person/AI/import, what, before → after) inside the project file.
+- **Project tab (`FProject`):** left column the work (name, code, type, use, the `.designer-proj` it comes from), location (address, city, province, parcel, plot / covered / semi-covered areas, floors), client (name, tax id, phone, email) and notes; right column the schedule (start, working days, days a week, hours a day, holidays: `Project.EndDate` counts working days skipping the weekly rest and holidays), the definitions (currency, general expenses, profit and taxes %, chained into `Project.PriceFactor`), the contract conditions (mode, advance %, guarantee retention %, certificate period, adjustment index and base month, guarantee days) and the professionals (`Professional`, a TableView edited by clicking a cell). Choice lists are stored in English and shown translated (`Project.WorkTypes()` etc.). A tab is a form embedded in its page: `New FXxx(tabMain[TAB_XXX])` in `fMain.Run`, with a `TAB_` constant; `fMain.ProjectChanged` tells every tab to show the project.
+
+## Architecture
+| Area | Location | Role |
+|---|---|---|
+| Entry point | `.src/main.module` | Resources folder (`.hidden` from the IDE, `/usr/share/sumi-contract` installed), config, log, `--smoke-test`, opens `fMain`, a file given on the command line |
+| Global state | `.src/sumi.module` | `sumi.Project`, `dirResources`, `Interactive` (False in the smoke test: no windows or messages), `Status`, `Changed` |
+| Settings | `.src/Config.class`, `Forms/fSettings` | Static; every public variable is saved to `~/.config/sumi-contract/config.json`. Those in `Behaviour()` are shown in fSettings: a new setting only needs a variable and a line there. Derived values (`FormatMoney`, `FormatQuantity`) are set in `UpdateDerived`. `Config.Money(f)` formats an amount |
+| Document | `.src/Document/Project.class`, `Professional.class`, `JsonFile.module` | The file: JSON `{format: "sumi-contract", version, project}`, extension `.contract-proj`. A newer version is refused; older ones load with defaults. Saving writes `<file>.saving` and then moves it. Dates are written `yyyy-mm-dd hh:nn:ss` and read by `Project.ReadDate` (not `Val`, which follows the locale) |
+| File actions | `.src/actions.module` | New, Open, Save, Save as, recent files (`Config.RecentFiles`) |
+| Log | `.src/Library/AppLog.module` | `AppLog.Info/Warning/Error`; one file a day in `~/.config/sumi-contract/logs`, last 7 kept |
+| Icons | `.src/Library/Icons.module`, `Utils.SetIcon`, `.hidden/svg/actions` | `Icons.Apply(form)` gives buttons their icon by name/tag/text; `Utils.SetIcon(button, "actions/x.svg")` sets one, from `Config.IconFamily`'s folder first |
+| Prices | `.src/Prices/` | `PriceBook`, `Resource`, `Analysis`, `AnalysisLine`, `LaborCategory`, `LaborCharge`, `Machine`, `LibraryImport`; `Library/Csv.module` reads CSV |
+| Tests | `.src/Tests/SmokeTest.module` | Headless smoke test |
+
+## Things worth knowing
+- **Building:** `gbc3 -a -w .` in the project folder (`-g` adds line numbers to runtime errors).
+- **Smoke test:** `gbc3 -a . && gbx3 . -- --smoke-test`; exit code = failures. It uses a temporary folder for config and files. Covers config defaults, save/load of the config (arrays keep their type), the project file round trip (every field, holidays, professionals) and its refusals, the end date with weekly rest and holidays, the price factor, CSV parsing, the price model (parts with yields and losses, linked sub-analyses, the update coefficient, the labor and machine calculations against licita2003's numbers, problems, loops, flatten, save/load), the import (a fixture, and the real licita2003 CSVs when the computer has them; `SMOKE_VERBOSE=1` prints the report), and that the icon files exist. Add a check for every new feature.
+- **Arrays:** only `String[]` has `Join`; use `Utils.JoinNumbers` for `Integer[]` / `Float[]`. `New` can't be used inside an expression (an argument).
+- **JSON** is in `gb.util.web` (`JSON.Encode` takes only the value; no indenting).
+- **The compiler doesn't check members:** `Config.Typo` compiles and fails only when run. After renaming, grep for callers (`grep -a`, some sources may hold non-UTF-8 bytes).
+- **Collections drop empty strings:** assigning `""` (Null) to a Collection key removes it; that is why `Config` keeps `$aDefaultNames` apart from `$cDefaults`.
+- **Embedded forms:** a tab form made with `New FXxx(tabMain[i])` gets `Form_Open` only when first shown, after `fMain` has already called it: set it up in `_new()`.
+- **Event groups:** the form file does not take `Group`; attach in code (`Object.Attach(control, Me, "Field")`), as `FProject._new` does.
+- **Reserved words:** `Use` can't be a variable name (it is `Project.Usage`, key `"use"` in the file).
+- **Actions:** the toolbar buttons have an `Action` name; `fMain.Action_Activate` dispatches them.

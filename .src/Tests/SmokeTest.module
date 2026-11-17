@@ -1,0 +1,348 @@
+' Gambas module file
+
+'' Headless smoke test: gbc3 -a . && gbx3 . -- --smoke-test
+'' No window is opened and the user's config and files are not touched. The exit code is the number of failures.
+
+Private $iFailures As Integer
+Private $iChecks As Integer
+Private $sTemp As String
+
+Public Function Run() As Integer
+
+    $sTemp = Temp$("smoke")
+    Mkdir $sTemp
+    sumi.Interactive = False
+    Config.Root = $sTemp &/ "config"
+    Config.Depot = Config.Root &/ "config.json"
+
+    TestConfig()
+    TestProjectFile()
+    TestSchedule()
+    TestCsv()
+    TestPrices()
+    TestImport()
+    TestIcons()
+
+    Shell "rm -rf " & Shell$($sTemp) Wait
+    Print Subst("Smoke test: &1 checks, &2 failures", $iChecks, $iFailures)
+    Return $iFailures
+
+End
+
+Private Sub Check(bOk As Boolean, sWhat As String)
+
+    Inc $iChecks
+    If bOk Then Return
+    Inc $iFailures
+    Print "FAIL: " & sWhat
+
+End
+
+Private Sub TestConfig()
+
+    Dim cBehaviour As Collection = Config.Behaviour()
+    Dim v As Variant
+
+    ' every setting shown in fSettings is a variable with a default
+    For Each v In cBehaviour
+        Check(Config.HasDefault(cBehaviour.Key), "Config default for " & cBehaviour.Key)
+    Next
+
+    Config.DigitsMoney = 3
+    Config.UpdateDerived()
+    Check(Config.FormatMoney = "#,##0.000", "Config.FormatMoney: " & Config.FormatMoney)
+    Config.AddRecent("/a")
+    Config.AddRecent("/b")
+    Config.AddRecent("/a")
+    Check(Config.RecentFiles.Join() = "/a,/b", "recent files: " & Config.RecentFiles.Join())
+
+    Config.Save(Config.Depot)
+    Config.DigitsMoney = 1
+    Config.RecentFiles = []
+    Config.Load(Config.Depot)
+    Check(Config.DigitsMoney = 3, "Config reloaded DigitsMoney")
+    Check(Config.RecentFiles.Count = 2, "Config reloaded RecentFiles as String[]")
+    Config.DigitsMoney = 2
+    Config.UpdateDerived()
+
+End
+
+Private Sub TestProjectFile()
+
+    Dim p, q As Project
+    Dim hPro As Professional
+    Dim sFile As String = $sTemp &/ "test." & JsonFile.FileExtension
+
+    p = New Project
+    p.Name = "Casa Alejandro"
+    p.Client = "Alejandro"
+    p.Location = "Lote 60"
+    p.Code = "OB-001"
+    p.Usage = "Commercial"
+    p.CoveredArea = 182.5
+    p.Floors = 2
+    p.ClientTaxId = "20-12345678-9"
+    p.RetentionPct = 7.5
+    p.AdjustmentIndex = "CAC"
+    p.AddHoliday(Date(2026, 12, 25))
+    p.AddHoliday(Date(2026, 12, 8))
+    hPro = New Professional
+    hPro.Role = "Design"
+    hPro.Name = "Arq. X"
+    hPro.Registration = "1234"
+    p.Professionals.Add(hPro)
+    p.Notes = "two lines\nof notes, with \"quotes\" and ñ"
+    p.DesignFile = "/tmp/x.designer-proj"
+
+    Check(Not JsonFile.SaveFile(sFile, p), "save: " & JsonFile.LastError)
+    q = JsonFile.LoadFile(sFile)
+    Check(q <> Null, "load: " & JsonFile.LastError)
+    If Not q Then Return
+    Check(q.Name = p.Name And q.Client = p.Client And q.Location = p.Location And q.Code = p.Code, "project fields after load")
+    Check(q.Usage = "Commercial" And q.CoveredArea = 182.5 And q.Floors = 2 And q.ClientTaxId = p.ClientTaxId, "work and client after load")
+    Check(q.RetentionPct = 7.5 And q.AdjustmentIndex = "CAC", "contract conditions after load")
+    Check(q.Holidays.Count = 2 And DateDiff(q.Holidays[0], Date(2026, 12, 8), gb.Day) = 0, "holidays after load, sorted")
+    Check(q.Professionals.Count = 1 And q.Professionals[0].Name = "Arq. X" And q.Professionals[0].Registration = "1234", "professionals after load")
+    Check(q.StartDate = p.StartDate And q.DurationDays = p.DurationDays, "schedule after load")
+    Check(q.Notes = p.Notes, "notes after load")
+    Check(q.DesignFile = p.DesignFile, "design file after load")
+    Check(q.FileName = sFile, "file name after load")
+    Check(Abs(DateDiff(q.Created, p.Created, gb.Second)) <= 1, "created date after load")
+    Check(Not q.RequiresSaving, "a loaded project needs no saving")
+
+    ' refusals
+    File.Save($sTemp &/ "bad.json", "{\"format\": \"other\"}")
+    Check(JsonFile.LoadFile($sTemp &/ "bad.json") = Null, "another format is refused")
+    File.Save($sTemp &/ "new.json", "{\"format\": \"sumi-contract\", \"version\": 999}")
+    Check(JsonFile.LoadFile($sTemp &/ "new.json") = Null, "a newer version is refused")
+    Check(JsonFile.LoadFile($sTemp &/ "missing") = Null, "a missing file is refused")
+
+End
+
+Private Sub TestSchedule()
+
+    Dim p As New Project
+
+    p.StartDate = Date(2026, 11, 16)            ' a Monday
+    p.WorkDaysPerWeek = 5
+    p.DurationDays = 5
+    Check(DateDiff(p.EndDate(), Date(2026, 11, 20), gb.Day) = 0, "5 working days from Monday end on Friday: " & p.EndDate())
+    p.DurationDays = 6
+    Check(DateDiff(p.EndDate(), Date(2026, 11, 23), gb.Day) = 0, "the 6th working day is the next Monday")
+    p.WorkDaysPerWeek = 6
+    Check(DateDiff(p.EndDate(), Date(2026, 11, 21), gb.Day) = 0, "with Saturdays, the 6th is Saturday")
+    p.AddHoliday(Date(2026, 11, 18))
+    Check(DateDiff(p.EndDate(), Date(2026, 11, 23), gb.Day) = 0, "a holiday moves the end a day")
+    Check(Not p.AddHoliday(Date(2026, 11, 18, 15, 0, 0)), "the same holiday twice")
+    p.StartDate = Date(2026, 11, 15)            ' a Sunday: not counted
+    p.DurationDays = 1
+    Check(DateDiff(p.EndDate(), Date(2026, 11, 16), gb.Day) = 0, "starting on Sunday, the first day is Monday")
+
+    p.OverheadPct = 10
+    p.ProfitPct = 10
+    p.TaxesPct = 0
+    Check(Abs(p.PriceFactor() - 1.21) < 1e-9, "price factor 10% + 10%")
+
+End
+
+Private Sub TestCsv()
+
+    Dim a As String[][] = Csv.Parse("a,b,c\r\n1,\"x, \"\"y\"\"\",3\n\n4,5")
+
+    Check(a.Count = 4, "csv rows: " & a.Count)
+    Check(a[1][1] = "x, \"y\"", "csv quoted field: " & a[1][1])
+    Check(a[3][0] = "4" And a[3][1] = "5", "csv last row without newline")
+
+End
+
+'' A small book: cement, sand, a laborer, a machine; mortar; masonry using mortar
+Private Function SmallBook() As PriceBook
+
+    Dim b As New PriceBook
+    Dim r As Resource
+    Dim a As Analysis
+    Dim l As LaborCategory
+    Dim m As Machine
+
+    b.DefaultCharges()
+    r = New Resource
+    r.Code = 2001
+    r.Name = "cement"
+    r.Unit = "t"
+    r.Price = 100
+    b.Resources["2001"] = r
+    r = New Resource
+    r.Code = 3001
+    r.Name = "sand"
+    r.Unit = "m3"
+    r.Price = 10
+    r.LossPct = 10
+    b.Resources["3001"] = r
+    r = New Resource
+    r.Code = 90009
+    r.Name = "ayudante"
+    r.Kind = Resource.LABOR
+    r.Unit = "h"
+    r.Price = 3
+    b.Resources["90009"] = r
+    r = New Resource
+    r.Code = 100001
+    r.Name = "excavadora"
+    r.Kind = Resource.EQUIPMENT
+    r.Unit = "h"
+    r.Price = 90
+    b.Resources["100001"] = r
+    l = New LaborCategory
+    l.Code = 90009
+    l.Wage = 1.36
+    b.Labor["90009"] = l
+    ' licita2003's "equ" row 1
+    m = New Machine
+    m.Code = 100001
+    m.Power = 110
+    m.Cost = 390000
+    m.FuelPrice = 1.35
+    b.Machines["100001"] = m
+
+    a = New Analysis
+    a.Code = 1
+    a.Name = "mortar"
+    a.Unit = "m3"
+    a.LaborYield = 2
+    AddLine(a, False, 2001, 0.3)
+    AddLine(a, False, 3001, 1)
+    AddLine(a, False, 90009, 4)
+    b.Analyses["1"] = a
+    a = New Analysis
+    a.Code = 2
+    a.Name = "masonry"
+    a.Unit = "m2"
+    AddLine(a, True, 1, 0.5)
+    AddLine(a, False, 100001, 0.1)
+    AddLine(a, False, 2001, 0.1)
+    b.Analyses["2"] = a
+    Return b
+
+End
+
+Private Sub AddLine(a As Analysis, bAnalysis As Boolean, iCode As Integer, fQty As Float)
+
+    Dim l As New AnalysisLine
+
+    l.IsAnalysis = bAnalysis
+    l.Code = iCode
+    l.Quantity = fQty
+    a.Lines.Add(l)
+
+End
+
+Private Sub TestPrices()
+
+    Dim b As PriceBook = SmallBook()
+    Dim f As Float[]
+    Dim p, q As Project
+    Dim sFile As String = $sTemp &/ "prices." & JsonFile.FileExtension
+
+    ' mortar: A = 0.3 * 100 + 1 * 10 * 1.1 = 41; C = 4 * 3 / 2 = 6
+    f = b.Parts(b.Analyses["1"])
+    Check(Abs(f[0] - 41) < 1e-9 And f[1] = 0 And Abs(f[2] - 6) < 1e-9, "mortar parts: " & Utils.JoinNumbers(f, " "))
+    ' masonry: 0.5 mortar (A 20.5, C 3) + 0.1 h machine (B 9) + 0.1 t cement (A 10)
+    f = b.Parts(b.Analyses["2"])
+    Check(Abs(f[0] - 30.5) < 1e-9 And Abs(f[1] - 9) < 1e-9 And Abs(f[2] - 3) < 1e-9, "masonry parts, with the linked mortar: " & Utils.JoinNumbers(f, " "))
+    Check(Abs(b.Direct(b.Analyses["2"]) - 42.5) < 1e-9, "masonry direct cost")
+
+    ' the mortar changes: the masonry follows
+    b.Resources["2001"].Price = 200
+    Check(Abs(b.Parts(b.Analyses["2"])[0] - 55.5) < 1e-9, "a sub-analysis is linked")
+    b.UpdateCoef = 2
+    Check(Abs(b.Direct(b.Analyses["2"]) - 135) < 1e-9, "the update coefficient applies to every price")
+    b.UpdateCoef = 1
+    b.Resources["2001"].Price = 100
+
+    ' calculations: licita2003's equ row 1 = 104.9295 $/h; labor 1.36 + 43.2% + 200/176 + 60/1056
+    Check(Abs(b.Machines["100001"].PerHour() - 104.9295) < 1e-6, "machine per hour: " & b.Machines["100001"].PerHour())
+    Check(Abs(b.LaborCost(b.Labor["90009"]) - (1.36 * 1.432 + 200 / 176 + 60 / 1056)) < 1e-9, "labor per hour: " & b.LaborCost(b.Labor["90009"]))
+    b.Resources["90009"].Calculated = True
+    Check(Abs(b.UnitPrice(90009) - b.LaborCost(b.Labor["90009"])) < 1e-9, "a calculated resource takes its calculation")
+    b.Resources["90009"].Calculated = False
+
+    ' problems, loops, missing things
+    Check(b.Problems(b.Analyses["2"]).Count = 0, "masonry has no problems: " & b.Problems(b.Analyses["2"]).Join("; "))
+    AddLine(b.Analyses["1"], True, 2, 1)
+    Check(b.Problems(b.Analyses["1"]).Count > 0, "a loop is a problem")
+    f = b.Parts(b.Analyses["1"])            ' it must end
+    Check(True, "a loop ends")
+    b.Analyses["1"].Lines.Remove(b.Analyses["1"].Lines.Max)
+    AddLine(b.Analyses["2"], False, 4444, 1)
+    Check(b.Problems(b.Analyses["2"]).Count = 1, "a missing resource is a problem")
+    b.Analyses["2"].Lines.Remove(b.Analyses["2"].Lines.Max)
+    Check(Utils.JoinNumbers(b.UsedBy(1, True)) = "2", "UsedBy: mortar is used by masonry")
+    Check(b.NextResourceCode(Resource.LABOR) = 90010 And b.NextAnalysisCode() = 3, "next codes")
+
+    ' flatten: masonry becomes cement 0.15 + 0.1, sand 0.5, ayudante 2, machine 0.1; the cost doesn't change
+    f = b.Parts(b.Analyses["2"])
+    b.Flatten(b.Analyses["2"])
+    Check(b.Analyses["2"].Lines.Count = 4, "flatten merges the resources: " & b.Analyses["2"].Lines.Count)
+    Check(Abs(b.Direct(b.Analyses["2"]) - (f[0] + f[1] + f[2] * 2)) < 1e-9, "flatten: the labor yield of the mortar is lost, as in licita2003")
+
+    ' the file
+    p = New Project
+    p.Prices = SmallBook()
+    Check(Not JsonFile.SaveFile(sFile, p), "save prices")
+    q = JsonFile.LoadFile(sFile)
+    Check(q.Prices.Resources.Count = 4 And q.Prices.Analyses.Count = 2 And q.Prices.Charges.Count = 10, "prices after load")
+    Check(Abs(q.Prices.Direct(q.Prices.Analyses["2"]) - 42.5) < 1e-9, "the same cost after load")
+    Check(q.Prices.Analyses["2"].Lines[0].IsAnalysis, "a sub-analysis line after load")
+    Check(Abs(q.Prices.Machines["100001"].PerHour() - 104.9295) < 1e-6, "a machine after load")
+
+End
+
+Private Sub TestImport()
+
+    Dim sDir As String = $sTemp &/ "lib" &/ "base"
+    Dim b As New PriceBook
+    Dim sReal As String = User.Home &/ ".config/s64sketch/costs/licita2003"
+
+    Shell "mkdir -p " & Shell$(sDir) & " " & Shell$($sTemp &/ "lib/added") Wait
+    File.Save(sDir &/ "rubros.csv", "number,name\n1,MOVIMIENTO DE SUELOS\n")
+    File.Save(sDir &/ "resources.csv", "code,name,unit,price,origin,loss,kind\n2001,\"cemento, portland\",t,254.0,Corrientes,,material\n90009,ayudante,h,2.79,Corrientes,,labor\n")
+    File.Save(sDir &/ "analyses.csv", "code,rubro,name,unit,equipment_yield,labor_yield\n1,1,Excavacion,m3,1,1\n")
+    File.Save(sDir &/ "analysis-items.csv", "analysis,resource,quantity\n1,90009,3.4\n1,7777,1\n9,2001,1\n")
+    File.Save(sDir &/ "labor.csv", "code,category,wage_per_hour\n90009,Ayudante,1.14\n")
+    File.Save($sTemp &/ "lib/added/resources.csv", "code,name,unit,price,origin,loss,kind\n7777,bañadera,u,,,,material\n")
+
+    Check(Not LibraryImport.ImportFolder(b, sDir, True), "import a library: " & LibraryImport.Report.Join("; "))
+    Check(b.Resources.Count = 3 And b.Analyses.Count = 1 And b.Rubros.Count = 1 And b.Labor.Count = 1, "imported counts")
+    Check(b.Resources["2001"].Name = "cemento, portland", "a quoted name")
+    Check(b.Analyses["1"].Lines.Count = 2, "analysis lines (one of an analysis that doesn't exist skipped)")
+    Check(Not b.Resources["90009"].Calculated And b.UnitPrice(90009) = 2.79, "labor keeps its typed price")
+    Check(InStr(LibraryImport.Report.Join("\n"), "differ from their calculation"), "the report says the labor calculation differs")
+    Check(InStr(LibraryImport.Report.Join("\n"), "have no price"), "the report says what has no price")
+    b = New PriceBook
+    Check(LibraryImport.ImportFolder(b, $sTemp &/ "nothing"), "an empty folder is refused")
+
+    ' the real library, if this computer has it
+    If Exist(sReal &/ "resources.csv") Then
+        b = New PriceBook
+        b.DefaultCharges()
+        Check(Not LibraryImport.ImportFolder(b, sReal, True), "import licita2003")
+        Check(b.Analyses.Count >= 467 And b.Resources.Count >= 395, Subst("licita2003: &1 analyses, &2 resources", b.Analyses.Count, b.Resources.Count))
+        ' licita2003 analysis 1: Excavacion para sanjas continuas a mano = 3.4 h of ayudante 90009
+        Check(Abs(b.Direct(b.Analyses["1"]) - 3.4 * b.Resources["90009"].Price) < 1e-9, "licita2003 analysis 1 costs 3.4 h of ayudante")
+        If Env["SMOKE_VERBOSE"] Then Print LibraryImport.Report.Join("\n")
+    Endif
+
+End
+
+Private Sub TestIcons()
+
+    Dim sFile As String
+
+    For Each sFile In Icons.Files()
+        Check(Exist(sumi.dirResources &/ "svg" &/ sFile), "icon " & sFile)
+    Next
+    For Each sFile In ["document-new", "document-open", "document-save", "document-save-as", "configure", "help-about"]
+        Check(Exist(sumi.dirResources &/ "svg/actions" &/ sFile & ".svg"), "toolbar icon " & sFile)
+    Next
+
+End

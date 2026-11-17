@@ -1,0 +1,84 @@
+' Gambas module file
+
+'' Reads CSV files: comma separated, fields in double quotes may hold commas, newlines and "" for a quote.
+
+'' The rows of sFile as Collections keyed by the header's names; Null if it can't be read
+Public Function Read(sFile As String) As Collection[]
+
+    Dim sText As String
+    Dim aRows As String[][]
+    Dim aOut As New Collection[]
+    Dim aHeader, aRow As String[]
+    Dim c As Collection
+    Dim i, j As Integer
+
+    Try sText = File.Load(sFile)
+    If Error Then Return Null
+    aRows = Parse(sText)
+    If aRows.Count = 0 Then Return aOut
+    aHeader = aRows[0]
+    For i = 1 To aRows.Max
+        aRow = aRows[i]
+        If aRow.Count = 1 And If aRow[0] = "" Then Continue      ' a blank line
+        c = New Collection
+        For j = 0 To Min(aHeader.Max, aRow.Max)
+            c[Trim(aHeader[j])] = aRow[j]
+        Next
+        aOut.Add(c)
+    Next
+    Return aOut
+
+End
+
+'' Splits CSV text into rows of fields
+Public Function Parse(sText As String) As String[][]
+
+    Dim aRows As New String[][]
+    Dim aRow As New String[]
+    Dim sField As String
+    Dim bQuoted As Boolean
+    Dim i As Integer
+    Dim sChar As String
+    Dim iLen As Integer = Len(sText)
+
+    i = 1
+    While i <= iLen
+        sChar = Mid$(sText, i, 1)
+        If bQuoted Then
+            If sChar = "\"" Then
+                If Mid$(sText, i + 1, 1) = "\"" Then
+                    sField &= "\""
+                    Inc i
+                Else
+                    bQuoted = False
+                Endif
+            Else
+                sField &= sChar
+            Endif
+        Else
+            Select Case sChar
+                Case "\""
+                    bQuoted = True
+                Case ","
+                    aRow.Add(sField)
+                    sField = ""
+                Case "\r"
+                    ' CRLF: the \n ends the row
+                Case "\n"
+                    aRow.Add(sField)
+                    aRows.Add(aRow)
+                    aRow = New String[]
+                    sField = ""
+                Default
+                    sField &= sChar
+            End Select
+        Endif
+        Inc i
+    Wend
+    If sField Or If aRow.Count Then
+        aRow.Add(sField)
+        aRows.Add(aRow)
+    Endif
+    Return aRows
+
+End

@@ -1,0 +1,300 @@
+' Gambas class file
+
+'' A building's paperwork: what the file holds. For now the project's own data (starting.txt, item 0): the work,
+'' its location, client and professionals, its schedule, the definitions the budget uses and the contract conditions. Budget, Gantt, pricing and contracts come next.
+
+'' THE WORK
+Public Name As String = ""                      '' the work's name
+Public Code As String = ""                      '' the work's number or code, for the papers
+Public WorkType As String = "New building"      '' one of WorkTypes
+Public Usage As String = "Housing"                '' one of Usages
+Public DesignFile As String = ""                '' the sumi-designer project it comes from (.designer-proj), if any
+Public Notes As String = ""
+
+'' LOCATION
+Public Location As String = ""                  '' the address
+Public City As String = ""
+Public Province As String = ""
+Public Parcel As String = ""                    '' cadastral designation
+Public PlotArea As Float                        '' m2 of the plot
+Public CoveredArea As Float                     '' m2 covered
+Public SemiCoveredArea As Float                 '' m2 semi-covered (counted as half in most fees)
+Public Floors As Integer = 1
+
+'' CLIENT
+Public Client As String = ""                    '' who it is for
+Public ClientTaxId As String = ""               '' CUIT / tax id
+Public ClientPhone As String = ""
+Public ClientEmail As String = ""
+
+'' PROFESSIONALS: designer, structural engineer, site director, builder...
+Public Professionals As New Professional[]
+
+'' SCHEDULE: the time window the Gantt fits the tasks in
+Public StartDate As Date                        '' first day of work (no time part)
+Public DurationDays As Integer = 180            '' working days available for the construction
+Public WorkDaysPerWeek As Integer = 5           '' 5: Monday to Friday, 6: also Saturday, 7: every day
+Public HoursPerDay As Float = 8                 '' working hours a day, to turn labor hours into days
+Public Holidays As New Date[]                   '' non-working days besides the weekly rest (sorted)
+
+'' DEFINITIONS: how a direct cost becomes a price (percentages, applied in this order:
+'' direct cost + overhead, + profit over that, + taxes over that)
+Public Currency As String = "$"
+Public OverheadPct As Float = 15                '' general expenses of the work and the company
+Public ProfitPct As Float = 10
+Public TaxesPct As Float = 21                   '' VAT and other taxes on the price
+
+'' CONTRACT CONDITIONS: how the contracts of this work are paid (each contract may change them)
+Public ContractMode As String = "Unit prices"   '' one of ContractModes
+Public AdvancePct As Float                      '' advance payment, discounted from the certificates in proportion
+Public RetentionPct As Float = 5                '' guarantee retention of each certificate, returned at the final reception
+Public CertificatePeriod As String = "Monthly"  '' one of CertificatePeriods
+Public AdjustmentIndex As String = ""           '' the price index the contracts are adjusted by ("" = fixed prices)
+Public AdjustmentBase As String = ""            '' the base month of that index (yyyy-mm)
+Public GuaranteeDays As Integer = 365           '' from the provisional to the final reception
+
+'' PRICES: resources, analyses, rubros, labor and equipment (see PriceBook)
+Public Prices As New PriceBook
+
+Public Created As Date = Now
+Public Modified As Date = Now
+
+Public FileName As String = ""                  '' where it is saved; "" = not yet
+Public RequiresSaving As Boolean                '' changed since it was opened or saved
+
+'' The choices of the lists (stored in English; the form shows them translated)
+Static Public Function WorkTypes() As String[]
+
+    Return ["New building", "Extension", "Renovation", "Extension and renovation", "Demolition", "Infrastructure"]
+
+End
+
+Static Public Function Usages() As String[]
+
+    Return ["Housing", "Multi-family housing", "Commercial", "Offices", "Industrial", "Educational", "Health", "Mixed", "Other"]
+
+End
+
+Static Public Function ContractModes() As String[]
+
+    Return ["Unit prices", "Lump sum", "Cost plus fee", "Labor only"]
+
+End
+
+Static Public Function CertificatePeriods() As String[]
+
+    Return ["Weekly", "Biweekly", "Monthly", "By milestone"]
+
+End
+
+Public Sub _new()
+
+    StartDate = Date(Year(Now), Month(Now), Day(Now))
+    Currency = Config.Currency
+    Prices.DefaultCharges()
+
+End
+
+'' The name shown in the window title
+Public Function Title() As String
+
+    If FileName Then Return File.BaseName(FileName)
+    If Name Then Return Name
+    Return ("Untitled")
+
+End
+
+'' Is d a working day? Monday first: 5 days = Mon-Fri, 6 = Mon-Sat, 7 = all
+Public Function IsWorkDay(d As Date) As Boolean
+
+    Dim iDay As Integer = WeekDay(d)            ' 0 = Sunday ... 6 = Saturday
+
+    If iDay = 0 Then iDay = 7                   ' Monday 1 ... Sunday 7
+    If iDay > WorkDaysPerWeek Then Return False
+    Return Not IsHoliday(d)
+
+End
+
+Public Function IsHoliday(d As Date) As Boolean
+
+    Dim h As Date
+
+    For Each h In Holidays
+        If DateDiff(h, d, gb.Day) = 0 Then Return True
+    Next
+    Return False
+
+End
+
+'' Adds a holiday (no time part), keeping them sorted; False if it was already there
+Public Function AddHoliday(d As Date) As Boolean
+
+    d = Date(Year(d), Month(d), Day(d))
+    If IsHoliday(d) Then Return False
+    Holidays.Add(d)
+    Holidays.Sort()
+    Return True
+
+End
+
+'' The last working day: DurationDays working days counted from StartDate (StartDate itself if it is one)
+Public Function EndDate() As Date
+
+    Dim d As Date = StartDate
+    Dim iLeft As Integer = Max(1, DurationDays)
+
+    If WorkDaysPerWeek < 1 Or WorkDaysPerWeek > 7 Then Return StartDate
+    Do
+        If IsWorkDay(d) Then
+            Dec iLeft
+            If iLeft = 0 Then Return d
+        Endif
+        d = DateAdd(d, gb.Day, 1)
+    Loop
+
+End
+
+'' The factor that turns a direct cost into a price with overhead, profit and taxes
+Public Function PriceFactor() As Float
+
+    Return (1 + OverheadPct / 100) * (1 + ProfitPct / 100) * (1 + TaxesPct / 100)
+
+End
+
+'' As a Collection for the file (see JsonFile)
+Public Function ToJson() As Collection
+
+    Dim c As New JSONCollection
+
+    Dim aList As Variant[]
+    Dim hPro As Professional
+    Dim d As Date
+
+    c["name"] = Name
+    c["code"] = Code
+    c["workType"] = WorkType
+    c["use"] = Usage
+    c["designFile"] = DesignFile
+    c["notes"] = Notes
+    c["location"] = Location
+    c["city"] = City
+    c["province"] = Province
+    c["parcel"] = Parcel
+    c["plotArea"] = PlotArea
+    c["coveredArea"] = CoveredArea
+    c["semiCoveredArea"] = SemiCoveredArea
+    c["floors"] = Floors
+    c["client"] = Client
+    c["clientTaxId"] = ClientTaxId
+    c["clientPhone"] = ClientPhone
+    c["clientEmail"] = ClientEmail
+    aList = New Variant[]
+    For Each hPro In Professionals
+        aList.Add(hPro.ToJson())
+    Next
+    c["professionals"] = aList
+    aList = New Variant[]
+    For Each d In Holidays
+        aList.Add(Format(d, "yyyy-mm-dd"))
+    Next
+    c["holidays"] = aList
+    c["startDate"] = Format(StartDate, "yyyy-mm-dd")
+    c["durationDays"] = DurationDays
+    c["workDaysPerWeek"] = WorkDaysPerWeek
+    c["hoursPerDay"] = HoursPerDay
+    c["currency"] = Currency
+    c["overheadPct"] = OverheadPct
+    c["profitPct"] = ProfitPct
+    c["taxesPct"] = TaxesPct
+    c["contractMode"] = ContractMode
+    c["advancePct"] = AdvancePct
+    c["retentionPct"] = RetentionPct
+    c["certificatePeriod"] = CertificatePeriod
+    c["adjustmentIndex"] = AdjustmentIndex
+    c["adjustmentBase"] = AdjustmentBase
+    c["guaranteeDays"] = GuaranteeDays
+    c["prices"] = Prices.ToJson()
+    c["created"] = Format(Created, "yyyy-mm-dd hh:nn:ss")
+    c["modified"] = Format(Modified, "yyyy-mm-dd hh:nn:ss")
+    Return c
+
+End
+
+'' From what ToJson wrote; what is missing keeps its default
+Public Sub FromJson(c As Collection)
+
+    Dim v As Variant
+    Dim d As Date
+
+    If Not c Then Return
+    If c.Exist("name") Then Name = c["name"]
+    If c.Exist("code") Then Code = c["code"]
+    If c.Exist("workType") Then WorkType = c["workType"]
+    If c.Exist("use") Then Usage = c["use"]
+    If c.Exist("designFile") Then DesignFile = c["designFile"]
+    If c.Exist("notes") Then Notes = c["notes"]
+    If c.Exist("location") Then Location = c["location"]
+    If c.Exist("city") Then City = c["city"]
+    If c.Exist("province") Then Province = c["province"]
+    If c.Exist("parcel") Then Parcel = c["parcel"]
+    If c.Exist("plotArea") Then PlotArea = c["plotArea"]
+    If c.Exist("coveredArea") Then CoveredArea = c["coveredArea"]
+    If c.Exist("semiCoveredArea") Then SemiCoveredArea = c["semiCoveredArea"]
+    If c.Exist("floors") Then Floors = c["floors"]
+    If c.Exist("client") Then Client = c["client"]
+    If c.Exist("clientTaxId") Then ClientTaxId = c["clientTaxId"]
+    If c.Exist("clientPhone") Then ClientPhone = c["clientPhone"]
+    If c.Exist("clientEmail") Then ClientEmail = c["clientEmail"]
+    If c.Exist("professionals") Then
+        Professionals.Clear
+        For Each v In c["professionals"]
+            If TypeOf(v) = gb.Object And If v Is Collection Then Professionals.Add(Professional.FromJson(v))
+        Next
+    Endif
+    If c.Exist("holidays") Then
+        Holidays.Clear
+        For Each v In c["holidays"]
+            d = ReadDate(v, Null)
+            If d Then AddHoliday(d)
+        Next
+    Endif
+    If c.Exist("startDate") Then StartDate = ReadDate(c["startDate"], StartDate)
+    If c.Exist("durationDays") Then DurationDays = c["durationDays"]
+    If c.Exist("workDaysPerWeek") Then WorkDaysPerWeek = c["workDaysPerWeek"]
+    If c.Exist("hoursPerDay") Then HoursPerDay = c["hoursPerDay"]
+    If c.Exist("currency") Then Currency = c["currency"]
+    If c.Exist("overheadPct") Then OverheadPct = c["overheadPct"]
+    If c.Exist("profitPct") Then ProfitPct = c["profitPct"]
+    If c.Exist("taxesPct") Then TaxesPct = c["taxesPct"]
+    If c.Exist("contractMode") Then ContractMode = c["contractMode"]
+    If c.Exist("advancePct") Then AdvancePct = c["advancePct"]
+    If c.Exist("retentionPct") Then RetentionPct = c["retentionPct"]
+    If c.Exist("certificatePeriod") Then CertificatePeriod = c["certificatePeriod"]
+    If c.Exist("adjustmentIndex") Then AdjustmentIndex = c["adjustmentIndex"]
+    If c.Exist("adjustmentBase") Then AdjustmentBase = c["adjustmentBase"]
+    If c.Exist("guaranteeDays") Then GuaranteeDays = c["guaranteeDays"]
+    If c.Exist("prices") Then
+        Prices = New PriceBook
+        Prices.FromJson(c["prices"])
+    Endif
+    If c.Exist("created") Then Created = ReadDate(c["created"], Created)
+    If c.Exist("modified") Then Modified = ReadDate(c["modified"], Modified)
+
+End
+
+'' A date written as "yyyy-mm-dd hh:nn:ss" (not Val: it follows the user's locale); dDefault if it can't be read
+Static Public Function ReadDate(sText As String, dDefault As Date) As Date
+
+    Dim a As String[]
+    Dim d As Date
+
+    a = Split(Replace(Replace(Trim(sText), "-", " "), ":", " "), " ", "", True)
+    If a.Count < 3 Then Return dDefault
+    While a.Count < 6
+        a.Add("0")
+    Wend
+    Try d = Date(CInt(a[0]), CInt(a[1]), CInt(a[2]), CInt(a[3]), CInt(a[4]), CInt(a[5]))
+    If Error Then Return dDefault
+    Return d
+
+End

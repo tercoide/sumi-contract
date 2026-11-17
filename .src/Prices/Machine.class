@@ -1,0 +1,89 @@
+' Gambas class file
+
+'' The hourly cost of a piece of equipment, as licita2003's "equ" sheet: depreciation + interest + repairs
+'' + fuel + lubricants
+
+Public Code As Integer                          '' the equipment resource it prices (1000xx)
+Public Name As String = ""
+Public Power As Float                           '' HP
+Public Cost As Float                            '' purchase cost today
+Public ResidualPct As Float = 10                '' value left at the end of its life, % of Cost
+Public LifeHours As Float = 10000
+Public HoursPerYear As Float = 2000
+Public InterestPct As Float = 7                 '' yearly rate over half the cost (the average capital)
+Public RepairsPct As Float = 75                 '' repairs and spare parts, % of the depreciation
+Public Fuel As String = "Gas Oil"
+Public FuelPrice As Float                       '' $ a liter
+Public FuelUse As Float = 0.19                  '' liters per HP and hour
+Public LubricantPct As Float = 30               '' % of the fuel cost
+
+Public Function Depreciation() As Float
+
+    If LifeHours <= 0 Then Return 0
+    Return Cost * (1 - ResidualPct / 100) / LifeHours
+
+End
+
+Public Function Interest() As Float
+
+    If HoursPerYear <= 0 Then Return 0
+    Return Cost * 0.5 * InterestPct / 100 / HoursPerYear
+
+End
+
+Public Function Repairs() As Float
+
+    Return Depreciation() * RepairsPct / 100
+
+End
+
+Public Function FuelCost() As Float
+
+    Return Power * FuelUse * FuelPrice
+
+End
+
+Public Function Lubricants() As Float
+
+    Return FuelCost() * LubricantPct / 100
+
+End
+
+Public Function PerHour() As Float
+
+    Return Depreciation() + Interest() + Repairs() + FuelCost() + Lubricants()
+
+End
+
+Public Function ToJson() As Collection
+
+    Dim c As New JSONCollection
+
+    c["code"] = Code
+    c["name"] = Name
+    c["power"] = Power
+    c["cost"] = Cost
+    c["residualPct"] = ResidualPct
+    c["lifeHours"] = LifeHours
+    c["hoursPerYear"] = HoursPerYear
+    c["interestPct"] = InterestPct
+    c["repairsPct"] = RepairsPct
+    c["fuel"] = Fuel
+    c["fuelPrice"] = FuelPrice
+    c["fuelUse"] = FuelUse
+    c["lubricantPct"] = LubricantPct
+    Return c
+
+End
+
+Static Public Function FromJson(c As Collection) As Machine
+
+    Dim m As New Machine
+    Dim s As String
+
+    For Each s In ["code", "name", "power", "cost", "residualPct", "lifeHours", "hoursPerYear", "interestPct", "repairsPct", "fuel", "fuelPrice", "fuelUse", "lubricantPct"]
+        If c.Exist(s) Then Object.SetProperty(m, UCase(Left(s)) & Mid(s, 2), c[s])
+    Next
+    Return m
+
+End

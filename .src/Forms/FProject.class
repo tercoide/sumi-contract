@@ -1,0 +1,345 @@
+' Gambas class file
+
+'' The Project tab (starting.txt, item 0). Left: the work, its location, the client and notes. Right: the schedule
+'' (with holidays, they move the end date), the definitions that turn a direct cost into a price, the contract
+'' conditions and the professionals. Editing a field changes sumi.Project at once; every field is attached
+'' as "Field" (Form_Open) and is read in Field_Change / Field_Click.
+
+Private $p As Project
+Private $bFilling As Boolean
+
+Private Const PRO_COLUMNS As Integer = 5
+
+'' Set up when made (an embedded form opens later, after fMain shows the project)
+Public Sub _new()
+
+    Dim s As String
+    Dim h As Object
+
+    Icons.Apply(Me)
+
+    ' every field raises its events as "Field" (read in Field_Change / Field_Click)
+    For Each h In [txtName, txtCode, cmbWorkType, cmbUsage, txtNotes, txtLocation, txtCity, txtProvince, txtParcel, spPlot, spCovered, spSemi, spFloors, txtClient, txtClientTaxId, txtClientPhone, txtClientEmail, dtStart, spDuration, spWorkDays, spHours, txtCurrency, spOverhead, spProfit, spTaxes, cmbMode, spAdvance, spRetention, cmbPeriod, txtIndex, txtIndexBase, spGuarantee]
+        Object.Attach(h, Me, "Field")
+    Next
+
+    ' the lists show the choices translated; the project keeps them in English
+    For Each s In Project.WorkTypes()
+        cmbWorkType.Add(Tr(s))
+    Next
+    For Each s In Project.Usages()
+        cmbUsage.Add(Tr(s))
+    Next
+    For Each s In Project.ContractModes()
+        cmbMode.Add(Tr(s))
+    Next
+    For Each s In Project.CertificatePeriods()
+        cmbPeriod.Add(Tr(s))
+    Next
+
+    tvPros.Columns.Count = PRO_COLUMNS
+    tvPros.Columns[0].Text = ("Role")
+    tvPros.Columns[1].Text = ("Name")
+    tvPros.Columns[2].Text = ("Registration")
+    tvPros.Columns[3].Text = ("Phone")
+    tvPros.Columns[4].Text = ("Email")
+    tvPros.Columns[0].Width = Desktop.Scale * 18
+    tvPros.Columns[1].Width = Desktop.Scale * 22
+    tvPros.Columns[2].Width = Desktop.Scale * 10
+
+    dtHoliday.Value = Date(Year(Now), Month(Now), Day(Now))
+
+End
+
+Public Sub ShowProject(p As Project)
+
+    $p = p
+    $bFilling = True
+
+    txtName.Text = p.Name
+    txtCode.Text = p.Code
+    SetCombo(cmbWorkType, Project.WorkTypes().Find(p.WorkType))
+    SetCombo(cmbUsage, Project.Usages().Find(p.Usage))
+    txtDesign.Text = p.DesignFile
+    txtNotes.Text = p.Notes
+
+    txtLocation.Text = p.Location
+    txtCity.Text = p.City
+    txtProvince.Text = p.Province
+    txtParcel.Text = p.Parcel
+    spPlot.Value = p.PlotArea
+    spCovered.Value = p.CoveredArea
+    spSemi.Value = p.SemiCoveredArea
+    spFloors.Value = p.Floors
+
+    txtClient.Text = p.Client
+    txtClientTaxId.Text = p.ClientTaxId
+    txtClientPhone.Text = p.ClientPhone
+    txtClientEmail.Text = p.ClientEmail
+
+    dtStart.Value = p.StartDate
+    spDuration.Value = p.DurationDays
+    spWorkDays.Value = p.WorkDaysPerWeek
+    spHours.Value = p.HoursPerDay
+
+    txtCurrency.Text = p.Currency
+    spOverhead.Value = p.OverheadPct
+    spProfit.Value = p.ProfitPct
+    spTaxes.Value = p.TaxesPct
+
+    SetCombo(cmbMode, Project.ContractModes().Find(p.ContractMode))
+    spAdvance.Value = p.AdvancePct
+    spRetention.Value = p.RetentionPct
+    SetCombo(cmbPeriod, Project.CertificatePeriods().Find(p.CertificatePeriod))
+    txtIndex.Text = p.AdjustmentIndex
+    txtIndexBase.Text = p.AdjustmentBase
+    spGuarantee.Value = p.GuaranteeDays
+
+    $bFilling = False
+    FillHolidays()
+    FillPros()
+    ShowDerived()
+
+End
+
+'' A choice not in the list (a file from elsewhere) leaves the combo empty
+Private Sub SetCombo(hCombo As ComboBox, iIndex As Integer)
+
+    If iIndex >= 0 And If iIndex < hCombo.Count Then
+        hCombo.Index = iIndex
+    Else
+        hCombo.Text = ""
+    Endif
+
+End
+
+'' What follows from the fields: the end date, the price factor, the dates of the file
+Private Sub ShowDerived()
+
+    Dim dEnd As Date = $p.EndDate()
+
+    lblEnd.Text = Subst(("Ends on &1: &2 calendar days, &3 holidays in between"), Format(dEnd, "dddd yyyy-mm-dd"), DateDiff($p.StartDate, dEnd, gb.Day) + 1, HolidaysBetween($p.StartDate, dEnd))
+    lblFactor.Text = Subst(("Price = direct cost × &1 (&2 over cost)"), Format($p.PriceFactor(), "0.0000"), Format($p.PriceFactor() - 1, "0.00%"))
+    lblDates.Text = Subst(("Created &1, modified &2"), Format($p.Created, "yyyy-mm-dd hh:nn"), Format($p.Modified, "yyyy-mm-dd hh:nn"))
+
+End
+
+Private Function HolidaysBetween(d1 As Date, d2 As Date) As Integer
+
+    Dim d As Date
+    Dim n As Integer
+
+    For Each d In $p.Holidays
+        If d >= d1 And If d <= d2 Then Inc n
+    Next
+    Return n
+
+End
+
+'' Text boxes, spin boxes and dates
+Public Sub Field_Change()
+
+    If $bFilling Or If Not $p Then Return
+    Select Case Last.Name
+        Case "txtName"
+            $p.Name = txtName.Text
+            If sumi.Interactive Then fMain.UpdateTitle()
+        Case "txtCode"
+            $p.Code = txtCode.Text
+        Case "txtNotes"
+            $p.Notes = txtNotes.Text
+        Case "txtLocation"
+            $p.Location = txtLocation.Text
+        Case "txtCity"
+            $p.City = txtCity.Text
+        Case "txtProvince"
+            $p.Province = txtProvince.Text
+        Case "txtParcel"
+            $p.Parcel = txtParcel.Text
+        Case "spPlot"
+            $p.PlotArea = spPlot.Value
+        Case "spCovered"
+            $p.CoveredArea = spCovered.Value
+        Case "spSemi"
+            $p.SemiCoveredArea = spSemi.Value
+        Case "spFloors"
+            $p.Floors = spFloors.Value
+        Case "txtClient"
+            $p.Client = txtClient.Text
+        Case "txtClientTaxId"
+            $p.ClientTaxId = txtClientTaxId.Text
+        Case "txtClientPhone"
+            $p.ClientPhone = txtClientPhone.Text
+        Case "txtClientEmail"
+            $p.ClientEmail = txtClientEmail.Text
+        Case "dtStart"
+            If dtStart.Value Then $p.StartDate = Date(Year(dtStart.Value), Month(dtStart.Value), Day(dtStart.Value))
+        Case "spDuration"
+            $p.DurationDays = spDuration.Value
+        Case "spWorkDays"
+            $p.WorkDaysPerWeek = spWorkDays.Value
+        Case "spHours"
+            $p.HoursPerDay = spHours.Value
+        Case "txtCurrency"
+            $p.Currency = Trim(txtCurrency.Text)
+        Case "spOverhead"
+            $p.OverheadPct = spOverhead.Value
+        Case "spProfit"
+            $p.ProfitPct = spProfit.Value
+        Case "spTaxes"
+            $p.TaxesPct = spTaxes.Value
+        Case "spAdvance"
+            $p.AdvancePct = spAdvance.Value
+        Case "spRetention"
+            $p.RetentionPct = spRetention.Value
+        Case "txtIndex"
+            $p.AdjustmentIndex = Trim(txtIndex.Text)
+        Case "txtIndexBase"
+            $p.AdjustmentBase = Trim(txtIndexBase.Text)
+        Case "spGuarantee"
+            $p.GuaranteeDays = spGuarantee.Value
+        Case Else
+            Return
+    End Select
+    ShowDerived()
+    sumi.Changed()
+
+End
+
+'' The read-only combo boxes raise Click when a choice is made
+Public Sub Field_Click()
+
+    If $bFilling Or If Not $p Then Return
+    If Not (Last Is ComboBox) Or If Last.Index < 0 Then Return
+    Select Case Last.Name
+        Case "cmbWorkType"
+            $p.WorkType = Project.WorkTypes()[Last.Index]
+        Case "cmbUsage"
+            $p.Usage = Project.Usages()[Last.Index]
+        Case "cmbMode"
+            $p.ContractMode = Project.ContractModes()[Last.Index]
+        Case "cmbPeriod"
+            $p.CertificatePeriod = Project.CertificatePeriods()[Last.Index]
+        Case Else
+            Return
+    End Select
+    sumi.Changed()
+
+End
+
+Public Sub btnBrowse_Click()
+
+    Dialog.Title = ("The sumi-designer project")
+    Dialog.Filter = ["*.designer-proj", ("sumi-designer projects"), "*", ("All files")]
+    Dialog.Path = IIf($p.DesignFile, $p.DesignFile, IIf(Config.FilesLastPath, Config.FilesLastPath, User.Home) & "/")
+    If Dialog.OpenFile() Then Return
+    $p.DesignFile = Dialog.Path
+    txtDesign.Text = $p.DesignFile
+    sumi.Changed()
+
+End
+
+'' HOLIDAYS
+
+Private Sub FillHolidays()
+
+    Dim d As Date
+
+    lstHolidays.Clear
+    For Each d In $p.Holidays
+        lstHolidays.Add(Format(d, "dddd yyyy-mm-dd"))
+    Next
+
+End
+
+Public Sub btnHolidayAdd_Click()
+
+    If Not dtHoliday.Value Then Return
+    If Not $p.AddHoliday(dtHoliday.Value) Then Return
+    FillHolidays()
+    ShowDerived()
+    sumi.Changed()
+
+End
+
+Public Sub btnHolidayRemove_Click()
+
+    If lstHolidays.Index < 0 Then Return
+    $p.Holidays.Remove(lstHolidays.Index)
+    FillHolidays()
+    ShowDerived()
+    sumi.Changed()
+
+End
+
+'' PROFESSIONALS: a click on a cell edits it
+
+Private Sub FillPros()
+
+    Dim i, j As Integer
+
+    tvPros.Rows.Count = $p.Professionals.Count
+    For i = 0 To $p.Professionals.Max
+        For j = 0 To PRO_COLUMNS - 1
+            tvPros[i, j].Text = $p.Professionals[i].GetField(j)
+        Next
+    Next
+
+End
+
+Public Sub tvPros_Click()
+
+    If tvPros.Row < 0 Or If tvPros.Column < 0 Then Return
+    tvPros.Edit()
+
+End
+
+Public Sub tvPros_Save(Row As Integer, Column As Integer, Value As String)
+
+    If Row < 0 Or If Row > $p.Professionals.Max Then Return
+    $p.Professionals[Row].SetField(Column, Trim(Value))
+    tvPros[Row, Column].Text = Trim(Value)
+    sumi.Changed()
+
+End
+
+Public Sub btnProAdd_Click()
+
+    Dim hPro As New Professional
+
+    ' the usual roles first, then empty rows
+    hPro.Role = NextRole()
+    $p.Professionals.Add(hPro)
+    FillPros()
+    tvPros.Row = $p.Professionals.Max
+    tvPros.Column = 1
+    sumi.Changed()
+
+End
+
+Public Sub btnProRemove_Click()
+
+    If tvPros.Row < 0 Or If tvPros.Row > $p.Professionals.Max Then Return
+    $p.Professionals.Remove(tvPros.Row)
+    FillPros()
+    sumi.Changed()
+
+End
+
+'' The first usual role the project doesn't have yet
+Private Function NextRole() As String
+
+    Dim sRole As String
+    Dim hPro As Professional
+    Dim bHas As Boolean
+
+    For Each sRole In [("Design"), ("Structural engineering"), ("Site direction"), ("Builder"), ("Safety and hygiene"), ("Installations")]
+        bHas = False
+        For Each hPro In $p.Professionals
+            If hPro.Role = sRole Then bHas = True
+        Next
+        If Not bHas Then Return sRole
+    Next
+    Return ""
+
+End

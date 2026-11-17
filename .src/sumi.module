@@ -1,0 +1,23 @@
+' Gambas module file
+
+'' Global state of sumi-contract: the open project and where the resources are
+
+Public dirResources As String                   '' .hidden when run from the IDE, /usr/share/sumi-contract installed
+Public Interactive As Boolean                   '' False in the smoke test: no windows, no messages
+Public Project As Project                       '' the open project: one at a time, New and Open replace it
+
+'' A message in the status bar
+Public Sub Status(sText As String)
+
+    If Interactive Then fMain.SetStatus(sText)
+
+End
+
+'' The project changed: it needs saving, and the window shows it
+Public Sub Changed()
+
+    If Not Project Then Return
+    Project.RequiresSaving = True
+    If Interactive Then fMain.UpdateTitle()
+
+End

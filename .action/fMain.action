@@ -1,0 +1,29 @@
+# Gambas Action File 3.0
+
+{ Actions
+  { Action about
+    Text = "About this program"
+    Picture = "$ToolButton"
+  }
+  { Action config
+    Text = "Preferences"
+    Picture = "$ToolButton"
+  }
+  { Action file_new
+    Text = "New"
+    Picture = "$ToolButton"
+  }
+  { Action file_open
+    Text = "Open"
+    Picture = "$MenuButton"
+  }
+  { Action file_save
+    Text = "Save"
+    Picture = "$ToolButton"
+  }
+  { Action file_saveas
+    Text = "Save as"
+    Picture = "$ToolButton"
+  }
+}
+

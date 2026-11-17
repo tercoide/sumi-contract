@@ -1,0 +1,66 @@
+' Gambas module file
+
+'' The project file: JSON, {"format": FileFormat, "version": FileVersion, "project": {...}}.
+'' A newer version than FileVersion is refused; older ones are read with defaults for what they lack.
+
+Public Const FileFormat As String = "sumi-contract"
+Public Const FileVersion As Integer = 1
+Public Const FileExtension As String = "contract-proj"
+
+Public LastError As String                      '' why the last LoadFile or SaveFile failed
+
+'' Writes p to sFile (first to a temporary file, then moved, so a failed save does not ruin the old one).
+'' Returns True on error (LastError says why).
+Public Function SaveFile(sFile As String, p As Project) As Boolean
+
+    Dim c As New JSONCollection
+    Dim sTemp As String = sFile & ".saving"
+
+    LastError = ""
+    p.Modified = Now
+    c["format"] = FileFormat
+    c["version"] = FileVersion
+    c["project"] = p.ToJson()
+
+    Try File.Save(sTemp, JSON.Encode(c))
+    If Error Then
+        LastError = Error.Text
+        Return True
+    Endif
+    Try Kill sFile
+    Try Move sTemp To sFile
+    If Error Then
+        LastError = Error.Text
+        Return True
+    Endif
+    Return False
+
+End
+
+'' Reads sFile; Null on error (LastError says why)
+Public Function LoadFile(sFile As String) As Project
+
+    Dim c As Collection
+    Dim p As Project
+
+    LastError = ""
+    If Not Exist(sFile) Then
+        LastError = ("The file does not exist.")
+        Return Null
+    Endif
+    Try c = JSON.Decode(File.Load(sFile))
+    If Not c Or If c["format"] <> FileFormat Then
+        LastError = ("It is not a sumi-contract project.")
+        Return Null
+    Endif
+    If CInt(c["version"]) > FileVersion Then
+        LastError = Subst(("It was saved by a newer sumi-contract (file version &1)."), c["version"])
+        Return Null
+    Endif
+
+    p = New Project
+    p.FromJson(c["project"])
+    p.FileName = sFile
+    Return p
+
+End

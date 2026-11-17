@@ -1,0 +1,169 @@
+' Gambas class file
+
+'' The program settings, saved as JSON in ~/.config/sumi-contract/config.json. Every public variable is saved;
+'' the ones listed in Behaviour() are also shown in fSettings.
+
+Create Static
+
+Public Root As String                           '' ~/.config/sumi-contract
+Public Depot As String                          '' the configuration file
+Public Log As String                            '' today's log file (AppLog.Path)
+Public LogLevel As String = "info"              '' debug, info, warning, error (see AppLog)
+
+'' INTERFACE
+Public ButtonSize As Integer = 32
+Public IconFamily As String
+
+'' FORMATS
+Public Currency As String = "$"                 '' shown before amounts
+Public DigitsMoney As Integer = 2
+Public DigitsQuantity As Integer = 2
+Public FormatMoney As String = "#,##0.00"       '' derived from DigitsMoney, see UpdateDerived
+Public FormatQuantity As String = "0.00"
+
+'' FILES
+Public FilesLastPath As String = ""
+Public RecentFiles As String[] = []
+Public Const MaxRecentFiles As Integer = 10
+
+Private $cDefaults As Collection                ' default values of the variables in Behaviour(), see StoreDefaults
+Private $aDefaultNames As String[]              ' the names StoreDefaults saw
+
+'' Describes the variables the user can edit in fSettings, keyed by variable name:
+'' [section, title, editor, extra, help]
+'' editor: "switch" Boolean, "color" Gambas color, "integer" and "float" with extra = [min, max],
+'' "list" with extra = String[] of choices, or "@icons" for the icon sets, "text", "folders" a String[] of folders.
+'' Variables not listed here are still loaded and saved, but are not shown to the user.
+Static Public Function Behaviour() As Collection
+
+    Dim o As New Collection
+
+    o.Add(["Formats", ("Currency symbol"), "text", Null, ("Shown before every amount.")], "Currency")
+    o.Add(["Formats", ("Decimals for amounts"), "integer", [0, 4], ("Digits after the decimal point in prices and totals.")], "DigitsMoney")
+    o.Add(["Formats", ("Decimals for quantities"), "integer", [0, 6], ("Digits after the decimal point in quantities.")], "DigitsQuantity")
+    o.Add(["Display", ("Icon set"), "list", "@icons", ("Takes effect after restarting sumi-contract.")], "IconFamily")
+    o.Add(["Reports", ("Log level"), "list", ["debug", "info", "warning", "error"], ("How much sumi-contract writes to its log (~/.config/sumi-contract/logs, one file per day, the last 7 kept). Warnings and errors are always written.")], "LogLevel")
+
+    Return o
+
+End
+
+'' Keeps the values the editable variables have before the configuration file is read
+Public Sub StoreDefaults()
+
+    Dim sName As String
+
+    $cDefaults = New Collection
+    $aDefaultNames = New String[]
+    For Each sName In Behaviour().Keys
+        $cDefaults[sName] = Object.GetProperty(Me, sName)       ' an empty string is not kept: DefaultValue gives Null = ""
+        $aDefaultNames.Add(sName)
+    Next
+
+End
+
+Public Function HasDefault(sName As String) As Boolean
+
+    If Not $aDefaultNames Then Return False
+    Return $aDefaultNames.Exist(sName)
+
+End
+
+Public Function DefaultValue(sName As String) As Variant
+
+    Return $cDefaults[sName]
+
+End
+
+'' Returns the value of a configuration variable by name
+Public Function GetValue(sName As String) As Variant
+
+    Return Object.GetProperty(Me, sName)
+
+End
+
+'' Sets a configuration variable by name
+Public Sub SetValue(sName As String, vValue As Variant)
+
+    Object.SetProperty(Me, sName, vValue)
+
+End
+
+'' Sets the variables that are derived from the edited ones
+Public Sub UpdateDerived()
+
+    FormatMoney = "#,##" & DigitsFormat(DigitsMoney)
+    FormatQuantity = DigitsFormat(DigitsQuantity)
+
+End
+
+Private Function DigitsFormat(iDigits As Integer) As String
+
+    If iDigits <= 0 Then Return "0"
+    Return "0." & String(iDigits, "0")
+
+End
+
+'' An amount with the currency symbol
+Public Function Money(fValue As Float) As String
+
+    Return Trim(Currency & " " & Format(fValue, FormatMoney))
+
+End
+
+'' Puts sFile first in the recent files
+Public Sub AddRecent(sFile As String)
+
+    Dim i As Integer = RecentFiles.Find(sFile)
+
+    If i >= 0 Then RecentFiles.Remove(i)
+    RecentFiles.Add(sFile, 0)
+    If RecentFiles.Count > MaxRecentFiles Then RecentFiles.Remove(MaxRecentFiles, -1)
+
+End
+
+Public Sub Load(sFile As String)
+
+    Dim cConfig As Collection
+    Dim sSymbol As String
+    Dim MyClass As Class = Object.Class(Me)
+
+    If Not Exist(sFile) Then Return
+    Try cConfig = JSON.Decode(File.Load(sFile))
+    If Not cConfig Then Return
+    For Each sSymbol In MyClass.Symbols
+        If MyClass[sSymbol].Kind <> Class.Variable Then Continue
+        If cConfig.Exist(sSymbol) Then Try Object.SetProperty(Me, sSymbol, TypedLike(Object.GetProperty(Me, sSymbol), cConfig[sSymbol]))
+    Next
+
+End
+
+'' JSON gives Variant[] for lists: as a new array of the same type as the variable (String[], Integer[]...)
+Private Function TypedLike(vCurrent As Variant, vValue As Variant) As Variant
+
+    Dim aNew As Object
+    Dim v As Variant
+
+    If TypeOf(vValue) <> gb.Object Or If Not (vValue Is Array) Then Return vValue
+    If TypeOf(vCurrent) <> gb.Object Or If Not (vCurrent Is Array) Then Return vValue
+    aNew = Object.New(Object.Type(vCurrent))
+    For Each v In vValue
+        aNew.Add(v)
+    Next
+    Return aNew
+
+End
+
+Public Sub Save(sFile As String)
+
+    Dim jConfig As New JSONCollection
+    Dim MyClass As Class = Object.Class(Me)
+    Dim sSymbol As String
+
+    If Not Exist(File.Dir(sFile)) Then Shell "mkdir -p " & Shell$(File.Dir(sFile)) Wait
+    For Each sSymbol In MyClass.Symbols
+        If MyClass[sSymbol].Kind = Class.Variable Then jConfig.Add(Object.GetProperty(Me, sSymbol), sSymbol)
+    Next
+    Try File.Save(sFile, JSON.Encode(jConfig))
+
+End

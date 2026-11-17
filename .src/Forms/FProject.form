@@ -1,0 +1,596 @@
+# Gambas Form File 3.0
+
+{ Form Form
+  MoveScaled(0,0,150,210)
+  Arrangement = Arrange.Fill
+  { svMain ScrollView
+    MoveScaled(0,0,150,210)
+    Arrangement = Arrange.Vertical
+    Margin = True
+    ScrollBar = Scroll.Vertical
+    { hbColumns HBox
+      MoveScaled(0,0,148,205)
+      Spacing = True
+      { vbLeft VBox
+        MoveScaled(0,0,73,200)
+        Expand = True
+        Spacing = True
+        { frWork Frame
+          MoveScaled(0,0,72,27)
+          Text = ("The work")
+          Arrangement = Arrange.Vertical
+          Spacing = True
+          Margin = True
+          { htxtName HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { ltxtName Label
+              MoveScaled(0,0,24,4)
+              Text = ("Name")
+            }
+            { txtName TextBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+                }
+          }
+          { htxtCode HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { ltxtCode Label
+              MoveScaled(0,0,24,4)
+              Text = ("Code")
+            }
+            { txtCode TextBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+                }
+          }
+          { hcmbWorkType HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lcmbWorkType Label
+              MoveScaled(0,0,24,4)
+              Text = ("Type of work")
+            }
+            { cmbWorkType ComboBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              ReadOnly = True
+                }
+          }
+          { hcmbUsage HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lcmbUsage Label
+              MoveScaled(0,0,24,4)
+              Text = ("Use")
+            }
+            { cmbUsage ComboBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              ReadOnly = True
+                }
+          }
+          { hDesign HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lDesign Label
+              MoveScaled(0,0,24,4)
+              Text = ("Design")
+            }
+            { txtDesign TextBox
+              MoveScaled(25,0,30,4)
+              Expand = True
+              ReadOnly = True
+              Placeholder = ("The sumi-designer project it comes from")
+            }
+            { btnBrowse Button
+              MoveScaled(56,0,14,4)
+              Text = ("Browse...")
+            }
+          }
+        }
+        { frLocation Frame
+          MoveScaled(0,0,72,45)
+          Text = ("Location")
+          Arrangement = Arrange.Vertical
+          Spacing = True
+          Margin = True
+          { htxtLocation HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { ltxtLocation Label
+              MoveScaled(0,0,24,4)
+              Text = ("Address")
+            }
+            { txtLocation TextBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+                }
+          }
+          { htxtCity HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { ltxtCity Label
+              MoveScaled(0,0,24,4)
+              Text = ("City")
+            }
+            { txtCity TextBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+                }
+          }
+          { htxtProvince HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { ltxtProvince Label
+              MoveScaled(0,0,24,4)
+              Text = ("Province")
+            }
+            { txtProvince TextBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+                }
+          }
+          { htxtParcel HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { ltxtParcel Label
+              MoveScaled(0,0,24,4)
+              Text = ("Cadastral parcel")
+            }
+            { txtParcel TextBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+                }
+          }
+          { hspPlot HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lspPlot Label
+              MoveScaled(0,0,24,4)
+              Text = ("Plot area (m²)")
+            }
+            { spPlot SpinBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              MinValue = 0
+              MaxValue = 10000000
+              Alignment = Align.Right
+              Precision = 2
+              Step = 1
+                }
+          }
+          { hspCovered HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lspCovered Label
+              MoveScaled(0,0,24,4)
+              Text = ("Covered area (m²)")
+            }
+            { spCovered SpinBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              MinValue = 0
+              MaxValue = 10000000
+              Alignment = Align.Right
+              Precision = 2
+              Step = 1
+                }
+          }
+          { hspSemi HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lspSemi Label
+              MoveScaled(0,0,24,4)
+              Text = ("Semi-covered area (m²)")
+            }
+            { spSemi SpinBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              MinValue = 0
+              MaxValue = 10000000
+              Alignment = Align.Right
+              Precision = 2
+              Step = 1
+                }
+          }
+          { hspFloors HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lspFloors Label
+              MoveScaled(0,0,24,4)
+              Text = ("Floors")
+            }
+            { spFloors SpinBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              MinValue = 1
+              MaxValue = 200
+              Alignment = Align.Right
+                }
+          }
+        }
+        { frClient Frame
+          MoveScaled(0,0,72,25)
+          Text = ("Client")
+          Arrangement = Arrange.Vertical
+          Spacing = True
+          Margin = True
+          { htxtClient HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { ltxtClient Label
+              MoveScaled(0,0,24,4)
+              Text = ("Name")
+            }
+            { txtClient TextBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+                }
+          }
+          { htxtClientTaxId HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { ltxtClientTaxId Label
+              MoveScaled(0,0,24,4)
+              Text = ("Tax id (CUIT)")
+            }
+            { txtClientTaxId TextBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+                }
+          }
+          { htxtClientPhone HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { ltxtClientPhone Label
+              MoveScaled(0,0,24,4)
+              Text = ("Phone")
+            }
+            { txtClientPhone TextBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+                }
+          }
+          { htxtClientEmail HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { ltxtClientEmail Label
+              MoveScaled(0,0,24,4)
+              Text = ("Email")
+            }
+            { txtClientEmail TextBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+                }
+          }
+        }
+        { frNotes Frame
+          MoveScaled(0,0,72,28)
+          Text = ("Notes")
+          Arrangement = Arrange.Vertical
+          Spacing = True
+          Margin = True
+          { txtNotes TextArea
+            MoveScaled(0,0,70,20)
+            Expand = True
+            Wrap = True
+          }
+        }
+      }
+      { vbRight VBox
+        MoveScaled(0,0,73,200)
+        Expand = True
+        Spacing = True
+        { frSchedule Frame
+          MoveScaled(0,0,72,48)
+          Text = ("Schedule")
+          Arrangement = Arrange.Vertical
+          Spacing = True
+          Margin = True
+          { hdtStart HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { ldtStart Label
+              MoveScaled(0,0,24,4)
+              Text = ("Start date")
+            }
+            { dtStart DateBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+                }
+          }
+          { hspDuration HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lspDuration Label
+              MoveScaled(0,0,24,4)
+              Text = ("Working days")
+            }
+            { spDuration SpinBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              MinValue = 1
+              MaxValue = 5000
+              Alignment = Align.Right
+                }
+          }
+          { hspWorkDays HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lspWorkDays Label
+              MoveScaled(0,0,24,4)
+              Text = ("Working days a week")
+            }
+            { spWorkDays SpinBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              MinValue = 1
+              MaxValue = 7
+              Alignment = Align.Right
+                }
+          }
+          { hspHours HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lspHours Label
+              MoveScaled(0,0,24,4)
+              Text = ("Hours a day")
+            }
+            { spHours SpinBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              MinValue = 1
+              MaxValue = 24
+              Alignment = Align.Right
+              Precision = 1
+              Step = 0.5
+                }
+          }
+          { hHoliday HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lHoliday Label
+              MoveScaled(0,0,24,4)
+              Text = ("Holidays")
+            }
+            { dtHoliday DateBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+            }
+            { btnHolidayAdd Button
+              MoveScaled(46,0,12,4)
+              Text = ("Add")
+            }
+            { btnHolidayRemove Button
+              MoveScaled(58,0,12,4)
+              Text = ("Remove")
+            }
+          }
+          { lstHolidays ListBox
+            MoveScaled(0,0,70,10)
+          }
+          { lblEnd Label
+            MoveScaled(0,0,70,4)
+            Font = Font["Bold"]
+          }
+        }
+        { frDefinitions Frame
+          MoveScaled(0,0,72,32)
+          Text = ("Definitions: from cost to price")
+          Arrangement = Arrange.Vertical
+          Spacing = True
+          Margin = True
+          { htxtCurrency HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { ltxtCurrency Label
+              MoveScaled(0,0,24,4)
+              Text = ("Currency symbol")
+            }
+            { txtCurrency TextBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              MaxLength = 5
+                }
+          }
+          { hspOverhead HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lspOverhead Label
+              MoveScaled(0,0,24,4)
+              Text = ("General expenses %")
+            }
+            { spOverhead SpinBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              MinValue = 0
+              MaxValue = 200
+              Alignment = Align.Right
+              Precision = 2
+              Step = 0.5
+                }
+          }
+          { hspProfit HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lspProfit Label
+              MoveScaled(0,0,24,4)
+              Text = ("Profit %")
+            }
+            { spProfit SpinBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              MinValue = 0
+              MaxValue = 200
+              Alignment = Align.Right
+              Precision = 2
+              Step = 0.5
+                }
+          }
+          { hspTaxes HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lspTaxes Label
+              MoveScaled(0,0,24,4)
+              Text = ("Taxes %")
+            }
+            { spTaxes SpinBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              MinValue = 0
+              MaxValue = 200
+              Alignment = Align.Right
+              Precision = 2
+              Step = 0.5
+                }
+          }
+          { lblFactor Label
+            MoveScaled(0,0,70,4)
+            Font = Font["Bold"]
+          }
+        }
+        { frConditions Frame
+          MoveScaled(0,0,72,42)
+          Text = ("Contract conditions")
+          Arrangement = Arrange.Vertical
+          Spacing = True
+          Margin = True
+          { hcmbMode HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lcmbMode Label
+              MoveScaled(0,0,24,4)
+              Text = ("Contract mode")
+            }
+            { cmbMode ComboBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              ReadOnly = True
+                }
+          }
+          { hspAdvance HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lspAdvance Label
+              MoveScaled(0,0,24,4)
+              Text = ("Advance payment %")
+            }
+            { spAdvance SpinBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              MinValue = 0
+              MaxValue = 100
+              Alignment = Align.Right
+              Precision = 2
+              Step = 0.5
+                }
+          }
+          { hspRetention HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lspRetention Label
+              MoveScaled(0,0,24,4)
+              Text = ("Guarantee retention %")
+            }
+            { spRetention SpinBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              MinValue = 0
+              MaxValue = 100
+              Alignment = Align.Right
+              Precision = 2
+              Step = 0.5
+                }
+          }
+          { hcmbPeriod HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lcmbPeriod Label
+              MoveScaled(0,0,24,4)
+              Text = ("Certificates")
+            }
+            { cmbPeriod ComboBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              ReadOnly = True
+                }
+          }
+          { htxtIndex HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { ltxtIndex Label
+              MoveScaled(0,0,24,4)
+              Text = ("Adjustment index")
+            }
+            { txtIndex TextBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              Placeholder = ("Empty: fixed prices")
+                }
+          }
+          { htxtIndexBase HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { ltxtIndexBase Label
+              MoveScaled(0,0,24,4)
+              Text = ("Index base month")
+            }
+            { txtIndexBase TextBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              Placeholder = ("yyyy-mm")
+                }
+          }
+          { hspGuarantee HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { lspGuarantee Label
+              MoveScaled(0,0,24,4)
+              Text = ("Guarantee period (days)")
+            }
+            { spGuarantee SpinBox
+              MoveScaled(25,0,20,4)
+              Expand = True
+              MinValue = 0
+              MaxValue = 3650
+              Alignment = Align.Right
+                }
+          }
+        }
+        { frPros Frame
+          MoveScaled(0,0,72,34)
+          Text = ("Professionals")
+          Arrangement = Arrange.Vertical
+          Spacing = True
+          Margin = True
+          { tvPros TableView
+            MoveScaled(0,0,70,20)
+            Expand = True
+            Header = GridView.Horizontal
+          }
+          { hProButtons HBox
+            MoveScaled(0,0,70,4)
+            Spacing = True
+            { SpringPro Spring
+              MoveScaled(0,0,20,4)
+            }
+            { btnProAdd Button
+              MoveScaled(30,0,16,4)
+              Text = ("Add")
+            }
+            { btnProRemove Button
+              MoveScaled(50,0,16,4)
+              Text = ("Remove")
+            }
+          }
+        }
+      }
+    }
+    { lblDates Label
+      MoveScaled(0,0,140,4)
+      Foreground = Color.Gray
+    }
+  }
+}

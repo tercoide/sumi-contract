@@ -1,0 +1,56 @@
+' Gambas module file
+
+' sumi-contract
+' The paperwork of the sumi suite: tasks, budget, contractors, progress and payments
+'
+' Copyright (C) Ing Martin P Cristia
+
+'' An error nobody caught: logged, then Gambas ends the program
+Public Sub Application_Error()
+
+    AppLog.Error(Error.Text & " (" & Error.Where & ")", "Application_Error")
+
+End
+
+Public Sub Main()
+
+    Dim i As Integer
+
+    ' installed (.deb) or run from the IDE
+    If Application.Path Like "/usr/bin*" Then
+        sumi.dirResources = "/usr/share/sumi-contract"
+    Else
+        sumi.dirResources = Application.Path &/ ".hidden"
+    Endif
+
+    Config.StoreDefaults()
+    Config.Root = User.Home &/ ".config/sumi-contract"
+    Config.Depot = Config.Root &/ "config.json"
+
+    ' test without a window: gbx3 . -- --smoke-test (see SmokeTest). It does not touch the user's config or files.
+    For i = 1 To Application.Args.Max
+        If Application.Args[i] = "--smoke-test" Then Quit SmokeTest.Run()
+    Next
+
+    Config.Load(Config.Depot)
+    Config.UpdateDerived()
+    Config.Save(Config.Depot)
+
+    ' one log file a day in ~/.config/sumi-contract/logs (see AppLog)
+    AppLog.Start(Config.Root &/ "logs", Config.LogLevel)
+    Config.Log = AppLog.Path()
+
+    sumi.Interactive = True
+    sumi.Project = New Project
+    Application.MainWindow = fMain
+    fMain.Run()
+
+    ' a file given on the command line
+    For i = 1 To Application.Args.Max
+        If Not (Application.Args[i] Begins "-") And If Exist(Application.Args[i]) Then
+            actions.FileOpen(Application.Args[i])
+            Break
+        Endif
+    Next
+
+End

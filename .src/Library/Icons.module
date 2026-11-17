@@ -1,0 +1,104 @@
+' Gambas module file
+
+'' Las imagenes de los botones: cada uno por su nombre (btnSave -> save), el Tag de los hechos en codigo, o la primera
+'' palabra de su texto, en la tabla de abajo. Los archivos son de la carpeta svg de los recursos. Un boton que ya tiene
+'' imagen no se toca. Cada form llama a Apply cuando abre; los botones que se hacen despues, a Set.
+
+Private $cTable As Collection
+
+Private Function Table() As Collection
+
+    Dim aRows As String[]
+    Dim sRow, sKey As String
+    Dim aRow As String[]
+
+    If $cTable Then Return $cTable
+    $cTable = New Collection(gb.IgnoreCase)
+    aRows = ["document-new;new,nuevo,create"]
+    aRows.Add("document-duplicate;duplicate")
+    aRows.Add("document-delete;delete,eliminar")
+    aRows.Add("edit-select-text;rename,editinfo")
+    aRows.Add("tag;setcurrent,current,actual")
+    aRows.Add("view-refresh;resettext,measure,readagain,reread,relink")
+    aRows.Add("dialog-ok;ok,accept,aceptar,apply,applyprops,applyselected,use,editsave")
+    aRows.Add("document-save;save,savelibrary,saveimage,saveto")
+    aRows.Add("window-close;close,cancel,cancelar,editcancel,newcancel,removeattach,texclear,x")
+    aRows.Add("document-import;import,attach,download")
+    aRows.Add("document-open-folder;importfolder,texpick,browse")
+    aRows.Add("document-open-folder-1;newcategory")
+    aRows.Add("document-export;export")
+    aRows.Add("insert-image;newasset,insert")
+    aRows.Add("edit-find;search")
+    aRows.Add("view-sort-arrange;view,list")
+    aRows.Add("list-add;add,addmodel,more,layeradd,folderadd")
+    aRows.Add("list-remove;remove,layerremove,folderremove")
+    aRows.Add("edit-clear;clear")
+    aRows.Add("go-up;layerup,inward")
+    aRows.Add("go-down;layerdown,outward")
+    aRows.Add("mail-message-new;send")
+    aRows.Add("media-playback-start;render,play")
+    aRows.Add("media-playback-stop;stoprender,stop")
+    aRows.Add("multimedia-photo-viewer;show,pick,newpick")
+    aRows.Add("system-restart;defaults")
+    aRows.Add("bug-report;github,report")
+    aRows.Add("edit-copy;copy")
+    aRows.Add("help-about;askme,help,page,openpage")
+    For Each sRow In aRows
+        aRow = Split(sRow, ";")
+        For Each sKey In Split(aRow[1], ",")
+            $cTable[sKey] = "actions/" & aRow[0] & ".svg"
+        Next
+    Next
+    Return $cTable
+
+End
+
+'' El archivo de la clave sKey (sin "btn" adelante), o ""
+Public Function FileOf(sKey As String) As String
+
+    If LCase(sKey) Begins "btn" Then sKey = Mid$(sKey, 4)
+    Return Table()[sKey]
+
+End
+
+'' Todas las claves, para que el smoke test vea que sus archivos estan
+Public Function Files() As String[]
+
+    Dim a As New String[]
+    Dim s As String
+
+    For Each s In Table()
+        If Not a.Exist(s) Then a.Add(s)
+    Next
+    Return a
+
+End
+
+'' Pone a hButton la imagen de sKey
+Public Sub Set(hButton As Object, sKey As String)
+
+    Dim sFile As String = FileOf(sKey)
+
+    If sFile Then Utils.SetIcon(hButton, sFile)
+
+End
+
+'' Los botones de hForm que no tienen imagen
+Public Sub Apply(hForm As Form)
+
+    Dim h As Object
+    Dim sFile, sText As String
+
+    For Each h In hForm.Controls
+        If Not (h Is Button Or h Is ToolButton) Then Continue
+        If h.Picture Then Continue
+        sFile = FileOf(h.Name)
+        If Not sFile And If TypeOf(h.Tag) = gb.String Then sFile = FileOf(h.Tag)
+        If Not sFile And If h.Text Then
+            sText = Split(Trim(h.Text), " .…")[0]
+            sFile = FileOf(sText)
+        Endif
+        If sFile Then Utils.SetIcon(h, sFile)
+    Next
+
+End

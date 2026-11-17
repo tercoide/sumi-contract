@@ -1,0 +1,148 @@
+' Gambas class file
+
+'' Main window, as in the rest of the sumi suite: the top button bar, the central tab strip (Project, Budget, Gantt,
+'' Pricing, Contracts: items 0 to 4 of starting.txt) and the status bar (messages on the left, the open file on the right).
+'' Each tab is a form embedded in its page (see Run); the ones not made yet show a placeholder.
+
+Public ProjectTab As FProject                   '' the Project tab: the work's own data
+
+Public Const TAB_PROJECT As Integer = 0         '' the work, its schedule and definitions
+Public Const TAB_BUDGET As Integer = 1          '' sumi-designer's quantities with prices, and the total
+Public Const TAB_GANTT As Integer = 2           '' each task in the construction's time window
+Public Const TAB_PRICING As Integer = 3         '' the unit price analysis of each task
+Public Const TAB_CONTRACTS As Integer = 4       '' the contracts given: their work and payments progress
+
+Private $mRecent As Menu                        ' the recent files, under the Open button's arrow
+
+Public Sub Run()
+
+    Dim i As Integer
+
+    Utils.SetIcon(tbNew, "actions/document-new.svg")
+    Utils.SetIcon(mbOpen, "actions/document-open.svg")
+    Utils.SetIcon(tbSave, "actions/document-save.svg")
+    Utils.SetIcon(tbSaveAs, "actions/document-save-as.svg")
+    Utils.SetIcon(tbSettings, "actions/configure.svg")
+    Utils.SetIcon(tbAbout, "actions/help-about.svg")
+
+    ' the tabs
+    ProjectTab = New FProject(tabMain[TAB_PROJECT])
+    For i = TAB_BUDGET To tabMain.Count - 1
+        Placeholder(i)
+    Next
+    tabMain.Index = TAB_PROJECT
+
+    $mRecent = New Menu(Me, True)
+    $mRecent.Name = "RecentFiles"
+    mbOpen.Menu = "RecentFiles"     ' MenuButton.Menu is the menu's name
+    FillRecent()
+
+    ProjectChanged()
+    Me.Show()
+    Me.Maximized = True
+
+End
+
+'' A tab that is not made yet
+Private Sub Placeholder(iTab As Integer)
+
+    Dim hLabel As Label
+
+    hLabel = New Label(tabMain[iTab])
+    hLabel.Alignment = Align.Center
+    hLabel.Foreground = Color.Gray
+    hLabel.Text = Subst(("&1: coming soon"), tabMain[iTab].Text)
+
+End
+
+'' A new project was made or opened: every tab shows it
+Public Sub ProjectChanged()
+
+    ProjectTab.ShowProject(sumi.Project)
+    UpdateTitle()
+    FillRecent()
+
+End
+
+'' The window title and the file in the status bar, with * when there are unsaved changes
+Public Sub UpdateTitle()
+
+    Dim sMark As String
+
+    If sumi.Project.RequiresSaving Then sMark = " *"
+    Me.Text = sumi.Project.Title() & sMark & " - sumi-contract"
+    lblFile.Text = IIf(sumi.Project.FileName, sumi.Project.FileName, ("Not saved")) & sMark
+
+End
+
+Public Sub SetStatus(sText As String)
+
+    lblStatus.Text = sText
+
+End
+
+'' After the settings change (formats, icons)
+Public Sub SettingsChanged()
+
+    ProjectTab.ShowProject(sumi.Project)
+
+End
+
+Private Sub FillRecent()
+
+    Dim sFile As String
+    Dim hItem As Menu
+
+    $mRecent.Children.Clear
+    For Each sFile In Config.RecentFiles
+        hItem = New Menu($mRecent) As "RecentItem"
+        hItem.Text = File.Name(sFile)
+        hItem.Tag = sFile
+        hItem.Enabled = Exist(sFile)
+    Next
+    If $mRecent.Children.Count = 0 Then
+        hItem = New Menu($mRecent)
+        hItem.Text = ("No recent projects")
+        hItem.Enabled = False
+    Endif
+
+End
+
+Public Sub RecentItem_Click()
+
+    actions.FileOpen(Last.Tag)
+
+End
+
+Public Function Action_Activate(sAction As String) As Boolean
+
+    Select Case sAction
+        Case "file_new"
+            actions.FileNew()
+        Case "file_open"
+            actions.FileOpen()
+        Case "file_save"
+            actions.FileSave()
+        Case "file_saveas"
+            actions.FileSaveAs()
+        Case "config"
+            fSettings.ShowModal()
+        Case "about"
+            fAbout.ShowModal()
+        Case Else
+            Return False
+    End Select
+    Return True
+
+End
+
+Public Sub Form_Close()
+
+    If actions.AskSave() Then
+        Stop Event
+        Return
+    Endif
+    Config.Save(Config.Depot)
+    AppLog.Finish()
+
+End
