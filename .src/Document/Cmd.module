@@ -15,7 +15,8 @@
 '' Commands (see Help): info, log, undo, redo, project.set, book.set, rubro.set, rubro.delete, charge.add,
 '' charge.set, charge.delete, resource.list, resource.get, resource.add, resource.set, resource.delete,
 '' analysis.list, analysis.get, analysis.add, analysis.set, analysis.copy, analysis.delete, analysis.addline,
-'' analysis.setline, analysis.removeline, analysis.flatten, prices.import
+'' analysis.setline, analysis.removeline, analysis.flatten, prices.import, budget.list, item.add, item.set,
+'' item.delete, item.move, rubro.coefs
 
 Public Const ABSENT As String = "~absent~"      '' a snapshot of something that didn't exist
 Public Const COALESCE_SECONDS As Integer = 120  '' edits of the same field in a row become one change
@@ -112,6 +113,18 @@ Private Function Dispatch(sCommand As String, c As Collection) As Collection
             Return AnalysisFlatten(c)
         Case "prices.import"
             Return PricesImport(c)
+        Case "budget.list"
+            Return BudgetList(c)
+        Case "item.add"
+            Return ItemAdd(c)
+        Case "item.set"
+            Return ItemSet(c)
+        Case "item.delete"
+            Return ItemDelete(c)
+        Case "item.move"
+            Return ItemMove(c)
+        Case "rubro.coefs"
+            Return RubroCoefs(c)
     End Select
     Return Fail(Subst(("Unknown command &1."), sCommand))
 
@@ -149,6 +162,12 @@ Public Function Help() As Collection
     c["analysis.removeline"] = "{key, index}"
     c["analysis.flatten"] = "{key} sub-analyses become their resources (the link is lost)"
     c["prices.import"] = "{folder, added?} imports a CSV library (Tincho's licita2003 format)"
+    c["budget.list"] = "{rubro?} -> the budget: items (code, description, unit, qty, unit direct cost, unit price, total, problem) and totals by rubro and overall"
+    c["item.add"] = "{analysis: key | description + unitCost (a manual item), qty?, rubro? (default: the analysis's), unit?, note?} -> its id and code"
+    c["item.set"] = "{key (id or code like 3.02), field: value...} fields: qty, description, unit, unitCost, rubro, analysis, note, coefs [{name, pct}...] (the item's own coefficients), qtySource, designQty, designRef"
+    c["item.delete"] = "{key}"
+    c["item.move"] = "{key, by} moves an item up (by < 0) or down within its rubro"
+    c["rubro.coefs"] = "{rubro, coefs [{name, pct}...]} the coefficients of a rubro in the budget (on top of the project's)"
     Return c
 
 End
@@ -280,9 +299,12 @@ Public Function Snapshot(sTarget As String) As Variant
         Return b.Analyses[sId].ToJson()
     Endif
     Select Case sTarget
+        Case "budget"
+            Return p.Budget.ToJson()
         Case "project"
             c = p.ToJson()
             c.Remove("prices")
+            c.Remove("budget")
             c.Remove("changes")
             c.Remove("modified")
             Return c
@@ -334,6 +356,9 @@ Public Sub Restore(sTarget As String, v As Variant)
         Return
     Endif
     Select Case sTarget
+        Case "budget"
+            p.Budget = New Budget
+            p.Budget.FromJson(v)
         Case "project"
             p.FromJson(v)
         Case "book"
@@ -493,7 +518,7 @@ Private Function Info() As Collection
 
     Dim p As Project = sumi.Project
 
-    Return Ok(["name": p.Name, "client": p.Client, "location": p.Location, "file": p.FileName, "currency": p.Currency, "startDate": Format(p.StartDate, "yyyy-mm-dd"), "endDate": Format(p.EndDate(), "yyyy-mm-dd"), "priceFactor": p.PriceFactor(), "updateCoef": p.Prices.UpdateCoef, "resources": p.Prices.Resources.Count, "analyses": p.Prices.Analyses.Count, "rubros": p.Prices.Rubros.Count, "changes": p.Changes.Count, "you": Who.Name(), "via": Who.Via])
+    Return Ok(["name": p.Name, "client": p.Client, "location": p.Location, "file": p.FileName, "currency": p.Currency, "startDate": Format(p.StartDate, "yyyy-mm-dd"), "endDate": Format(p.EndDate(), "yyyy-mm-dd"), "priceFactor": p.PriceFactor(), "updateCoef": p.Prices.UpdateCoef, "resources": p.Prices.Resources.Count, "analyses": p.Prices.Analyses.Count, "rubros": p.Prices.Rubros.Count, "budgetItems": p.Budget.Items.Count, "budgetPrice": p.Budget.Totals()[1], "changes": p.Changes.Count, "you": Who.Name(), "via": Who.Via])
 
 End
 
@@ -507,7 +532,7 @@ Private Function ProjectSet(c As Collection) As Collection
     Dim sKey As String
 
     aAllowed = KeysOf(sumi.Project.ToJson())
-    For Each sKey In ["prices", "created", "modified", "changes"]
+    For Each sKey In ["prices", "budget", "created", "modified", "changes"]
         If aAllowed.Exist(sKey) Then aAllowed.Remove(aAllowed.Find(sKey))
     Next
     For Each v In c
@@ -1014,5 +1039,165 @@ Private Function PricesImport(c As Collection) As Collection
         Return Fail(LibraryImport.Report.Join("\n"))
     Endif
     Return Ok(["report": LibraryImport.Report])
+
+End
+
+'' THE BUDGET
+
+Private Function DescribeItem(b As BudgetItem) As Collection
+
+    Dim h As Budget = sumi.Project.Budget
+    Dim c As Collection = b.ToJson()
+
+    c["description"] = h.DescriptionOf(b)
+    c["unit"] = h.UnitOf(b)
+    If b.Analysis And If sumi.Project.Prices.Analyses.Exist(b.Analysis) Then c["analysisCode"] = sumi.Project.Prices.Analyses[b.Analysis].Code
+    c["unitDirect"] = h.UnitDirect(b)
+    c["unitPrice"] = h.UnitPrice(b)
+    c["total"] = h.Total(b)
+    If h.Problem(b) Then c["problem"] = h.Problem(b)
+    Return c
+
+End
+
+Private Function BudgetList(c As Collection) As Collection
+
+    Dim h As Budget = sumi.Project.Budget
+    Dim aItems As New Variant[]
+    Dim aRubros As New Variant[]
+    Dim b As BudgetItem
+    Dim iRubro As Integer
+    Dim f As Float[]
+
+    For Each b In h.Items
+        If c["rubro"] And If b.Rubro <> c["rubro"] Then Continue
+        aItems.Add(DescribeItem(b))
+    Next
+    For Each iRubro In h.UsedRubros()
+        f = h.Totals(iRubro)
+        aRubros.Add(["rubro": iRubro, "name": sumi.Project.Prices.RubroName(iRubro), "direct": f[0], "price": f[1], "coefs": Coef.ListToJson(h.CoefsOf(iRubro))])
+    Next
+    f = h.Totals()
+    Return Ok(["items": aItems, "rubros": aRubros, "direct": f[0], "price": f[1], "projectFactor": sumi.Project.PriceFactor()])
+
+End
+
+Private Function ItemAdd(c As Collection) As Collection
+
+    Dim h As Budget = sumi.Project.Budget
+    Dim b As New BudgetItem
+    Dim a As Analysis
+    Dim cSet As New Collection
+    Dim v As Variant
+    Dim sBad As String
+
+    If c["analysis"] Then
+        a = sumi.Project.Prices.FindAnalysis(CStr(c["analysis"]))
+        If Not a Then Return Fail(Subst(("There is no analysis &1."), c["analysis"]))
+        b.Analysis = a.Id
+        b.Rubro = a.Rubro
+    Else If Not Trim(c["description"]) Then
+        Return Fail(("An item needs an analysis, or a description (a manual item)."))
+    Endif
+    For Each v In c
+        If c.Key <> "analysis" And If c.Key <> "id" And If c.Key <> "key" Then cSet[c.Key] = v
+    Next
+    sBad = b.Apply(cSet)
+    If sBad Then Return Fail(Subst(("Budget items have no field &1."), sBad))
+    Start("item.add", c, Subst(("Budget: item added, &1"), h.DescriptionOf(b)))
+    Touch("budget")
+    h.Items.Add(b, h.InsertPos(b.Rubro))
+    h.Renumber()
+    Return Ok(["id": b.Id, "code": b.Code])
+
+End
+
+Private Function ItemSet(c As Collection) As Collection
+
+    Dim h As Budget = sumi.Project.Budget
+    Dim b As BudgetItem
+    Dim cSet As New Collection
+    Dim v As Variant
+    Dim sBad As String
+    Dim a As Analysis
+    Dim hTest As BudgetItem
+
+    If c["key"] Then b = h.Find(CStr(c["key"]))
+    If Not b Then Return Fail(Subst(("There is no budget item &1."), c["key"]))
+    For Each v In c
+        If c.Key <> "key" Then cSet[c.Key] = v
+    Next
+    If cSet.Count = 0 Then Return Fail(("Nothing to set."))
+    If cSet.Exist("analysis") And If cSet["analysis"] Then
+        a = sumi.Project.Prices.FindAnalysis(CStr(cSet["analysis"]))
+        If Not a Then Return Fail(Subst(("There is no analysis &1."), cSet["analysis"]))
+        cSet["analysis"] = a.Id
+    Endif
+    hTest = BudgetItem.FromJson(b.ToJson())
+    sBad = hTest.Apply(cSet)
+    If sBad Then Return Fail(Subst(("Budget items have no field &1 (or a bad value)."), sBad))
+    Start("item.set", c, Subst(("Budget item &1: &2"), b.Code, KeysOf(cSet).Join(", ")))
+    Touch("budget")
+    b.Apply(cSet)
+    ' a new rubro: it goes to the end of that rubro
+    If cSet.Exist("rubro") Then
+        h.Items.Remove(h.IndexOf(b.Id))
+        h.Items.Add(b, h.InsertPos(b.Rubro))
+    Endif
+    h.Renumber()
+    Return Ok(["code": b.Code])
+
+End
+
+Private Function ItemDelete(c As Collection) As Collection
+
+    Dim h As Budget = sumi.Project.Budget
+    Dim b As BudgetItem
+
+    If c["key"] Then b = h.Find(CStr(c["key"]))
+    If Not b Then Return Fail(Subst(("There is no budget item &1."), c["key"]))
+    Start("item.delete", c, Subst(("Budget: item deleted, &1 &2"), b.Code, h.DescriptionOf(b)))
+    Touch("budget")
+    h.Items.Remove(h.IndexOf(b.Id))
+    h.Renumber()
+    Return Ok()
+
+End
+
+Private Function ItemMove(c As Collection) As Collection
+
+    Dim h As Budget = sumi.Project.Budget
+    Dim b As BudgetItem
+    Dim i, j As Integer
+
+    If c["key"] Then b = h.Find(CStr(c["key"]))
+    If Not b Then Return Fail(Subst(("There is no budget item &1."), c["key"]))
+    i = h.IndexOf(b.Id)
+    j = i + IIf(c["by"] < 0, -1, 1)
+    If j < 0 Or If j > h.Items.Max Or If h.Items[j].Rubro <> b.Rubro Then Return Fail(("It is already at the end of its rubro."))
+    Start("item.move", c, Subst(("Budget: item &1 moved"), b.Code))
+    Touch("budget")
+    h.Items.Remove(i)
+    h.Items.Add(b, j)
+    h.Renumber()
+    Return Ok(["code": b.Code])
+
+End
+
+Private Function RubroCoefs(c As Collection) As Collection
+
+    Dim h As Budget = sumi.Project.Budget
+    Dim a As Coef[]
+
+    If Not c["rubro"] Then Return Fail(("It needs the rubro number."))
+    a = Coef.ListFromJson(c["coefs"])
+    Start("rubro.coefs", c, Subst(("Budget: coefficients of rubro &1"), c["rubro"]))
+    Touch("budget")
+    If a.Count Then
+        h.RubroCoefs[CStr(c["rubro"])] = a
+    Else If h.RubroCoefs.Exist(CStr(c["rubro"])) Then
+        h.RubroCoefs.Remove(CStr(c["rubro"]))
+    Endif
+    Return Ok()
 
 End

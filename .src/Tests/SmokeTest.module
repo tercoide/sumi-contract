@@ -24,6 +24,7 @@ Public Function Run() As Integer
     TestImport()
     TestCmd()
     TestAssistant()
+    TestBudget()
     TestIcons()
 
     Shell "rm -rf " & Shell$($sTemp) Wait
@@ -496,6 +497,75 @@ Private Sub TestAssistant()
     Check(Not Assistant.Reply(500, "<html>"), "a reply that isn't JSON")
     Check(Assistant.MessageCount() = n And Not Assistant.Busy(), "the conversation is as before the failed turns")
     Config.UserName = ""
+
+End
+
+Private Sub TestBudget()
+
+    Dim p As New Project
+    Dim c As Collection
+    Dim h As Budget
+    Dim sFile As String = $sTemp &/ "budget." & JsonFile.FileExtension
+    Dim sA, sB, sM As String
+
+    sumi.Project = p
+    p.OverheadPct = 10
+    p.ProfitPct = 0
+    p.TaxesPct = 0
+    Cmd.Run("rubro.set", ["number": 1, "name": "MOVIMIENTO DE SUELOS"])
+    Cmd.Run("rubro.set", ["number": 4, "name": "MAMPOSTERIAS"])
+    Cmd.Run("resource.add", ["kind": "material", "name": "ladrillo", "unit": "u", "price": 2])
+    Cmd.Run("analysis.add", ["code": "50", "name": "muro 0.15", "unit": "m2", "rubro": 4, "lines": [["resource": "MAT-0001", "qty": 60]]])
+    Cmd.Run("analysis.add", ["code": "1", "name": "excavacion", "unit": "m3", "rubro": 1, "lines": [["resource": "MAT-0001", "qty": 5]]])
+    h = p.Budget
+
+    c = Cmd.Run("item.add", ["analysis": "50", "qty": 100])
+    sA = c["id"]
+    Check(c["ok"] And c["code"] = "4.01", "an item from an analysis code, in its rubro: " & JSON.Encode(c))
+    c = Cmd.Run("item.add", ["analysis": "1", "qty": 10])
+    sB = c["id"]
+    Check(c["code"] = "1.01" And h.Items[0].Id = sB, "items are ordered by rubro")
+    c = Cmd.Run("item.add", ["description": "Limpieza de obra", "unit": "gl", "unitCost": 500, "qty": 1, "rubro": 4])
+    sM = c["id"]
+    Check(c["code"] = "4.02", "a manual item")
+    Check(Cmd.Run("item.add", ["qty": 1]).Exist("error"), "an item needs an analysis or a description")
+
+    ' 100 m2 x 120 = 12000 direct; x 1.10 = 13200
+    Check(Abs(h.Total(h.Find(sA)) - 13200) < 1e-6, "item total with the project's coefficients: " & h.Total(h.Find(sA)))
+    Cmd.Run("rubro.coefs", ["rubro": 4, "coefs": [["name": "dificultad de acceso", "pct": 5]]])
+    Check(Abs(h.Total(h.Find(sA)) - 13860) < 1e-6, "a rubro coefficient")
+    Cmd.Run("item.set", ["key": "4.01", "coefs": [["name": "altura", "pct": 10]]])
+    Check(Abs(h.Total(h.Find(sA)) - 15246) < 1e-6, "an item coefficient on top: " & h.Total(h.Find(sA)))
+    Check(Abs(h.Total(h.Find(sB)) - 110) < 1e-6, "other rubros don't take it")
+    c = Cmd.Run("budget.list")
+    Check(c["items"].Count = 3 And c["rubros"].Count = 2 And Abs(c["price"] - (15246 + 110 + 500 * 1.1 * 1.05)) < 1e-6, "budget.list totals: " & c["price"])
+
+    ' prices follow the price book
+    Cmd.Run("resource.set", ["key": "MAT-0001", "price": 3])
+    Check(Abs(h.UnitDirect(h.Find(sA)) - 180) < 1e-9, "a new resource price reaches the budget")
+
+    ' moving, changing rubro, deleting
+    Check(Cmd.Run("item.move", ["key": sM, "by": -1])["code"] = "4.01", "move up within the rubro")
+    Check(Cmd.Run("item.move", ["key": sM, "by": -1]).Exist("error"), "not out of its rubro")
+    Cmd.Run("item.set", ["key": sM, "rubro": 1])
+    Check(h.Find(sM).Code = "1.02" And h.Find(sA).Code = "4.01", "a new rubro renumbers")
+
+    ' a design quantity changed by hand is marked
+    Cmd.Run("item.set", ["key": sB, "qtySource": "design", "designQty": 10, "designRef": "excavation"])
+    Check(Not h.Find(sB).Overridden(), "the design's quantity")
+    Cmd.Run("item.set", ["key": sB, "qty": 12])
+    Check(h.Find(sB).Overridden() And InStr(h.Problem(h.Find(sB)), "by hand") > 0, "changed by hand: marked")
+
+    ' undo, delete, the file
+    Cmd.Run("undo")
+    Check(h.Find(sB) = Null Or p.Budget.Find(sB).Quantity = 10, "undo the budget")
+    Cmd.Run("item.delete", ["key": sM])
+    Check(p.Budget.Items.Count = 2, "delete an item")
+    Check(Not JsonFile.SaveFile(sFile, p), "save the budget")
+    p = JsonFile.LoadFile(sFile)
+    Check(p.Budget.Items.Count = 2 And p.Budget.Find("4.01").Coefs.Count = 1 And p.Budget.CoefsOf(4).Count = 1, "the budget after load")
+    sumi.Project = p
+    Check(Abs(p.Budget.Total(p.Budget.Find("4.01")) - 100 * 180 * 1.1 * 1.05 * 1.1) < 1e-6, "the same total after load")
 
 End
 

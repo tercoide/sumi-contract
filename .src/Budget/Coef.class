@@ -1,0 +1,78 @@
+' Gambas class file
+
+'' A coefficient with its reason: a % that raises (or, negative, lowers) a price. The budget has them at three
+'' levels (decided with the user 2026-11-17: "several coefficients in each part for particular reasons"): the
+'' project's (general expenses, profit, taxes: Project.PriceFactor), a rubro's, and an item's.
+
+Public Name As String = ""                      '' why: "financial cost", "access difficulty", "IIBB"...
+Public Pct As Float
+
+Public Function Factor() As Float
+
+    Return 1 + Pct / 100
+
+End
+
+Public Function ToJson() As Collection
+
+    Return ["name": Name, "pct": Pct]
+
+End
+
+Static Public Function FromJson(c As Collection) As Coef
+
+    Dim k As New Coef
+
+    k.Name = c["name"]
+    k.Pct = c["pct"]
+    Return k
+
+End
+
+Static Public Function Make(sName As String, fPct As Float) As Coef
+
+    Dim k As New Coef
+
+    k.Name = sName
+    k.Pct = fPct
+    Return k
+
+End
+
+'' The product of the factors of a list
+Static Public Function Chain(aCoefs As Coef[]) As Float
+
+    Dim k As Coef
+    Dim f As Float = 1
+
+    For Each k In aCoefs
+        f *= k.Factor()
+    Next
+    Return f
+
+End
+
+Static Public Function ListToJson(aCoefs As Coef[]) As Variant[]
+
+    Dim a As New Variant[]
+    Dim k As Coef
+
+    For Each k In aCoefs
+        a.Add(k.ToJson())
+    Next
+    Return a
+
+End
+
+Static Public Function ListFromJson(v As Variant) As Coef[]
+
+    Dim a As New Coef[]
+    Dim w As Variant
+
+    If IsNull(v) Then Return a
+    For Each w In v
+        a.Add(Coef.FromJson(w))
+    Next
+    Return a
+
+End

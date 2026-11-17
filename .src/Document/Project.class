@@ -56,6 +56,9 @@ Public GuaranteeDays As Integer = 365           '' from the provisional to the f
 '' PRICES: resources, analyses, rubros, labor and equipment (see PriceBook)
 Public Prices As New PriceBook
 
+'' THE BUDGET: items by rubro, priced with Prices
+Public Budget As New Budget
+
 '' THE CHANGE LOG: every change made through Cmd (see Change), kept with the file
 Public Changes As New Change[]
 
@@ -218,6 +221,7 @@ Public Function ToJson() As Collection
     c["adjustmentBase"] = AdjustmentBase
     c["guaranteeDays"] = GuaranteeDays
     c["prices"] = Prices.ToJson()
+    c["budget"] = Budget.ToJson()
     aList = New Variant[]
     For Each hChange In Changes
         aList.Add(hChange.ToJson())
@@ -285,6 +289,10 @@ Public Sub FromJson(c As Collection)
     If c.Exist("prices") Then
         Prices = New PriceBook
         Prices.FromJson(c["prices"])
+    Endif
+    If c.Exist("budget") Then
+        Budget = New Budget
+        Budget.FromJson(c["budget"])
     Endif
     If c.Exist("changes") Then
         Changes.Clear

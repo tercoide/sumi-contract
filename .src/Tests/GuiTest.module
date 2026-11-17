@@ -63,7 +63,10 @@ Public Sub Step_Timer()
             fMain.tabMain.Index = fMain.TAB_HISTORY
         Case 9
             fMain.HistoryTab.Reload()
+            Cmd.Run("item.add", ["analysis": PriceBook.SortedByCode(sumi.Project.Prices.Analyses)[0].Code, "qty": 10])
+            Cmd.Run("item.add", ["description": "Limpieza", "unitCost": 100, "qty": 1, "rubro": 1])
             fMain.tabMain.Index = fMain.TAB_BUDGET
+            fMain.BudgetTab.TestSelect()
         Case 10
             FAssistant.Show()
         Case 11

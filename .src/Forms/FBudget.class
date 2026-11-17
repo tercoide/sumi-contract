@@ -1,0 +1,383 @@
+' Gambas class file
+
+'' The Budget tab (starting.txt, item 1): the items by rubro with their quantities, unit costs, prices and totals,
+'' the rubro subtotals and % of the total, and below the coefficients of the selected item and of its rubro
+'' (on top of the project's: general expenses, profit, taxes). Quantities, descriptions and a manual item's unit
+'' cost are edited in the grid. Every change goes through Cmd.
+
+Private Const C_CODE As Integer = 0
+Private Const C_DESC As Integer = 1
+Private Const C_UNIT As Integer = 2
+Private Const C_QTY As Integer = 3
+Private Const C_DIRECT As Integer = 4
+Private Const C_PRICE As Integer = 5
+Private Const C_TOTAL As Integer = 6
+Private Const C_PCT As Integer = 7
+
+Private tvItems As TableView
+Private lblTotals As Label
+Private lblFactor As Label
+Private tvItemCoefs As TableView
+Private tvRubroCoefs As TableView
+Private lblItemCoefs As Label
+Private lblRubroCoefs As Label
+Private $aRows As New String[]                  ' grid row -> item id ("" = a rubro title)
+Private $aRowRubro As New Integer[]             ' grid row -> rubro
+Private $sItem As String                        ' the selected item
+Private $iRubro As Integer                      ' the selected rubro
+
+Public Sub _new()
+
+    Dim hRow As HBox
+    Dim hCol As VBox
+
+    hRow = Ui.HBox(Me)
+    Ui.Button(hRow, ("Add item..."), "Add", Me, ("An item from an analysis of the Pricing tab"))
+    Ui.Button(hRow, ("Add manual item"), "AddManual", Me, ("An item without analysis: cleaning, site office, permits, fees..."))
+    Ui.Button(hRow, ("Delete"), "Delete", Me)
+    Ui.Button(hRow, ("Up"), "Up", Me)
+    Ui.Button(hRow, ("Down"), "Down", Me)
+    lblTotals = Ui.Label(hRow, "")
+    lblTotals.Expand = True
+    lblTotals.Alignment = Align.Right
+    lblTotals.Font.Bold = True
+
+    tvItems = New TableView(Me) As "Items"
+    tvItems.Expand = True
+    tvItems.Mode = Select.Single
+    Ui.Columns(tvItems, [("Code"), ("Description"), ("Unit"), ("Quantity"), ("Unit cost"), ("Unit price"), ("Total"), ("%")], [8, 60, 6, 12, 12, 12, 14, 7])
+
+    lblFactor = Ui.Label(Me, "")
+    lblFactor.Foreground = Color.Gray
+    hRow = Ui.HBox(Me, 20)
+    hCol = Ui.VBox(hRow)
+    lblItemCoefs = Ui.Label(hCol, ("Coefficients of the item"))
+    tvItemCoefs = New TableView(hCol) As "ItemCoefs"
+    tvItemCoefs.Expand = True
+    Ui.Columns(tvItemCoefs, [("Reason"), ("%")], [40, 10])
+    Ui.Button(Ui.HBox(hCol), ("Add"), "ItemCoefAdd", Me)
+    hCol = Ui.VBox(hRow)
+    lblRubroCoefs = Ui.Label(hCol, ("Coefficients of the rubro"))
+    tvRubroCoefs = New TableView(hCol) As "RubroCoefs"
+    tvRubroCoefs.Expand = True
+    Ui.Columns(tvRubroCoefs, [("Reason"), ("%")], [40, 10])
+    Ui.Button(Ui.HBox(hCol), ("Add"), "RubroCoefAdd", Me)
+
+End
+
+Public Sub ShowProject(p As Project)
+
+    $sItem = ""
+    Reload()
+
+End
+
+Public Sub Reload()
+
+    Dim h As Budget = sumi.Project.Budget
+    Dim b As BudgetItem
+    Dim iRubro, iRow, i As Integer
+    Dim f, fAll As Float[]
+    Dim fArea As Float
+    Dim sCur As String = sumi.Project.Currency
+
+    fAll = h.Totals()
+    $aRows.Clear
+    $aRowRubro.Clear
+    tvItems.Rows.Count = 0
+    For Each iRubro In h.UsedRubros()
+        f = h.Totals(iRubro)
+        iRow = AddRow("", iRubro)
+        tvItems[iRow, C_CODE].Text = CStr(iRubro)
+        tvItems[iRow, C_DESC].Text = sumi.Project.Prices.RubroName(iRubro) & IIf(h.CoefsOf(iRubro).Count, "  (" & Subst(("&1 coefficients"), h.CoefsOf(iRubro).Count) & ")", "")
+        tvItems[iRow, C_TOTAL].Text = Format(f[1], "#,##0.00")
+        tvItems[iRow, C_PCT].Text = Share(f[1], fAll[1])
+        For i = 0 To C_PCT
+            tvItems[iRow, i].Font = Font["Bold"]
+            tvItems[iRow, i].Background = Color.LightBackground
+        Next
+        For Each b In h.Items
+            If b.Rubro <> iRubro Then Continue
+            iRow = AddRow(b.Id, iRubro)
+            tvItems[iRow, C_CODE].Text = b.Code
+            tvItems[iRow, C_DESC].Text = h.DescriptionOf(b)
+            tvItems[iRow, C_UNIT].Text = h.UnitOf(b)
+            tvItems[iRow, C_QTY].Text = Format(b.Quantity, "#,##0.00")
+            tvItems[iRow, C_DIRECT].Text = Format(h.UnitDirect(b), "#,##0.00")
+            tvItems[iRow, C_PRICE].Text = Format(h.UnitPrice(b), "#,##0.00")
+            tvItems[iRow, C_TOTAL].Text = Format(h.Total(b), "#,##0.00")
+            tvItems[iRow, C_PCT].Text = Share(h.Total(b), fAll[1])
+            If b.Overridden() Then tvItems[iRow, C_QTY].Foreground = Color.Orange
+            If b.QtySource = "design" Then tvItems[iRow, C_QTY].ToolTip = Subst(("From the design: &1 &2"), b.DesignQty, b.DesignRef)
+            If h.Problem(b) Then
+                tvItems[iRow, C_DESC].Foreground = IIf(b.Overridden(), Color.Orange, Color.Red)
+                tvItems[iRow, C_DESC].ToolTip = h.Problem(b)
+            Endif
+            If Not b.Analysis Then tvItems[iRow, C_DESC].Font = Font["Italic"]
+        Next
+    Next
+    For iRow = 0 To tvItems.Rows.Max
+        For Each i In [C_QTY, C_DIRECT, C_PRICE, C_TOTAL, C_PCT]
+            tvItems[iRow, i].Alignment = Align.Right
+        Next
+    Next
+
+    fArea = sumi.Project.CoveredArea + sumi.Project.SemiCoveredArea / 2
+    lblTotals.Text = Subst(("Direct cost &1 &2   Price &1 &3"), sCur, Format(fAll[0], "#,##0.00"), Format(fAll[1], "#,##0.00")) 
+    If fArea > 0 Then lblTotals.Text &= "   " & Subst(("&1 &2 a m²"), sCur, Format(fAll[1] / fArea, "#,##0"))
+    lblFactor.Text = Subst(("Project coefficients: general expenses &1%, profit &2%, taxes &3% (× &4). Rubro and item coefficients go on top. Orange: a design quantity changed by hand."), sumi.Project.OverheadPct, sumi.Project.ProfitPct, sumi.Project.TaxesPct, Format(sumi.Project.PriceFactor(), "0.0000"))
+
+    i = $aRows.Find($sItem)
+    If $sItem And If i >= 0 Then tvItems.Row = i
+    ShowCoefs()
+
+End
+
+'' A part of a whole as "12.5%" ("" if the whole is 0; IIf would divide anyway)
+Private Function Share(fPart As Float, fWhole As Float) As String
+
+    If fWhole = 0 Then Return ""
+    Return Format(fPart / fWhole, "0.0%")
+
+End
+
+Private Function AddRow(sId As String, iRubro As Integer) As Integer
+
+    tvItems.Rows.Count += 1
+    $aRows.Add(sId)
+    $aRowRubro.Add(iRubro)
+    Return tvItems.Rows.Max
+
+End
+
+Private Function Current() As BudgetItem
+
+    If Not $sItem Then Return Null
+    Return sumi.Project.Budget.Find($sItem)
+
+End
+
+Public Sub Items_Change()
+
+    If tvItems.Row < 0 Or If tvItems.Row > $aRows.Max Then Return
+    $sItem = $aRows[tvItems.Row]
+    $iRubro = $aRowRubro[tvItems.Row]
+    ShowCoefs()
+
+End
+
+Public Sub Items_Click()
+
+    Dim b As BudgetItem
+
+    Items_Change()
+    b = Current()
+    If Not b Then Return
+    Select Case tvItems.Column
+        Case C_QTY, C_DESC, C_UNIT
+            tvItems.Edit()
+        Case C_DIRECT
+            If Not b.Analysis Then tvItems.Edit()
+    End Select
+
+End
+
+Public Sub Items_Save(Row As Integer, Column As Integer, Value As String)
+
+    Dim c As New Collection
+    Dim bBad As Boolean
+
+    If Row < 0 Or If Row > $aRows.Max Or If Not $aRows[Row] Then Return
+    Select Case Column
+        Case C_QTY
+            c["qty"] = Ui.ParseNumber(Value, ByRef bBad)
+        Case C_DIRECT
+            c["unitCost"] = Ui.ParseNumber(Value, ByRef bBad)
+        Case C_DESC
+            c["description"] = Trim(Value)
+        Case C_UNIT
+            c["unit"] = Trim(Value)
+    End Select
+    If bBad Then
+        Message.Warning(Subst(("&1 is not a number."), Value))
+        Return
+    Endif
+    If c.Count = 0 Then Return
+    c["key"] = $aRows[Row]
+    Ui.Failed(Cmd.Run("item.set", c))
+
+End
+
+Public Sub Add_Click()
+
+    Dim sId As String = FPick.Choose("analysis", ("Add an item to the budget"))
+    Dim c As Collection
+
+    If Not sId Then Return
+    c = Cmd.Run("item.add", ["analysis": sId, "qty": 0])
+    If Ui.Failed(c) Then Return
+    $sItem = c["id"]
+    Reload()
+    tvItems.Column = C_QTY
+
+End
+
+Public Sub AddManual_Click()
+
+    Dim c As Collection
+
+    c = Cmd.Run("item.add", ["description": ("New manual item"), "unit": "gl", "qty": 1, "rubro": Max(1, $iRubro)])
+    If Ui.Failed(c) Then Return
+    $sItem = c["id"]
+    Reload()
+
+End
+
+Public Sub Delete_Click()
+
+    Dim b As BudgetItem = Current()
+
+    If Not b Then Return
+    If Message.Question(Subst(("Delete item &1 &2?"), b.Code, sumi.Project.Budget.DescriptionOf(b)), ("Delete"), ("Cancel")) <> 1 Then Return
+    Ui.Failed(Cmd.Run("item.delete", ["key": b.Id]))
+
+End
+
+Public Sub Up_Click()
+
+    If Current() Then Ui.Failed(Cmd.Run("item.move", ["key": $sItem, "by": -1]))
+
+End
+
+Public Sub Down_Click()
+
+    If Current() Then Ui.Failed(Cmd.Run("item.move", ["key": $sItem, "by": 1]))
+
+End
+
+'' COEFFICIENTS
+
+Private Sub ShowCoefs()
+
+    Dim b As BudgetItem = Current()
+    Dim aNone As New Coef[]
+
+    If b Then FillCoefs(tvItemCoefs, b.Coefs) Else FillCoefs(tvItemCoefs, aNone)
+    tvItemCoefs.Enabled = (b <> Null)
+    lblItemCoefs.Text = ("Coefficients of the item")
+    If b Then lblItemCoefs.Text &= " " & b.Code
+    FillCoefs(tvRubroCoefs, sumi.Project.Budget.CoefsOf($iRubro))
+    tvRubroCoefs.Enabled = ($iRubro > 0)
+    lblRubroCoefs.Text = ("Coefficients of the rubro") & IIf($iRubro, " " & $iRubro & " " & sumi.Project.Prices.RubroName($iRubro), "")
+
+End
+
+Private Sub FillCoefs(tv As TableView, aCoefs As Coef[])
+
+    Dim i As Integer
+
+    tv.Rows.Count = aCoefs.Count
+    For i = 0 To aCoefs.Max
+        tv[i, 0].Text = aCoefs[i].Name
+        tv[i, 1].Text = Format(aCoefs[i].Pct, "0.00")
+        tv[i, 1].Alignment = Align.Right
+    Next
+
+End
+
+'' The list with row iRow changed (sName / fPct), added (iRow = -1) or removed (bRemove)
+Private Function Edited(aCoefs As Coef[], iRow As Integer, iColumn As Integer, sValue As String, Optional bRemove As Boolean) As Variant[]
+
+    Dim a As Variant[] = Coef.ListToJson(aCoefs)
+    Dim bBad As Boolean
+
+    If iRow < 0 Then
+        a.Add(["name": ("New coefficient"), "pct": 0])
+    Else If bRemove Then
+        a.Remove(iRow)
+    Else If iColumn = 0 Then
+        a[iRow]["name"] = Trim(sValue)
+    Else
+        a[iRow]["pct"] = Ui.ParseNumber(sValue, ByRef bBad)
+        If bBad Then Return Null
+    Endif
+    Return a
+
+End
+
+Public Sub ItemCoefs_Click()
+
+    tvItemCoefs.Edit()
+
+End
+
+Public Sub ItemCoefs_Save(Row As Integer, Column As Integer, Value As String)
+
+    Dim b As BudgetItem = Current()
+    Dim a As Variant[]
+
+    If Not b Then Return
+    a = Edited(b.Coefs, Row, Column, Value, Column = 1 And Trim(Value) = "-")
+    If Not a Then Return
+    Ui.Failed(Cmd.Run("item.set", ["key": b.Id, "coefs": a]))
+
+End
+
+Public Sub ItemCoefAdd_Click()
+
+    Dim b As BudgetItem = Current()
+
+    If Not b Then Return
+    Ui.Failed(Cmd.Run("item.set", ["key": b.Id, "coefs": Edited(b.Coefs, -1, 0, "")]))
+
+End
+
+Public Sub ItemCoefs_KeyPress()
+
+    Dim b As BudgetItem = Current()
+
+    If Key.Code <> Key.Delete Or If Not b Or If tvItemCoefs.Row < 0 Then Return
+    Ui.Failed(Cmd.Run("item.set", ["key": b.Id, "coefs": Edited(b.Coefs, tvItemCoefs.Row, 0, "", True)]))
+
+End
+
+Public Sub RubroCoefs_Click()
+
+    tvRubroCoefs.Edit()
+
+End
+
+Public Sub RubroCoefs_Save(Row As Integer, Column As Integer, Value As String)
+
+    Dim a As Variant[]
+
+    If Not $iRubro Then Return
+    a = Edited(sumi.Project.Budget.CoefsOf($iRubro), Row, Column, Value)
+    If Not a Then Return
+    Ui.Failed(Cmd.Run("rubro.coefs", ["rubro": $iRubro, "coefs": a]))
+
+End
+
+Public Sub RubroCoefAdd_Click()
+
+    If Not $iRubro Then Return
+    Ui.Failed(Cmd.Run("rubro.coefs", ["rubro": $iRubro, "coefs": Edited(sumi.Project.Budget.CoefsOf($iRubro), -1, 0, "")]))
+
+End
+
+Public Sub RubroCoefs_KeyPress()
+
+    If Key.Code <> Key.Delete Or If Not $iRubro Or If tvRubroCoefs.Row < 0 Then Return
+    Ui.Failed(Cmd.Run("rubro.coefs", ["rubro": $iRubro, "coefs": Edited(sumi.Project.Budget.CoefsOf($iRubro), tvRubroCoefs.Row, 0, "", True)]))
+
+End
+
+'' For GuiTest
+Public Sub TestSelect()
+
+    If tvItems.Rows.Count > 1 Then
+        tvItems.Row = 1
+        Items_Change()
+    Endif
+
+End

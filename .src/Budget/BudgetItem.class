@@ -1,0 +1,105 @@
+' Gambas class file
+
+'' A line of the budget: a task (an analysis) and how much of it, in a rubro. Or a manual item (no analysis:
+'' cleaning, site office, permits, fees...) with its own unit cost. Its quantity is typed, or comes from the
+'' sumi-designer model (QtySource = "design"); a design quantity changed by hand keeps the design's (DesignQty)
+'' and is marked. Its price is the direct cost × the project's coefficients × its rubro's × its own.
+
+Public Id As String                             '' permanent (see Ids)
+Public Code As String = ""                      '' "3.02": rubro and order
+Public Rubro As Integer
+Public Analysis As String = ""                  '' the analysis Id ("" = a manual item)
+Public Description As String = ""               '' "" = the analysis's name
+Public Unit As String = ""                      '' "" = the analysis's unit
+Public Quantity As Float
+Public QtySource As String = "manual"           '' "manual" or "design"
+Public DesignQty As Float                       '' what the design said, when QtySource = "design"
+Public DesignRef As String = ""                 '' what of the design it measures (an element type...)
+Public UnitCost As Float                        '' a manual item's direct cost a unit
+Public Coefs As New Coef[]                      '' its own coefficients
+Public Note As String = ""
+
+Public Sub _new()
+
+    Id = Ids.Make("i")
+
+End
+
+'' The quantity was changed by hand after coming from the design
+Public Function Overridden() As Boolean
+
+    Return QtySource = "design" And Abs(Quantity - DesignQty) > 1e-9
+
+End
+
+Public Function ToJson() As Collection
+
+    Dim c As New JSONCollection
+
+    c["id"] = Id
+    c["code"] = Code
+    c["rubro"] = Rubro
+    If Analysis Then c["analysis"] = Analysis
+    If Description Then c["description"] = Description
+    If Unit Then c["unit"] = Unit
+    c["qty"] = Quantity
+    c["qtySource"] = QtySource
+    If QtySource = "design" Then c["designQty"] = DesignQty
+    If DesignRef Then c["designRef"] = DesignRef
+    If UnitCost Then c["unitCost"] = UnitCost
+    If Coefs.Count Then c["coefs"] = Coef.ListToJson(Coefs)
+    If Note Then c["note"] = Note
+    Return c
+
+End
+
+Static Public Function FromJson(c As Collection) As BudgetItem
+
+    Dim b As New BudgetItem
+
+    If c["id"] Then b.Id = c["id"]
+    b.Apply(c)
+    Return b
+
+End
+
+'' Sets the fields present in c (the file's names). Returns a field it doesn't know, or "".
+Public Function Apply(c As Collection) As String
+
+    Dim v As Variant
+
+    For Each v In c
+        Select Case c.Key
+            Case "id"
+            Case "code"
+                Code = CStr(v)
+            Case "rubro"
+                Rubro = v
+            Case "analysis"
+                Analysis = v
+            Case "description"
+                Description = v
+            Case "unit"
+                Unit = v
+            Case "qty"
+                Quantity = v
+            Case "qtySource"
+                If v <> "manual" And If v <> "design" Then Return "qtySource"
+                QtySource = v
+            Case "designQty"
+                DesignQty = v
+            Case "designRef"
+                DesignRef = v
+            Case "unitCost"
+                UnitCost = v
+            Case "coefs"
+                Coefs = Coef.ListFromJson(v)
+            Case "note"
+                Note = v
+            Default
+                Return c.Key
+        End Select
+    Next
+    Return ""
+
+End

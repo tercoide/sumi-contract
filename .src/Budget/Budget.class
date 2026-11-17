@@ -1,0 +1,217 @@
+' Gambas class file
+
+'' The budget (starting.txt, item 1): items grouped by rubro, each an analysis × a quantity (or a manual item),
+'' priced with the project's price book and coefficients at three levels: the project's chain
+'' (Project.PriceFactor), the rubro's (RubroCoefs) and the item's. Quantities come from sumi-designer or are
+'' typed here.
+
+Public Items As New BudgetItem[]                '' in order: by rubro, then as people arranged them
+Public RubroCoefs As New Collection             '' Coef[] by CStr(rubro number)
+
+'' THE NUMBERS
+
+'' The direct cost of one unit of an item
+Public Function UnitDirect(b As BudgetItem) As Float
+
+    Dim p As Project = sumi.Project
+
+    If b.Analysis Then
+        If Not p.Prices.Analyses.Exist(b.Analysis) Then Return 0
+        Return p.Prices.Direct(p.Prices.Analyses[b.Analysis])
+    Endif
+    Return b.UnitCost
+
+End
+
+'' The factor from direct cost to price for an item: the project's × its rubro's × its own
+Public Function Factor(b As BudgetItem) As Float
+
+    Return sumi.Project.PriceFactor() * Coef.Chain(CoefsOf(b.Rubro)) * Coef.Chain(b.Coefs)
+
+End
+
+Public Function UnitPrice(b As BudgetItem) As Float
+
+    Return UnitDirect(b) * Factor(b)
+
+End
+
+Public Function Total(b As BudgetItem) As Float
+
+    Return b.Quantity * UnitPrice(b)
+
+End
+
+Public Function DirectTotal(b As BudgetItem) As Float
+
+    Return b.Quantity * UnitDirect(b)
+
+End
+
+'' The rubro's coefficients (an empty list if it has none)
+Public Function CoefsOf(iRubro As Integer) As Coef[]
+
+    If RubroCoefs.Exist(CStr(iRubro)) Then Return RubroCoefs[CStr(iRubro)]
+    Return New Coef[]
+
+End
+
+'' [direct, price] of a rubro (0 = all)
+Public Function Totals(Optional iRubro As Integer) As Float[]
+
+    Dim b As BudgetItem
+    Dim fDirect, fPrice As Float
+
+    For Each b In Items
+        If iRubro And If b.Rubro <> iRubro Then Continue
+        fDirect += DirectTotal(b)
+        fPrice += Total(b)
+    Next
+    Return [fDirect, fPrice]
+
+End
+
+'' The rubros the items are in, sorted
+Public Function UsedRubros() As Integer[]
+
+    Dim a As New Integer[]
+    Dim b As BudgetItem
+
+    For Each b In Items
+        If Not a.Exist(b.Rubro) Then a.Add(b.Rubro)
+    Next
+    Return a.Sort()
+
+End
+
+'' What a person reads for an item
+Public Function DescriptionOf(b As BudgetItem) As String
+
+    Dim a As Analysis
+
+    If b.Description Then Return b.Description
+    If b.Analysis Then
+        a = sumi.Project.Prices.Analyses[b.Analysis]
+        If a Then Return a.Name
+        Return ("(missing analysis)")
+    Endif
+    Return ""
+
+End
+
+Public Function UnitOf(b As BudgetItem) As String
+
+    Dim a As Analysis
+
+    If b.Unit Then Return b.Unit
+    If b.Analysis Then
+        a = sumi.Project.Prices.Analyses[b.Analysis]
+        If a Then Return a.Unit
+    Endif
+    Return ""
+
+End
+
+'' What is wrong with an item, or ""
+Public Function Problem(b As BudgetItem) As String
+
+    If b.Analysis And If Not sumi.Project.Prices.Analyses.Exist(b.Analysis) Then Return ("Its analysis doesn't exist")
+    If UnitDirect(b) = 0 Then Return ("It has no cost")
+    If b.Quantity = 0 Then Return ("It has no quantity")
+    If b.Overridden() Then Return Subst(("Quantity changed by hand (the design says &1)"), b.DesignQty)
+    Return ""
+
+End
+
+'' LOOKUPS AND ORDER
+
+Public Function Find(sKey As String) As BudgetItem
+
+    Dim b As BudgetItem
+
+    For Each b In Items
+        If b.Id = sKey Or If b.Code = sKey Then Return b
+    Next
+
+End
+
+Public Function IndexOf(sId As String) As Integer
+
+    Dim i As Integer
+
+    For i = 0 To Items.Max
+        If Items[i].Id = sId Then Return i
+    Next
+    Return -1
+
+End
+
+'' Where a new item of a rubro goes: after the last of its rubro, or before the first of a later one
+Public Function InsertPos(iRubro As Integer) As Integer
+
+    Dim i As Integer
+
+    For i = Items.Max DownTo 0
+        If Items[i].Rubro <= iRubro Then Return i + 1
+    Next
+    Return 0
+
+End
+
+'' The codes "rubro.order" (3.01, 3.02...), as the items are now
+Public Sub Renumber()
+
+    Dim b As BudgetItem
+    Dim cCount As New Collection
+    Dim n As Integer
+
+    For Each b In Items
+        n = 1
+        If cCount.Exist(CStr(b.Rubro)) Then n = cCount[CStr(b.Rubro)] + 1
+        cCount[CStr(b.Rubro)] = n
+        b.Code = b.Rubro & "." & Format(n, "00")
+    Next
+
+End
+
+'' THE FILE
+
+Public Function ToJson() As Collection
+
+    Dim c As New JSONCollection
+    Dim a As New Variant[]
+    Dim b As BudgetItem
+    Dim cRub As New JSONCollection
+    Dim v As Variant
+
+    For Each b In Items
+        a.Add(b.ToJson())
+    Next
+    c["items"] = a
+    For Each v In RubroCoefs
+        cRub[RubroCoefs.Key] = Coef.ListToJson(v)
+    Next
+    c["rubroCoefs"] = cRub
+    Return c
+
+End
+
+Public Sub FromJson(c As Collection)
+
+    Dim v As Variant
+
+    Items.Clear
+    RubroCoefs.Clear
+    If Not c Then Return
+    If c.Exist("items") Then
+        For Each v In c["items"]
+            Items.Add(BudgetItem.FromJson(v))
+        Next
+    Endif
+    If c.Exist("rubroCoefs") Then
+        For Each v In c["rubroCoefs"]
+            RubroCoefs[c["rubroCoefs"].Key] = Coef.ListFromJson(v)
+        Next
+    Endif
+
+End
