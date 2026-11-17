@@ -59,6 +59,9 @@ Public Prices As New PriceBook
 '' THE BUDGET: items by rubro, priced with Prices
 Public Budget As New Budget
 
+'' THE GANTT: a task for each budget item
+Public Schedule As New Schedule
+
 '' THE CHANGE LOG: every change made through Cmd (see Change), kept with the file
 Public Changes As New Change[]
 
@@ -222,6 +225,7 @@ Public Function ToJson() As Collection
     c["guaranteeDays"] = GuaranteeDays
     c["prices"] = Prices.ToJson()
     c["budget"] = Budget.ToJson()
+    c["schedule"] = Schedule.ToJson()
     aList = New Variant[]
     For Each hChange In Changes
         aList.Add(hChange.ToJson())
@@ -293,6 +297,10 @@ Public Sub FromJson(c As Collection)
     If c.Exist("budget") Then
         Budget = New Budget
         Budget.FromJson(c["budget"])
+    Endif
+    If c.Exist("schedule") Then
+        Schedule = New Schedule
+        Schedule.FromJson(c["schedule"])
     Endif
     If c.Exist("changes") Then
         Changes.Clear

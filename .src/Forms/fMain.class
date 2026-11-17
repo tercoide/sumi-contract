@@ -6,6 +6,7 @@
 
 Public ProjectTab As FProject                   '' the Project tab: the work's own data
 Public BudgetTab As FBudget                     '' the Budget tab: items by rubro, totals, coefficients
+Public GanttTab As FGantt                       '' the Gantt tab: tasks, critical path, investment curve
 Public PricingTab As FPricing                   '' the Pricing tab: resources, analyses, rubros, labor charges
 Public HistoryTab As FHistory                   '' the History tab: the change log
 
@@ -34,9 +35,10 @@ Public Sub Run()
     ' the tabs
     ProjectTab = New FProject(tabMain[TAB_PROJECT])
     BudgetTab = New FBudget(tabMain[TAB_BUDGET])
+    GanttTab = New FGantt(tabMain[TAB_GANTT])
     PricingTab = New FPricing(tabMain[TAB_PRICING])
     HistoryTab = New FHistory(tabMain[TAB_HISTORY])
-    For Each i In [TAB_GANTT, TAB_CONTRACTS]
+    For Each i In [TAB_CONTRACTS]
         Placeholder(i)
     Next
     tabMain.Index = TAB_PROJECT
@@ -69,6 +71,7 @@ Public Sub ProjectChanged()
 
     ProjectTab.ShowProject(sumi.Project)
     BudgetTab.ShowProject(sumi.Project)
+    GanttTab.ShowProject(sumi.Project)
     PricingTab.ShowProject(sumi.Project)
     HistoryTab.Reload()
     UpdateTitle()
@@ -91,6 +94,8 @@ Private Sub RefreshTab(iTab As Integer)
             ProjectTab.Reload()
         Case TAB_BUDGET
             BudgetTab.Reload()
+        Case TAB_GANTT
+            GanttTab.Reload()
         Case TAB_PRICING
             PricingTab.Reload()
         Case TAB_HISTORY

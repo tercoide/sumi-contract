@@ -68,8 +68,12 @@ Public Sub Step_Timer()
             fMain.tabMain.Index = fMain.TAB_BUDGET
             fMain.BudgetTab.TestSelect()
         Case 10
-            FAssistant.Show()
+            Cmd.Run("task.set", ["key": sumi.Project.Budget.Items[0].Id, "days": 4])
+            Cmd.Run("task.set", ["key": sumi.Project.Budget.Items[1].Id, "days": 0, "after": [sumi.Project.Budget.Items[0].Id]])
+            fMain.tabMain.Index = fMain.TAB_GANTT
         Case 11
+            FAssistant.Show()
+        Case 12
             FAssistant.Close()
             $hTimer.Stop
             Print "gui-test: OK"

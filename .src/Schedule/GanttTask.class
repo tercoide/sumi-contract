@@ -1,0 +1,90 @@
+' Gambas class file
+
+'' The schedule of one budget item (decided with the user: one task per item): how many working days it takes,
+'' what it waits for, and when it can start. Days are working days counted from the project's start (day 0),
+'' on the project's calendar (Project.IsWorkDay). Durations come from the crews (set by the contractors, later)
+'' or are typed; Schedule.SuggestDays proposes one from the labor hours.
+
+Public Item As String                           '' the budget item's Id (the task's id too)
+Public Days As Float = 1                        '' working days it takes (0 = a milestone)
+Public Crew As Float = 0                        '' people working on it (0 = not set): for the suggestion
+Public After As New String[]                    '' items it waits for (finish to start)
+Public Lag As Integer                           '' working days to wait after them (negative = overlap)
+Public StartNotBefore As Integer                '' it can't start before this working day
+Public Done As Float                            '' progress, 0 to 1 (from the certificates, later)
+
+' worked out by Schedule.Compute
+Public EarlyStart As Float
+Public EarlyFinish As Float
+Public LateStart As Float
+Public LateFinish As Float
+
+Public Function Slack() As Float
+
+    Return LateStart - EarlyStart
+
+End
+
+Public Function Critical() As Boolean
+
+    Return Slack() < 1e-6
+
+End
+
+Public Function ToJson() As Collection
+
+    Dim c As New JSONCollection
+
+    c["item"] = Item
+    c["days"] = Days
+    If Crew Then c["crew"] = Crew
+    If After.Count Then c["after"] = After
+    If Lag Then c["lag"] = Lag
+    If StartNotBefore Then c["startNotBefore"] = StartNotBefore
+    If Done Then c["done"] = Done
+    Return c
+
+End
+
+Static Public Function FromJson(c As Collection) As GanttTask
+
+    Dim t As New GanttTask
+
+    t.Item = c["item"]
+    t.Apply(c)
+    Return t
+
+End
+
+'' Sets the fields present in c; a field it doesn't know, or ""
+Public Function Apply(c As Collection) As String
+
+    Dim v, w As Variant
+
+    For Each v In c
+        Select Case c.Key
+            Case "item", "key"
+            Case "days"
+                If v < 0 Then Return "days"
+                Days = v
+            Case "crew"
+                Crew = v
+            Case "after"
+                After.Clear
+                For Each w In v
+                    After.Add(CStr(w))
+                Next
+            Case "lag"
+                Lag = v
+            Case "startNotBefore"
+                StartNotBefore = v
+            Case "done"
+                If v < 0 Or If v > 1 Then Return "done"
+                Done = v
+            Default
+                Return c.Key
+        End Select
+    Next
+    Return ""
+
+End

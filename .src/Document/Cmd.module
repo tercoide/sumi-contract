@@ -16,7 +16,7 @@
 '' charge.set, charge.delete, resource.list, resource.get, resource.add, resource.set, resource.delete,
 '' analysis.list, analysis.get, analysis.add, analysis.set, analysis.copy, analysis.delete, analysis.addline,
 '' analysis.setline, analysis.removeline, analysis.flatten, prices.import, budget.list, item.add, item.set,
-'' item.delete, item.move, rubro.coefs
+'' item.delete, item.move, rubro.coefs, schedule.get, task.set
 
 Public Const ABSENT As String = "~absent~"      '' a snapshot of something that didn't exist
 Public Const COALESCE_SECONDS As Integer = 120  '' edits of the same field in a row become one change
@@ -125,6 +125,10 @@ Private Function Dispatch(sCommand As String, c As Collection) As Collection
             Return ItemMove(c)
         Case "rubro.coefs"
             Return RubroCoefs(c)
+        Case "schedule.get"
+            Return ScheduleGet(c)
+        Case "task.set"
+            Return TaskSet(c)
     End Select
     Return Fail(Subst(("Unknown command &1."), sCommand))
 
@@ -167,6 +171,8 @@ Public Function Help() As Collection
     c["item.set"] = "{key (id or code like 3.02), field: value...} fields: qty, description, unit, unitCost, rubro, analysis, note, coefs [{name, pct}...] (the item's own coefficients), qtySource, designQty, designRef"
     c["item.delete"] = "{key}"
     c["item.move"] = "{key, by} moves an item up (by < 0) or down within its rubro"
+    c["schedule.get"] = "{curve?} -> the Gantt: for each item its task (days, crew, after, lag, earlyStart, earlyFinish, slack, critical, start and end dates), the length in working days, the end date, and with curve the money spent each month"
+    c["task.set"] = "{key (budget item id or code), days?, crew?, after? [item keys it waits for], lag?, startNotBefore?, done? (0 to 1), suggest? (true: days from the labor hours and the crew)}"
     c["rubro.coefs"] = "{rubro, coefs [{name, pct}...]} the coefficients of a rubro in the budget (on top of the project's)"
     Return c
 
@@ -301,10 +307,13 @@ Public Function Snapshot(sTarget As String) As Variant
     Select Case sTarget
         Case "budget"
             Return p.Budget.ToJson()
+        Case "schedule"
+            Return p.Schedule.ToJson()
         Case "project"
             c = p.ToJson()
             c.Remove("prices")
             c.Remove("budget")
+            c.Remove("schedule")
             c.Remove("changes")
             c.Remove("modified")
             Return c
@@ -359,6 +368,9 @@ Public Sub Restore(sTarget As String, v As Variant)
         Case "budget"
             p.Budget = New Budget
             p.Budget.FromJson(v)
+        Case "schedule"
+            p.Schedule = New Schedule
+            p.Schedule.FromJson(v)
         Case "project"
             p.FromJson(v)
         Case "book"
@@ -532,7 +544,7 @@ Private Function ProjectSet(c As Collection) As Collection
     Dim sKey As String
 
     aAllowed = KeysOf(sumi.Project.ToJson())
-    For Each sKey In ["prices", "budget", "created", "modified", "changes"]
+    For Each sKey In ["prices", "budget", "schedule", "created", "modified", "changes"]
         If aAllowed.Exist(sKey) Then aAllowed.Remove(aAllowed.Find(sKey))
     Next
     For Each v In c
@@ -1199,5 +1211,81 @@ Private Function RubroCoefs(c As Collection) As Collection
         h.RubroCoefs.Remove(CStr(c["rubro"]))
     Endif
     Return Ok()
+
+End
+
+'' THE GANTT
+
+Private Function ScheduleGet(c As Collection) As Collection
+
+    Dim p As Project = sumi.Project
+    Dim s As Schedule = p.Schedule
+    Dim aTasks As New Variant[]
+    Dim b As BudgetItem
+    Dim t As GanttTask
+    Dim cOut As Collection
+    Dim cTask As Collection
+
+    If s.Compute(p.Budget) Then Return Fail(s.Problem)
+    For Each b In p.Budget.Items
+        t = s.Tasks[b.Id]
+        cTask = t.ToJson()
+        cTask["code"] = b.Code
+        cTask["description"] = p.Budget.DescriptionOf(b)
+        cTask["earlyStart"] = t.EarlyStart
+        cTask["earlyFinish"] = t.EarlyFinish
+        cTask["slack"] = t.Slack()
+        cTask["critical"] = t.Critical()
+        cTask["start"] = Format(s.DateOf(t.EarlyStart), "yyyy-mm-dd")
+        cTask["end"] = Format(s.DateOf(Max(t.EarlyStart, t.EarlyFinish - 1)), "yyyy-mm-dd")
+        cTask["laborHoursPerUnit"] = s.LaborHours(b)
+        aTasks.Add(cTask)
+    Next
+    cOut = Ok(["tasks": aTasks, "length": s.Length, "end": Format(s.DateOf(Max(0, s.Length - 1)), "yyyy-mm-dd"), "available": p.DurationDays])
+    If c["curve"] Then cOut["curve"] = s.Curve(p.Budget)
+    Return cOut
+
+End
+
+Private Function TaskSet(c As Collection) As Collection
+
+    Dim p As Project = sumi.Project
+    Dim b, o As BudgetItem
+    Dim t, hTest As GanttTask
+    Dim cSet As New Collection
+    Dim v As Variant
+    Dim sBad As String
+    Dim aAfter As New String[]
+
+    If c["key"] Then b = p.Budget.Find(CStr(c["key"]))
+    If Not b Then Return Fail(Subst(("There is no budget item &1."), c["key"]))
+    p.Schedule.Sync(p.Budget)
+    t = p.Schedule.Tasks[b.Id]
+    For Each v In c
+        If c.Key <> "key" And If c.Key <> "suggest" Then cSet[c.Key] = v
+    Next
+    ' "after" by code or id, checked for loops
+    If cSet.Exist("after") Then
+        For Each v In cSet["after"]
+            o = p.Budget.Find(CStr(v))
+            If Not o Then Return Fail(Subst(("There is no budget item &1."), v))
+            If o.Id = b.Id Or If p.Schedule.MakesLoop(b.Id, o.Id) Then Return Fail(Subst(("&1 can't wait for &2: it would be a loop."), b.Code, o.Code))
+            aAfter.Add(o.Id)
+        Next
+        cSet["after"] = aAfter
+    Endif
+    If c["suggest"] Then
+        If cSet.Exist("crew") Then v = cSet["crew"] Else v = IIf(t.Crew > 0, t.Crew, 2)
+        cSet["crew"] = v
+        cSet["days"] = Max(1, Ceil(p.Schedule.SuggestDays(b, v) - 1e-9))
+    Endif
+    If cSet.Count = 0 Then Return Fail(("Nothing to set."))
+    hTest = GanttTask.FromJson(t.ToJson())
+    sBad = hTest.Apply(cSet)
+    If sBad Then Return Fail(Subst(("Tasks have no field &1 (or a bad value)."), sBad))
+    Start("task.set", c, Subst(("Gantt: task &1, &2"), b.Code, KeysOf(cSet).Join(", ")))
+    Touch("schedule")
+    t.Apply(cSet)
+    Return Ok(["days": t.Days])
 
 End

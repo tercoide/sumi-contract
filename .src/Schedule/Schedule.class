@@ -1,0 +1,292 @@
+' Gambas class file
+
+'' The Gantt (starting.txt, item 2): a GanttTask for each budget item, scheduled by the critical path method on
+'' working days from the project's start, and the investment curve (the price spent each month, spread over
+'' each task's working days).
+
+Public Tasks As New Collection                  '' GanttTask by item Id
+Public Problem As String                        '' why the last Compute couldn't finish (a loop), or ""
+Public Length As Float                          '' working days of the whole work (after Compute)
+
+'' The task of an item, made if it has none (1 day, or the suggestion)
+Public Function TaskOf(sItem As String) As GanttTask
+
+    Dim t As GanttTask = Tasks[sItem]
+
+    If t Then Return t
+    t = New GanttTask
+    t.Item = sItem
+    Tasks[sItem] = t
+    Return t
+
+End
+
+'' Makes the missing tasks and drops those of items that are gone
+Public Sub Sync(h As Budget)
+
+    Dim b As BudgetItem
+    Dim t As GanttTask
+    Dim aGone As New String[]
+    Dim sId As String
+
+    For Each b In h.Items
+        If Not Tasks.Exist(b.Id) Then
+            t = TaskOf(b.Id)
+            t.Days = Max(1, Ceil(SuggestDays(b, 2) - 1e-9))
+        Endif
+    Next
+    For Each t In Tasks
+        If h.IndexOf(t.Item) < 0 Then aGone.Add(t.Item)
+    Next
+    For Each sId In aGone
+        Tasks.Remove(sId)
+    Next
+    For Each t In Tasks
+        For Each sId In aGone
+            If t.After.Exist(sId) Then t.After.Remove(t.After.Find(sId))
+        Next
+    Next
+
+End
+
+'' Labor hours of one unit of an item (its analysis's labor lines, sub-analyses included, over its labor yield)
+Public Function LaborHours(b As BudgetItem) As Float
+
+    If Not b.Analysis Then Return 0
+    If Not sumi.Project.Prices.Analyses.Exist(b.Analysis) Then Return 0
+    Return HoursOf(sumi.Project.Prices.Analyses[b.Analysis], 0)
+
+End
+
+Private Function HoursOf(a As Analysis, iDepth As Integer) As Float
+
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim l As AnalysisLine
+    Dim f As Float
+    Dim r As Resource
+
+    If iDepth > PriceBook.MAX_DEPTH Then Return 0
+    For Each l In a.Lines
+        If l.IsAnalysis Then
+            If b.Analyses.Exist(l.Ref) Then f += l.Quantity * HoursOf(b.Analyses[l.Ref], iDepth + 1)
+        Else
+            r = b.Resources[l.Ref]
+            If r And If r.Kind = Resource.LABOR And If LCase(r.Unit) Begins "h" Then f += l.Quantity / IIf(a.LaborYield > 0, a.LaborYield, 1)
+        Endif
+    Next
+    Return f
+
+End
+
+'' Working days an item takes with a crew of fCrew people: quantity × labor hours a unit / (crew × hours a day)
+Public Function SuggestDays(b As BudgetItem, fCrew As Float) As Float
+
+    Dim fHours As Float = sumi.Project.HoursPerDay
+
+    If fCrew <= 0 Or If fHours <= 0 Then Return 0
+    Return b.Quantity * LaborHours(b) / (fCrew * fHours)
+
+End
+
+'' The critical path: early start and finish forward, late ones backward. True if there is a loop.
+Public Function Compute(h As Budget) As Boolean
+
+    Dim aOrder As String[]
+    Dim t, p As GanttTask
+    Dim sId As String
+    Dim f As Float
+
+    Problem = ""
+    Sync(h)
+    aOrder = TopoOrder()
+    If Not aOrder Then
+        Problem = ("Some tasks wait for each other in a loop.")
+        Return True
+    Endif
+
+    ' forward
+    For Each sId In aOrder
+        t = Tasks[sId]
+        f = t.StartNotBefore
+        For Each p In Predecessors(t)
+            f = Max(f, p.EarlyFinish + t.Lag)
+        Next
+        t.EarlyStart = Max(0, f)
+        t.EarlyFinish = t.EarlyStart + t.Days
+    Next
+    Length = 0
+    For Each t In Tasks
+        Length = Max(Length, t.EarlyFinish)
+    Next
+
+    ' backward
+    For Each t In Tasks
+        t.LateFinish = Length
+    Next
+    aOrder = aOrder.Reverse()
+    For Each sId In aOrder
+        t = Tasks[sId]
+        t.LateStart = t.LateFinish - t.Days
+        For Each p In Predecessors(t)
+            p.LateFinish = Min(p.LateFinish, t.LateStart - t.Lag)
+        Next
+    Next
+
+End
+
+Private Function Predecessors(t As GanttTask) As GanttTask[]
+
+    Dim a As New GanttTask[]
+    Dim sId As String
+
+    For Each sId In t.After
+        If Tasks.Exist(sId) Then a.Add(Tasks[sId])
+    Next
+    Return a
+
+End
+
+'' The tasks in an order where each comes after what it waits for; Null if there is a loop
+Private Function TopoOrder() As String[]
+
+    Dim aOut As New String[]
+    Dim cState As New Collection
+    Dim t As GanttTask
+
+    For Each t In Tasks
+        If Visit(t, cState, aOut) Then Return Null
+    Next
+    Return aOut
+
+End
+
+Private Function Visit(t As GanttTask, cState As Collection, aOut As String[]) As Boolean
+
+    Dim p As GanttTask
+
+    If cState[t.Item] = 2 Then Return False
+    If cState[t.Item] = 1 Then Return True          ' a loop
+    cState[t.Item] = 1
+    For Each p In Predecessors(t)
+        If Visit(p, cState, aOut) Then Return True
+    Next
+    cState[t.Item] = 2
+    aOut.Add(t.Item)
+
+End
+
+'' Would t waiting for sOther make a loop?
+Public Function MakesLoop(sItem As String, sOther As String) As Boolean
+
+    Dim cSeen As New Collection
+
+    Return Reaches(sOther, sItem, cSeen)
+
+End
+
+'' Does sFrom wait (directly or not) for sTo?
+Private Function Reaches(sFrom As String, sTo As String, cSeen As Collection) As Boolean
+
+    Dim sId As String
+
+    If sFrom = sTo Then Return True
+    If cSeen.Exist(sFrom) Or If Not Tasks.Exist(sFrom) Then Return False
+    cSeen[sFrom] = True
+    For Each sId In Tasks[sFrom].After
+        If Reaches(sId, sTo, cSeen) Then Return True
+    Next
+
+End
+
+'' The date of a working day counted from the project's start (day 0 = the first working day)
+Public Function DateOf(fDay As Float) As Date
+
+    Dim p As Project = sumi.Project
+    Dim d As Date = p.StartDate
+    Dim n As Integer = Int(fDay)
+
+    While Not p.IsWorkDay(d)
+        d = DateAdd(d, gb.Day, 1)
+    Wend
+    While n > 0
+        d = DateAdd(d, gb.Day, 1)
+        If p.IsWorkDay(d) Then Dec n
+    Wend
+    Return d
+
+End
+
+'' The investment curve: [month "yyyy-mm", price spent that month, accumulated] for each month of the work,
+'' each item's total spread evenly over its working days (early schedule). Compute first.
+Public Function Curve(h As Budget) As Variant[]
+
+    Dim cMonth As New Collection
+    Dim aMonths As New String[]
+    Dim b As BudgetItem
+    Dim t As GanttTask
+    Dim i, iDays As Integer
+    Dim fDaily, fAcc As Float
+    Dim sMonth As String
+    Dim aOut As New Variant[]
+    Dim aDays As New String[]
+    Dim d As Date
+
+    ' the month of each working day, once
+    d = DateOf(0)
+    For i = 0 To CInt(Ceil(Length)) + 1
+        aDays.Add(Format(d, "yyyy-mm"))
+        Repeat
+            d = DateAdd(d, gb.Day, 1)
+        Until sumi.Project.IsWorkDay(d)
+    Next
+
+    For Each b In h.Items
+        t = Tasks[b.Id]
+        If Not t Then Continue
+        iDays = Max(1, CInt(Ceil(t.Days)))
+        fDaily = h.Total(b) / iDays
+        For i = 0 To iDays - 1
+            If t.EarlyStart + i <= aDays.Max Then sMonth = aDays[Int(t.EarlyStart + i)] Else sMonth = Format(DateOf(t.EarlyStart + i), "yyyy-mm")
+            If Not cMonth.Exist(sMonth) Then
+                cMonth[sMonth] = 0.0
+                aMonths.Add(sMonth)
+            Endif
+            cMonth[sMonth] += fDaily
+        Next
+    Next
+    aMonths.Sort()
+    For Each sMonth In aMonths
+        fAcc += cMonth[sMonth]
+        aOut.Add([sMonth, cMonth[sMonth], fAcc])
+    Next
+    Return aOut
+
+End
+
+Public Function ToJson() As Collection
+
+    Dim c As New JSONCollection
+    Dim a As New Variant[]
+    Dim t As GanttTask
+
+    For Each t In Tasks
+        a.Add(t.ToJson())
+    Next
+    c["tasks"] = a
+    Return c
+
+End
+
+Public Sub FromJson(c As Collection)
+
+    Dim v As Variant
+    Dim t As GanttTask
+
+    Tasks.Clear
+    If Not c Or If Not c.Exist("tasks") Then Return
+    For Each v In c["tasks"]
+        t = GanttTask.FromJson(v)
+        Tasks[t.Item] = t
+    Next
+
+End

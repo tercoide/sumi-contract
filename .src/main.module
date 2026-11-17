@@ -9,7 +9,8 @@
 Public Sub Application_Error()
 
     AppLog.Error(Error.Text & " (" & Error.Where & ")", "Application_Error")
-    If sumi.Interactive And If Application.Args.Count > 1 And If Application.Args[1] = "--gui-test" Then Quit 1
+    ' the tests must end, not wait (the network components keep the program alive after an error)
+    If Application.Args.Count > 1 And If Application.Args[1] Begins "--" Then Quit 1
 
 End
 

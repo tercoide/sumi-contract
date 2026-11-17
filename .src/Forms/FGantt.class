@@ -1,0 +1,215 @@
+' Gambas class file
+
+'' The Gantt tab (starting.txt, item 2): a task for each budget item, by rubro, with its working days, crew, what
+'' it waits for and the lag; the dates and slack from the critical path; the bars drawn in the last column
+'' (critical ones in red); and the investment curve by month. Days, crew, "after" (codes, comma separated) and
+'' lag are edited in the grid. Every change goes through Cmd (task.set).
+
+Private Const C_CODE As Integer = 0
+Private Const C_DESC As Integer = 1
+Private Const C_DAYS As Integer = 2
+Private Const C_CREW As Integer = 3
+Private Const C_AFTER As Integer = 4
+Private Const C_LAG As Integer = 5
+Private Const C_START As Integer = 6
+Private Const C_END As Integer = 7
+Private Const C_SLACK As Integer = 8
+Private Const C_BARS As Integer = 9
+
+Private tvTasks As TableView
+Private gvCurve As GridView
+Private lblInfo As Label
+Private $aRows As New String[]                  ' row -> item id
+Private $fLength As Float
+
+Public Sub _new()
+
+    Dim hRow As HBox
+
+    hRow = Ui.HBox(Me)
+    Ui.Button(hRow, ("Suggest durations"), "Suggest", Me, ("Every task's days from its labor hours and its crew (2 people if not set)"))
+    lblInfo = Ui.Label(hRow, "")
+    lblInfo.Expand = True
+    lblInfo.Alignment = Align.Right
+    lblInfo.Font.Bold = True
+
+    tvTasks = New TableView(Me) As "Tasks"
+    tvTasks.Expand = True
+    tvTasks.Mode = Select.Single
+    Ui.Columns(tvTasks, [("Code"), ("Task"), ("Days"), ("Crew"), ("After"), ("Lag"), ("Start"), ("End"), ("Slack"), ("")], [7, 36, 7, 6, 12, 6, 11, 11, 7, 60])
+
+    Ui.Label(Me, ("Investment curve: the price spent each month (each item spread over its working days)"))
+    gvCurve = New GridView(Me)
+    gvCurve.H = Desktop.Scale * 20
+    Ui.Columns(gvCurve, [("Month"), ("Spent"), ("Accumulated"), ("% accumulated")], [14, 18, 18, 14])
+
+End
+
+Public Sub ShowProject(p As Project)
+
+    Reload()
+
+End
+
+Public Sub Reload()
+
+    Dim p As Project = sumi.Project
+    Dim s As Schedule = p.Schedule
+    Dim h As Budget = p.Budget
+    Dim b As BudgetItem
+    Dim t As GanttTask
+    Dim iRow, i As Integer
+    Dim aCodes As String[]
+    Dim sId As String
+    Dim aCurve As Variant[]
+    Dim fTotal As Float
+
+    If s.Compute(h) Then
+        lblInfo.Text = s.Problem
+        lblInfo.Foreground = Color.Red
+        Return
+    Endif
+    $fLength = s.Length
+    $aRows.Clear
+    tvTasks.Rows.Count = h.Items.Count
+    For Each b In h.Items
+        t = s.Tasks[b.Id]
+        $aRows.Add(b.Id)
+        iRow = $aRows.Max
+        aCodes = New String[]
+        For Each sId In t.After
+            If h.IndexOf(sId) >= 0 Then aCodes.Add(h.Items[h.IndexOf(sId)].Code)
+        Next
+        tvTasks[iRow, C_CODE].Text = b.Code
+        tvTasks[iRow, C_DESC].Text = h.DescriptionOf(b)
+        tvTasks[iRow, C_DAYS].Text = Format(t.Days, "0.#")
+        tvTasks[iRow, C_CREW].Text = Ui.Num(t.Crew, "0.#")
+        tvTasks[iRow, C_AFTER].Text = aCodes.Join(", ")
+        tvTasks[iRow, C_LAG].Text = IIf(t.Lag, CStr(t.Lag), "")
+        tvTasks[iRow, C_START].Text = Format(s.DateOf(t.EarlyStart), "dd/mm/yy")
+        tvTasks[iRow, C_END].Text = Format(s.DateOf(Max(t.EarlyStart, t.EarlyFinish - 1)), "dd/mm/yy")
+        tvTasks[iRow, C_SLACK].Text = Format(t.Slack(), "0.#")
+        For Each i In [C_DAYS, C_CREW, C_LAG, C_SLACK]
+            tvTasks[iRow, i].Alignment = Align.Right
+        Next
+        If t.Critical() Then tvTasks[iRow, C_CODE].Foreground = Color.Red
+    Next
+
+    lblInfo.Foreground = Color.Foreground
+    lblInfo.Text = Subst(("&1 working days, ends &2 (&3 available, ends &4)"), Format(s.Length, "0.#"), Format(s.DateOf(Max(0, s.Length - 1)), "dd/mm/yyyy"), p.DurationDays, Format(p.EndDate(), "dd/mm/yyyy"))
+    If s.Length > p.DurationDays Then lblInfo.Foreground = Color.Red
+
+    aCurve = s.Curve(h)
+    fTotal = h.Totals()[1]
+    gvCurve.Rows.Count = aCurve.Count
+    For i = 0 To aCurve.Max
+        gvCurve[i, 0].Text = aCurve[i][0]
+        gvCurve[i, 1].Text = Format(aCurve[i][1], "#,##0")
+        gvCurve[i, 2].Text = Format(aCurve[i][2], "#,##0")
+        If fTotal Then gvCurve[i, 3].Text = Format(aCurve[i][2] / fTotal, "0.0%")
+        gvCurve[i, 1].Alignment = Align.Right
+        gvCurve[i, 2].Alignment = Align.Right
+        gvCurve[i, 3].Alignment = Align.Right
+    Next
+    tvTasks.Refresh
+
+End
+
+'' The bars: the task from its early start to its early finish over the whole length; critical in red, the
+'' slack as a thin line after it
+Public Sub Tasks_Draw(X As Integer, Y As Integer, Width As Integer, Height As Integer, Row As Integer, Column As Integer)
+
+    Dim t As GanttTask
+    Dim fScale As Float
+    Dim x1, x2, xs As Integer
+
+    If Column <> C_BARS Or If Row > $aRows.Max Or If $fLength <= 0 Then Return
+    t = sumi.Project.Schedule.Tasks[$aRows[Row]]
+    If Not t Then Return
+    fScale = (Width - 4) / $fLength
+    x1 = X + 2 + t.EarlyStart * fScale
+    x2 = X + 2 + t.EarlyFinish * fScale
+    xs = X + 2 + t.LateFinish * fScale
+    If t.Days = 0 Then
+        ' a milestone: a diamond
+        Paint.MoveTo(x1, Y + Height / 2 - 5)
+        Paint.LineTo(x1 + 5, Y + Height / 2)
+        Paint.LineTo(x1, Y + Height / 2 + 5)
+        Paint.LineTo(x1 - 5, Y + Height / 2)
+        Paint.ClosePath()
+        Paint.Background = Color.Foreground
+        Paint.Fill()
+        Return
+    Endif
+    Paint.Rectangle(x1, Y + 3, Max(2, x2 - x1), Height - 6)
+    Paint.Background = IIf(t.Critical(), Color.Red, Color.SelectedBackground)
+    Paint.Fill()
+    If t.Done > 0 Then
+        Paint.Rectangle(x1, Y + Height / 2 - 1, Max(1, (x2 - x1) * t.Done), 3)
+        Paint.Background = Color.Foreground
+        Paint.Fill()
+    Endif
+    If xs > x2 + 1 Then
+        Paint.MoveTo(x2, Y + Height / 2)
+        Paint.LineTo(xs, Y + Height / 2)
+        Paint.Background = Color.Gray
+        Paint.LineWidth = 1
+        Paint.Stroke()
+    Endif
+
+End
+
+Public Sub Tasks_Click()
+
+    If tvTasks.Row < 0 Then Return
+    If [C_DAYS, C_CREW, C_AFTER, C_LAG].Exist(tvTasks.Column) Then tvTasks.Edit()
+
+End
+
+Public Sub Tasks_Save(Row As Integer, Column As Integer, Value As String)
+
+    Dim c As New Collection
+    Dim bBad As Boolean
+    Dim a As New String[]
+    Dim s As String
+
+    If Row < 0 Or If Row > $aRows.Max Then Return
+    Select Case Column
+        Case C_DAYS
+            c["days"] = Ui.ParseNumber(Value, ByRef bBad)
+        Case C_CREW
+            c["crew"] = Ui.ParseNumber(Value, ByRef bBad)
+        Case C_LAG
+            c["lag"] = CInt(Ui.ParseNumber(Value, ByRef bBad))
+        Case C_AFTER
+            For Each s In Split(Value, ",; ", "", True)
+                a.Add(Trim(s))
+            Next
+            c["after"] = a
+    End Select
+    If bBad Then
+        Message.Warning(Subst(("&1 is not a number."), Value))
+        Return
+    Endif
+    If c.Count = 0 Then Return
+    c["key"] = $aRows[Row]
+    Ui.Failed(Cmd.Run("task.set", c))
+
+End
+
+Public Sub Suggest_Click()
+
+    Dim sId As String
+    Dim c As Collection
+
+    If Message.Question(("Every task's days will be worked out from its labor hours and its crew (2 people where it has none). Go on?"), ("Suggest"), ("Cancel")) <> 1 Then Return
+    Cmd.BeginGroup()
+    For Each sId In $aRows
+        c = Cmd.Run("task.set", ["key": sId, "suggest": True])
+        If c.Exist("error") Then Break
+    Next
+    Cmd.EndGroup()
+    Ui.Failed(c)
+    Reload()
+
+End

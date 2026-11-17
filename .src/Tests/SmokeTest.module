@@ -25,6 +25,7 @@ Public Function Run() As Integer
     TestCmd()
     TestAssistant()
     TestBudget()
+    TestSchedule2()
     TestIcons()
 
     Shell "rm -rf " & Shell$($sTemp) Wait
@@ -36,6 +37,10 @@ End
 Private Sub Check(bOk As Boolean, sWhat As String)
 
     Inc $iChecks
+    If Env["SMOKE_TRACE"] Then
+        Print "check " & $iChecks & ": " & sWhat
+        Flush
+    Endif
     If bOk Then Return
     Inc $iFailures
     Print "FAIL: " & sWhat
@@ -566,6 +571,62 @@ Private Sub TestBudget()
     Check(p.Budget.Items.Count = 2 And p.Budget.Find("4.01").Coefs.Count = 1 And p.Budget.CoefsOf(4).Count = 1, "the budget after load")
     sumi.Project = p
     Check(Abs(p.Budget.Total(p.Budget.Find("4.01")) - 100 * 180 * 1.1 * 1.05 * 1.1) < 1e-6, "the same total after load")
+
+End
+
+Private Sub TestSchedule2()
+
+    Dim p As New Project
+    Dim c As Collection
+    Dim sE, sM, sF As String
+    Dim s As Schedule
+    Dim v As Variant
+    Dim fSum As Float
+    Dim sFile As String = $sTemp &/ "gantt." & JsonFile.FileExtension
+
+    sumi.Project = p
+    p.StartDate = Date(2026, 11, 16)                ' a Monday
+    p.WorkDaysPerWeek = 5
+    p.HoursPerDay = 8
+    Cmd.Run("resource.add", ["kind": "labor", "name": "ayudante", "unit": "h", "price": 3])
+    Cmd.Run("analysis.add", ["code": "1", "name": "excavacion", "unit": "m3", "rubro": 1, "lines": [["resource": "MO-0001", "qty": 2]]])
+    Cmd.Run("analysis.add", ["code": "2", "name": "muro", "unit": "m2", "rubro": 4, "lines": [["resource": "MO-0001", "qty": 1]]])
+    sE = Cmd.Run("item.add", ["analysis": "1", "qty": 40])["id"]
+    sM = Cmd.Run("item.add", ["analysis": "2", "qty": 100])["id"]
+    sF = Cmd.Run("item.add", ["description": "obrador", "unitCost": 1000, "qty": 1, "rubro": 1])["id"]
+    s = p.Schedule
+
+    ' 40 m3 x 2 h / (2 people x 8 h) = 5 days
+    c = Cmd.Run("task.set", ["key": "1.01", "suggest": True, "crew": 2])
+    Check(c["ok"] And c["days"] = 5, "days suggested from the labor hours: " & JSON.Encode(c))
+    Check(Cmd.Run("task.set", ["key": "4.01", "days": 10, "after": ["1.01"]])["ok"], "a task waits for another")
+    Cmd.Run("task.set", ["key": sF, "days": 3])
+    Check(Cmd.Run("task.set", ["key": "1.01", "after": ["4.01"]]).Exist("error"), "a loop is refused")
+    Check(Cmd.Run("task.set", ["key": "1.01", "days": -1]).Exist("error"), "negative days are refused")
+
+    c = Cmd.Run("schedule.get", ["curve": True])
+    Check(c["ok"] And c["length"] = 15, "the length is the critical path: " & JSON.Encode(c["length"]))
+    Check(s.Tasks[sM].EarlyStart = 5 And s.Tasks[sE].Critical() And s.Tasks[sM].Critical() And Not s.Tasks[sF].Critical(), "early start and the critical path")
+    Check(s.Tasks[sF].Slack() = 12, "slack: " & s.Tasks[sF].Slack())
+    Check(Format(s.DateOf(5), "yyyy-mm-dd") = "2026-11-23" And c["end"] = "2026-12-04", "dates on working days: " & c["end"])
+    For Each v In c["curve"]
+        fSum += v[1]
+    Next
+    Check(c["curve"].Count = 2 And Abs(fSum - p.Budget.Totals()[1]) < 1e-6, "the investment curve spends the whole budget by month")
+    Cmd.Run("task.set", ["key": "4.01", "lag": 2])
+    Cmd.Run("schedule.get")
+    Check(s.Tasks[sM].EarlyStart = 7, "a lag")
+    Cmd.Run("undo")
+    s = sumi.Project.Schedule
+    s.Compute(p.Budget)
+    Check(s.Tasks[sM].EarlyStart = 5, "undo a task change")
+
+    ' an item deleted takes its task and the waits for it
+    Cmd.Run("item.delete", ["key": sE])
+    sumi.Project.Schedule.Compute(sumi.Project.Budget)
+    Check(Not sumi.Project.Schedule.Tasks.Exist(sE) And sumi.Project.Schedule.Tasks[sM].After.Count = 0 And sumi.Project.Schedule.Tasks[sM].EarlyStart = 0, "a deleted item leaves the Gantt")
+    Check(Not JsonFile.SaveFile(sFile, sumi.Project), "save the Gantt")
+    Check(JsonFile.LoadFile(sFile).Schedule.Tasks[sM].Days = 10, "the Gantt after load")
 
 End
 
