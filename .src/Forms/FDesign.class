@@ -1,0 +1,131 @@
+' Gambas class file
+
+'' The quantities of the sumi-designer file and the analyses of each row; "Update the budget" makes the items
+'' (see DesignLink). The analyses sumi-designer gives are read-only here (it is the master); the others are
+'' typed as "code x factor; code x factor" ("52; 79 x 2").
+
+Private tvRows As TableView
+Private lblInfo As Label
+Private $aRows As Variant[]
+
+Public Sub _new()
+
+    Dim hRow As HBox
+
+    lblInfo = Ui.Label(Me, "")
+    tvRows = New TableView(Me) As "Rows"
+    tvRows.Expand = True
+    Ui.Columns(tvRows, [("Group"), ("Item"), ("Unit"), ("Quantity"), ("Analyses"), ("From")], [18, 40, 6, 12, 30, 14])
+    hRow = Ui.HBox(Me)
+    Ui.Label(hRow, ("Analyses: codes of the Pricing tab, with a factor if needed (plaster on both faces: 79 x 2).")).Expand = True
+    Ui.Button(hRow, ("Update the budget"), "Sync", Me)
+    Ui.Button(hRow, ("Close"), "Close", Me)
+    Reload()
+
+End
+
+Private Sub Reload()
+
+    Dim c As Collection = Cmd.Run("design.rows")
+    Dim i As Integer
+    Dim v As Variant
+
+    If c.Exist("error") Then
+        lblInfo.Text = c["error"]
+        lblInfo.Foreground = Color.Red
+        tvRows.Rows.Count = 0
+        $aRows = New Variant[]
+        Return
+    Endif
+    $aRows = c["rows"]
+    lblInfo.Text = Subst(("&1, saved &2: &3 rows"), File.Name(sumi.Project.DesignFile), c["date"], $aRows.Count)
+    tvRows.Rows.Count = $aRows.Count
+    For i = 0 To $aRows.Max
+        v = $aRows[i]
+        tvRows[i, 0].Text = v["group"]
+        tvRows[i, 1].Text = v["item"]
+        tvRows[i, 2].Text = v["unit"]
+        tvRows[i, 3].Text = Format(v["qty"], "#,##0.00")
+        tvRows[i, 3].Alignment = Align.Right
+        tvRows[i, 4].Text = AnalysesText(v["analyses"])
+        If v["fromDesigner"] Then
+            tvRows[i, 5].Text = ("sumi-designer")
+            tvRows[i, 4].Foreground = Color.Gray
+        Else If v["analyses"].Count Then
+            tvRows[i, 5].Text = ("this project")
+        Else
+            tvRows[i, 5].Text = ("none")
+            tvRows[i, 5].Foreground = Color.Red
+        Endif
+    Next
+
+End
+
+Private Function AnalysesText(a As Variant[]) As String
+
+    Dim aOut As New String[]
+    Dim v As Variant
+
+    For Each v In a
+        If v.Exist("factor") And If v["factor"] <> 1 Then
+            aOut.Add(v["code"] & " x " & v["factor"])
+        Else
+            aOut.Add(CStr(v["code"]))
+        Endif
+    Next
+    Return aOut.Join("; ")
+
+End
+
+Public Sub Rows_Click()
+
+    If tvRows.Row < 0 Or If tvRows.Row > $aRows.Max Then Return
+    If tvRows.Column = 4 And If Not $aRows[tvRows.Row]["fromDesigner"] Then tvRows.Edit()
+
+End
+
+Public Sub Rows_Save(Row As Integer, Column As Integer, Value As String)
+
+    Dim a As New Variant[]
+    Dim s As String
+    Dim aParts As String[]
+    Dim bBad As Boolean
+    Dim f As Float
+
+    For Each s In Split(Value, ";", "", True)
+        aParts = Split(Replace(LCase(s), "×", "x"), "x*", "", True)
+        If aParts.Count = 0 Or If Not Trim(aParts[0]) Then Continue
+        f = 1
+        If aParts.Count > 1 Then
+            f = Ui.ParseNumber(aParts[1], ByRef bBad)
+            If bBad Then
+                Message.Warning(Subst(("&1 is not a number."), aParts[1]))
+                Return
+            Endif
+        Endif
+        If Not sumi.Project.Prices.AnalysisByCode(Trim(aParts[0])) Then
+            Message.Warning(Subst(("There is no analysis &1."), Trim(aParts[0])))
+            Return
+        Endif
+        a.Add(["code": Trim(aParts[0]), "factor": f])
+    Next
+    Ui.Failed(Cmd.Run("design.map", ["key": $aRows[Row]["key"], "analyses": a]))
+    Reload()
+
+End
+
+Public Sub Sync_Click()
+
+    Dim c As Collection = Cmd.Run("design.sync")
+
+    If Ui.Failed(c) Then Return
+    FReport.Run(("From the design"), c["report"])
+    Reload()
+
+End
+
+Public Sub Close_Click()
+
+    Me.Close
+
+End

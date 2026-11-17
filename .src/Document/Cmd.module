@@ -142,6 +142,8 @@ Private Function Dispatch(sCommand As String, c As Collection) As Collection
             Return PaymentCmd(sCommand, c)
         Case "report.pdf"
             Return ReportPdf(c)
+        Case "design.rows", "design.sync", "design.map"
+            Return DesignCmd(sCommand, c)
         Case "schedule.get"
             Return ScheduleGet(c)
         Case "task.set"
@@ -211,6 +213,9 @@ Public Function Help() As Collection
     c["payment.add"] = "{contract, amount, date?, means? (transfer, cheque, cash, other), reference?, certificate? (number), invoice?, invoiceDate?, note?} -> its index"
     c["payment.set"] = "{contract, index, field: value...}"
     c["payment.delete"] = "{contract, index}"
+    c["design.rows"] = "{} -> the quantities of the sumi-designer file (Project tab), each row with its key and its analyses (and whether they come from the designer)"
+    c["design.sync"] = "{} creates and updates the budget items from the design's quantities and the analyses of each row"
+    c["design.map"] = "{key (a row's key), analyses [{code, factor}...]} the analyses of a design row in this project, while sumi-designer has none for it"
     c["report.pdf"] = "{kind (budget, summary, analyses, gantt, certificate), file (the .pdf to write), contract? and cert? (for a certificate)} writes a PDF report"
     c["rubro.coefs"] = "{rubro, coefs [{name, pct}...]} the coefficients of a rubro in the budget (on top of the project's)"
     Return c
@@ -1881,5 +1886,44 @@ Private Function ReportPdf(c As Collection) As Collection
     sWhy = Reports.Make(c["kind"], c["file"], c["contract"], CStr(c["cert"]))
     If sWhy Then Return Fail(sWhy)
     Return Ok(["file": c["file"]])
+
+End
+
+'' THE DESIGN (sumi-designer)
+
+Private Function DesignCmd(sCommand As String, c As Collection) As Collection
+
+    Dim cDesign As Collection
+    Dim aRows As New Variant[]
+    Dim vRow As Variant
+    Dim bDesigner As Boolean
+    Dim cRow As Collection
+
+    If sCommand = "design.map" Then
+        If Not c["key"] Then Return Fail(("It needs the row's key."))
+        Start(sCommand, c, Subst(("Design row &1: its analyses"), c["key"]))
+        Touch("budget")
+        If c["analyses"] And If c["analyses"].Count Then
+            sumi.Project.Budget.DesignMap[c["key"]] = c["analyses"]
+        Else If sumi.Project.Budget.DesignMap.Exist(c["key"]) Then
+            sumi.Project.Budget.DesignMap.Remove(c["key"])
+        Endif
+        Return Ok()
+    Endif
+    cDesign = DesignLink.Read(sumi.Project.DesignFile)
+    If Not cDesign Then Return Fail(DesignLink.Report.Join(" "))
+    If sCommand = "design.rows" Then
+        For Each vRow In cDesign["rows"]
+            cRow = ["key": vRow["key"], "group": vRow["group"], "item": vRow["item"], "unit": vRow["unit"], "qty": vRow["qty"]]
+            cRow["analyses"] = DesignLink.AnalysesOf(cDesign, vRow["key"], ByRef bDesigner)
+            cRow["fromDesigner"] = bDesigner
+            aRows.Add(cRow)
+        Next
+        Return Ok(["rows": aRows, "date": cDesign["date"]])
+    Endif
+    Start(sCommand, c, ("Budget: quantities from the design"))
+    Touch("budget")
+    DesignLink.Sync(cDesign)
+    Return Ok(["report": DesignLink.Report])
 
 End

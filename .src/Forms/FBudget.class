@@ -34,6 +34,7 @@ Public Sub _new()
     hRow = Ui.HBox(Me)
     Ui.Button(hRow, ("Add item..."), "Add", Me, ("An item from an analysis of the Pricing tab"))
     Ui.Button(hRow, ("Add manual item"), "AddManual", Me, ("An item without analysis: cleaning, site office, permits, fees..."))
+    Ui.Button(hRow, ("From the design..."), "Design", Me, ("The quantities of the sumi-designer file (Project tab) and the analyses of each row"))
     Ui.Button(hRow, ("Delete"), "Delete", Me)
     Ui.Button(hRow, ("Up"), "Up", Me)
     Ui.Button(hRow, ("Down"), "Down", Me)
@@ -225,6 +226,13 @@ Public Sub AddManual_Click()
     c = Cmd.Run("item.add", ["description": ("New manual item"), "unit": "gl", "qty": 1, "rubro": Max(1, $iRubro)])
     If Ui.Failed(c) Then Return
     $sItem = c["id"]
+    Reload()
+
+End
+
+Public Sub Design_Click()
+
+    FDesign.ShowModal()
     Reload()
 
 End

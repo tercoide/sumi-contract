@@ -84,6 +84,8 @@ Public Sub Step_Timer()
             fMain.tabMain.Index = fMain.TAB_GANTT
         Case 13
             FContractors.Show()
+            FDesign.Show()
+            FDesign.Close()
         Case 14
             FContractors.Close()
             FAssistant.Show()

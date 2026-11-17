@@ -3,7 +3,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: $(PACKAGE) $(VERSION)\n"
-"POT-Creation-Date: 2026-11-17 23:32 UTC\n"
+"POT-Creation-Date: 2026-11-17 23:39 UTC\n"
 "PO-Revision-Date: 2026-11-17 23:28 UTC\n"
 "Last-Translator: Automatically generated\n"
 "Language-Team: none\n"
@@ -105,23 +105,23 @@ msgstr "Llevó demasiados pasos; se detuvo acá."
 msgid "The answer was cut (too long)."
 msgstr "La respuesta se cortó (demasiado larga)."
 
-#: Budget.class:96
+#: Budget.class:98
 msgid "(missing analysis)"
 msgstr "(análisis faltante)"
 
-#: Budget.class:118
+#: Budget.class:120
 msgid "Its analysis doesn't exist"
 msgstr "Su análisis no existe"
 
-#: Budget.class:119
+#: Budget.class:121
 msgid "It has no cost"
 msgstr "No tiene costo"
 
-#: Budget.class:120
+#: Budget.class:122
 msgid "It has no quantity"
 msgstr "No tiene cantidad"
 
-#: Budget.class:121
+#: Budget.class:123
 msgid "Quantity changed by hand (the design says &1)"
 msgstr "Cantidad cambiada a mano (el diseño dice &1)"
 
@@ -129,317 +129,317 @@ msgstr "Cantidad cambiada a mano (el diseño dice &1)"
 msgid "There is no project open."
 msgstr "No hay un proyecto abierto."
 
-#: Cmd.module:150
+#: Cmd.module:152
 msgid "Unknown command &1."
 msgstr "Comando desconocido &1."
 
-#: Cmd.module:517
+#: Cmd.module:522
 msgid "Nothing to redo."
 msgstr "No hay nada para rehacer."
 
-#: Cmd.module:517
+#: Cmd.module:522
 msgid "Nothing to undo."
 msgstr "No hay nada para deshacer."
 
-#: Cmd.module:562
+#: Cmd.module:567
 msgid ""
 "&1 changed after that (&2): it can't be undone without losing that work."
 msgstr "&1 cambió después (&2): no se puede deshacer sin perder ese trabajo."
 
-#: Cmd.module:575
+#: Cmd.module:580
 msgid "Redo: "
 msgstr "Rehacer: "
 
-#: Cmd.module:575
+#: Cmd.module:580
 msgid "Undo: "
 msgstr "Deshacer: "
 
-#: Cmd.module:669
+#: Cmd.module:674
 msgid "The project has no field &1."
 msgstr "El proyecto no tiene el campo &1."
 
-#: Cmd.module:672
+#: Cmd.module:677
 msgid "Nothing to set."
 msgstr "No hay nada para cambiar."
 
-#: Cmd.module:673
+#: Cmd.module:678
 msgid "Project: "
 msgstr "Proyecto: "
 
-#: Cmd.module:689
+#: Cmd.module:694
 msgid "The price book has no field &1."
 msgstr "Los precios no tienen el campo &1."
 
-#: Cmd.module:691
+#: Cmd.module:696
 msgid "Price coefficients: "
 msgstr "Coeficientes de precios: "
 
-#: Cmd.module:703
+#: Cmd.module:708
 msgid "rubro.set needs a number and a name."
 msgstr "rubro.set necesita un número y un nombre."
 
-#: Cmd.module:705
+#: Cmd.module:710
 msgid "A rubro number is 1 or more."
 msgstr "El número de rubro es 1 o más."
 
-#: Cmd.module:706
+#: Cmd.module:711
 msgid "Rubro &1: &2"
 msgstr "Rubro &1: &2"
 
-#: Cmd.module:719
+#: Cmd.module:724
 msgid "There is no rubro &1."
 msgstr "No existe el rubro &1."
 
-#: Cmd.module:723
+#: Cmd.module:728
 msgid "&1 analyses are in rubro &2."
 msgstr "Hay &1 análisis en el rubro &2."
 
-#: Cmd.module:724
+#: Cmd.module:729
 msgid "Rubro &1 deleted"
 msgstr "Rubro &1 borrado"
 
-#: Cmd.module:738
+#: Cmd.module:743
 msgid "It needs the index of the charge."
 msgstr "Falta el índice de la carga."
 
-#: Cmd.module:740
+#: Cmd.module:745
 msgid "There is no charge &1."
 msgstr "No existe la carga &1."
 
-#: Cmd.module:744
+#: Cmd.module:749
 msgid "Labor charge added: &1"
 msgstr "Carga social agregada: &1"
 
-#: Cmd.module:749
+#: Cmd.module:754
 msgid "Labor charge &1 changed"
 msgstr "Carga social &1 cambiada"
 
-#: Cmd.module:753
+#: Cmd.module:758
 msgid "Labor charge deleted: &1"
 msgstr "Carga social borrada: &1"
 
-#: Cmd.module:815
+#: Cmd.module:820
 msgid "There is no resource &1."
 msgstr "No existe el insumo &1."
 
-#: Cmd.module:833
+#: Cmd.module:838
 msgid "Unknown kind &1: material, labor or equipment."
 msgstr "Tipo desconocido &1: material, mano de obra o equipo."
 
-#: Cmd.module:834
+#: Cmd.module:839
 msgid "A resource needs a name."
 msgstr "Un insumo necesita un nombre."
 
-#: Cmd.module:835
+#: Cmd.module:840
 msgid "There is already a resource &1."
 msgstr "Ya existe un insumo &1."
 
-#: Cmd.module:841
+#: Cmd.module:846
 msgid "Resources have no field &1."
 msgstr "Los insumos no tienen el campo &1."
 
-#: Cmd.module:844
+#: Cmd.module:849
 msgid "Resource added: &1 &2"
 msgstr "Insumo agregado: &1 &2"
 
-#: Cmd.module:866
+#: Cmd.module:871
 msgid "A code can't be empty."
 msgstr "El código no puede quedar vacío."
 
-#: Cmd.module:870
+#: Cmd.module:875
 msgid "Resources have no field &1 (or a bad value)."
 msgstr "Los insumos no tienen el campo &1 (o el valor no sirve)."
 
-#: Cmd.module:871
+#: Cmd.module:876
 msgid "Resource &1: &2"
 msgstr "Insumo &1: &2"
 
-#: Cmd.module:887
+#: Cmd.module:892
 msgid "&1 analyses use &2 (the first: &3)."
 msgstr "&1 análisis usan &2 (el primero: &3)."
 
-#: Cmd.module:888
+#: Cmd.module:893
 msgid "Resource deleted: &1 &2"
 msgstr "Insumo borrado: &1 &2"
 
-#: Cmd.module:978
+#: Cmd.module:983
 msgid "There is no analysis &1."
 msgstr "No existe el análisis &1."
 
-#: Cmd.module:1004
+#: Cmd.module:1009
 msgid "&1 uses &2: it would be a loop."
 msgstr "&1 usa &2: sería circular."
 
-#: Cmd.module:1027
+#: Cmd.module:1032
 msgid "An analysis needs a name."
 msgstr "Un análisis necesita un nombre."
 
-#: Cmd.module:1028
+#: Cmd.module:1033
 msgid "There is already an analysis &1."
 msgstr "Ya existe un análisis &1."
 
-#: Cmd.module:1033
+#: Cmd.module:1038
 msgid "Analyses have no field &1."
 msgstr "Los análisis no tienen el campo &1."
 
-#: Cmd.module:1042
+#: Cmd.module:1047
 msgid "Analysis added: &1 &2"
 msgstr "Análisis agregado: &1 &2"
 
-#: Cmd.module:1063
+#: Cmd.module:1068
 msgid "Lines change with analysis.addline, setline and removeline."
 msgstr "Los renglones se cambian con analysis.addline, setline y removeline."
 
-#: Cmd.module:1068
+#: Cmd.module:1073
 msgid "Analyses have no field &1 (or a bad value)."
 msgstr "Los análisis no tienen el campo &1 (o el valor no sirve)."
 
-#: Cmd.module:1069
+#: Cmd.module:1074
 msgid "Analysis &1: &2"
 msgstr "Análisis &1: &2"
 
-#: Cmd.module:1088
+#: Cmd.module:1093
 msgid "Analysis &1 copied as &2"
 msgstr "Análisis &1 copiado como &2"
 
-#: Cmd.module:1104
+#: Cmd.module:1109
 msgid "Analysis deleted: &1 &2"
 msgstr "Análisis borrado: &1 &2"
 
-#: Cmd.module:1120
+#: Cmd.module:1125
 msgid "It needs the index of the line."
 msgstr "Falta el índice del renglón."
 
-#: Cmd.module:1122
+#: Cmd.module:1127
 msgid "Analysis &1 has no line &2."
 msgstr "El análisis &1 no tiene el renglón &2."
 
-#: Cmd.module:1128
+#: Cmd.module:1133
 msgid "Analysis &1: line added, &2 &3"
 msgstr "Análisis &1: renglón agregado, &2 &3"
 
-#: Cmd.module:1133
+#: Cmd.module:1138
 msgid "It needs the quantity (qty)."
 msgstr "Falta la cantidad (qty)."
 
-#: Cmd.module:1134
+#: Cmd.module:1139
 msgid "Analysis &1: &2 now &3"
 msgstr "Análisis &1: &2 ahora &3"
 
-#: Cmd.module:1138
+#: Cmd.module:1143
 msgid "Analysis &1: line removed, &2"
 msgstr "Análisis &1: renglón quitado, &2"
 
-#: Cmd.module:1151
+#: Cmd.module:1156
 msgid "Analysis &1 flattened"
 msgstr "Análisis &1 aplanado"
 
-#: Cmd.module:1164
+#: Cmd.module:1169
 msgid "It needs the folder of the library."
 msgstr "Falta la carpeta de la biblioteca."
 
-#: Cmd.module:1165
+#: Cmd.module:1170
 msgid "Price library imported: &1"
 msgstr "Biblioteca de precios importada: &1"
 
-#: Cmd.module:1230
+#: Cmd.module:1235
 msgid "An item needs an analysis, or a description (a manual item)."
 msgstr "Un ítem necesita un análisis, o una descripción (un ítem manual)."
 
-#: Cmd.module:1236
+#: Cmd.module:1241
 msgid "Budget items have no field &1."
 msgstr "Los ítems del presupuesto no tienen el campo &1."
 
-#: Cmd.module:1237
+#: Cmd.module:1242
 msgid "Budget: item added, &1"
 msgstr "Presupuesto: ítem agregado, &1"
 
-#: Cmd.module:1256
+#: Cmd.module:1261
 msgid "There is no budget item &1."
 msgstr "No existe el ítem &1 del presupuesto."
 
-#: Cmd.module:1268
+#: Cmd.module:1273
 msgid "Budget items have no field &1 (or a bad value)."
 msgstr "Los ítems del presupuesto no tienen el campo &1 (o el valor no sirve)."
 
-#: Cmd.module:1269
+#: Cmd.module:1274
 msgid "Budget item &1: &2"
 msgstr "Ítem &1: &2"
 
-#: Cmd.module:1289
+#: Cmd.module:1294
 msgid "Budget: item deleted, &1 &2"
 msgstr "Presupuesto: ítem borrado, &1 &2"
 
-#: Cmd.module:1307
+#: Cmd.module:1312
 msgid "It is already at the end of its rubro."
 msgstr "Ya está en el extremo de su rubro."
 
-#: Cmd.module:1308
+#: Cmd.module:1313
 msgid "Budget: item &1 moved"
 msgstr "Presupuesto: ítem &1 movido"
 
-#: Cmd.module:1322
+#: Cmd.module:1327
 msgid "It needs the rubro number."
 msgstr "Falta el número de rubro."
 
-#: Cmd.module:1324
+#: Cmd.module:1329
 msgid "Budget: coefficients of rubro &1"
 msgstr "Presupuesto: coeficientes del rubro &1"
 
-#: Cmd.module:1391
+#: Cmd.module:1396
 msgid "&1 can't wait for &2: it would be a loop."
 msgstr "&1 no puede esperar a &2: sería circular."
 
-#: Cmd.module:1404
+#: Cmd.module:1409
 msgid "Tasks have no field &1 (or a bad value)."
 msgstr "Las tareas no tienen el campo &1 (o el valor no sirve)."
 
-#: Cmd.module:1405
+#: Cmd.module:1410
 msgid "Gantt: task &1, &2"
 msgstr "Gantt: tarea &1, &2"
 
-#: Cmd.module:1448
+#: Cmd.module:1453
 msgid "There is no contractor &1."
 msgstr "No existe el contratista &1."
 
-#: Cmd.module:1454
+#: Cmd.module:1459
 msgid "A contractor needs a name."
 msgstr "Un contratista necesita un nombre."
 
-#: Cmd.module:1455
+#: Cmd.module:1460
 msgid "There is already a contractor &1."
 msgstr "Ya existe un contratista &1."
 
-#: Cmd.module:1461
+#: Cmd.module:1466
 msgid "Contractors have no field &1."
 msgstr "Los contratistas no tienen el campo &1."
 
-#: Cmd.module:1462
+#: Cmd.module:1467
 msgid "Contractor added: &1"
 msgstr "Contratista agregado: &1"
 
-#: Cmd.module:1472
+#: Cmd.module:1477
 msgid "Contractors have no field &1 (or a bad value)."
 msgstr "Los contratistas no tienen el campo &1 (o el valor no sirve)."
 
-#: Cmd.module:1473
+#: Cmd.module:1478
 msgid "Contractor &1: &2"
 msgstr "Contratista &1: &2"
 
-#: Cmd.module:1478
+#: Cmd.module:1483
 msgid "Contract &1 is with &2."
 msgstr "El contrato &1 es con &2."
 
-#: Cmd.module:1480
+#: Cmd.module:1485
 msgid "Contractor deleted: &1"
 msgstr "Contratista borrado: &1"
 
-#: Cmd.module:1519
+#: Cmd.module:1524
 msgid "Standard library: the prices of &1 exported (&2 resources, &3 analyses)"
 msgstr ""
 "Biblioteca estándar: precios de &1 exportados (&2 insumos, &3 análisis)"
 
-#: Cmd.module:1534
+#: Cmd.module:1539
 msgid ""
 "The company has no standard library yet (export a project's prices to make "
 "it)."
@@ -447,99 +447,99 @@ msgstr ""
 "La empresa todavía no tiene biblioteca estándar (exportá los precios de un "
 "proyecto para crearla)."
 
-#: Cmd.module:1535
+#: Cmd.module:1540
 msgid "Prices taken from the standard library"
 msgstr "Precios tomados de la biblioteca estándar"
 
-#: Cmd.module:1556
+#: Cmd.module:1561
 msgid "(unknown contractor)"
 msgstr "(contratista desconocido)"
 
-#: Cmd.module:1588
+#: Cmd.module:1593
 msgid "(the budget item is gone)"
 msgstr "(el ítem del presupuesto ya no existe)"
 
-#: Cmd.module:1631
+#: Cmd.module:1636
 msgid "There is no contract &1."
 msgstr "No existe el contrato &1."
 
-#: Cmd.module:1645
+#: Cmd.module:1650
 msgid "A contract needs a contractor."
 msgstr "Un contrato necesita un contratista."
 
-#: Cmd.module:1646
+#: Cmd.module:1651
 msgid "There is already a contract &1."
 msgstr "Ya existe un contrato &1."
 
-#: Cmd.module:1657
+#: Cmd.module:1662
 msgid "Contracts have no field &1."
 msgstr "Los contratos no tienen el campo &1."
 
-#: Cmd.module:1660
+#: Cmd.module:1665
 msgid "Contract &1 with &2"
 msgstr "Contrato &1 con &2"
 
-#: Cmd.module:1667
+#: Cmd.module:1672
 msgid "Contracts have no field &1 (or a bad value)."
 msgstr "Los contratos no tienen el campo &1 (o el valor no sirve)."
 
-#: Cmd.module:1668
+#: Cmd.module:1673
 msgid "Contract &1: &2"
 msgstr "Contrato &1: &2"
 
-#: Cmd.module:1672
+#: Cmd.module:1677
 msgid "Contract deleted: &1 &2"
 msgstr "Contrato borrado: &1 &2"
 
-#: Cmd.module:1705
+#: Cmd.module:1710
 msgid "Item &1 is already taken by contracts: give the quantity."
 msgstr "El ítem &1 ya está tomado por contratos: indicá la cantidad."
 
-#: Cmd.module:1710
+#: Cmd.module:1715
 msgid "Contract &1: item &2 added, &3"
 msgstr "Contrato &1: ítem &2 agregado, &3"
 
-#: Cmd.module:1720
+#: Cmd.module:1725
 msgid "Contract &1 has no part &2."
 msgstr "El contrato &1 no tiene la parte &2."
 
-#: Cmd.module:1726
+#: Cmd.module:1731
 msgid "Contract &1: part changed"
 msgstr "Contrato &1: parte cambiada"
 
-#: Cmd.module:1731
+#: Cmd.module:1736
 msgid "It has certified work: it can't be removed."
 msgstr "Tiene trabajo certificado: no se puede quitar."
 
-#: Cmd.module:1732
+#: Cmd.module:1737
 msgid "Contract &1: part removed"
 msgstr "Contrato &1: parte quitada"
 
-#: Cmd.module:1756
+#: Cmd.module:1761
 msgid "Unknown kind of certificate &1."
 msgstr "Tipo de certificado desconocido &1."
 
-#: Cmd.module:1761
+#: Cmd.module:1766
 msgid "Contract &1 already has its &2 certificate."
 msgstr "El contrato &1 ya tiene su certificado de &2."
 
-#: Cmd.module:1774
+#: Cmd.module:1779
 msgid "Contract &1: certificate &2 (&3)"
 msgstr "Contrato &1: certificado &2 (&3)"
 
-#: Cmd.module:1781
+#: Cmd.module:1786
 msgid "Contract &1 has no certificate &2."
 msgstr "El contrato &1 no tiene el certificado &2."
 
-#: Cmd.module:1783
+#: Cmd.module:1788
 msgid "Only the last certificate can be deleted."
 msgstr "Solo se puede borrar el último certificado."
 
-#: Cmd.module:1784
+#: Cmd.module:1789
 msgid "Contract &1: certificate &2 deleted"
 msgstr "Contrato &1: certificado &2 borrado"
 
-#: Cmd.module:1791
+#: Cmd.module:1796
 msgid ""
 "Certificate &1 is issued: its measures can't change (set it back to draft "
 "first)."
@@ -547,57 +547,69 @@ msgstr ""
 "El certificado &1 está emitido: su medición no puede cambiar (volvelo a "
 "borrador primero)."
 
-#: Cmd.module:1805
+#: Cmd.module:1810
 msgid "A measure needs acc (the accumulated quantity) or pct."
 msgstr "Una medición necesita acc (la cantidad acumulada) o pct."
 
-#: Cmd.module:1807
+#: Cmd.module:1812
 msgid "The accumulated quantity can't go back (&1 before)."
 msgstr "La cantidad acumulada no puede retroceder (&1 antes)."
 
-#: Cmd.module:1808
+#: Cmd.module:1813
 msgid "&1 is more than the contract's &2."
 msgstr "&1 es más que los &2 del contrato."
 
-#: Cmd.module:1812
+#: Cmd.module:1817
 msgid "The status is draft or issued."
 msgstr "El estado es borrador o emitido."
 
-#: Cmd.module:1813
+#: Cmd.module:1818
 msgid "Contract &1: certificate &2 changed"
 msgstr "Contrato &1: certificado &2 cambiado"
 
-#: Cmd.module:1847
+#: Cmd.module:1852
 msgid "A payment needs its amount."
 msgstr "Un pago necesita su importe."
 
-#: Cmd.module:1851
+#: Cmd.module:1856
 msgid "Payments have no field &1."
 msgstr "Los pagos no tienen el campo &1."
 
-#: Cmd.module:1852
+#: Cmd.module:1857
 msgid "Contract &1: payment of &2"
 msgstr "Contrato &1: pago de &2"
 
-#: Cmd.module:1858
+#: Cmd.module:1863
 msgid "Contract &1 has no payment &2."
 msgstr "El contrato &1 no tiene el pago &2."
 
-#: Cmd.module:1860
+#: Cmd.module:1865
 msgid "Contract &1: payment deleted"
 msgstr "Contrato &1: pago borrado"
 
-#: Cmd.module:1866
+#: Cmd.module:1871
 msgid "Payments have no field &1 (or a bad value)."
 msgstr "Los pagos no tienen el campo &1 (o el valor no sirve)."
 
-#: Cmd.module:1867
+#: Cmd.module:1872
 msgid "Contract &1: payment changed"
 msgstr "Contrato &1: pago cambiado"
 
-#: Cmd.module:1880
+#: Cmd.module:1885
 msgid "It needs the kind of report and the file."
 msgstr "Faltan el tipo de informe y el archivo."
+
+#: Cmd.module:1903
+msgid "It needs the row's key."
+msgstr "Falta la clave del renglón."
+
+#: Cmd.module:1904
+msgid "Design row &1: its analyses"
+msgstr "Renglón del diseño &1: sus análisis"
+
+#: Cmd.module:1924
+msgid "Budget: quantities from the design"
+msgstr "Presupuesto: cantidades del diseño"
 
 #: Config.class:52
 msgid "Your name"
@@ -710,6 +722,56 @@ msgstr ""
 "Cuánto escribe sumi-contract en su registro (~/.config/sumi-contract/logs, "
 "un archivo por día, se guardan los últimos 7). Las advertencias y errores se "
 "escriben siempre."
+
+#: DesignLink.module:20
+msgid "The project has no sumi-designer file: choose it in the Project tab."
+msgstr ""
+"El proyecto no tiene archivo de sumi-designer: elegilo en la pestaña "
+"Proyecto."
+
+#: DesignLink.module:24
+msgid "&1 doesn't exist."
+msgstr "&1 no existe."
+
+#: DesignLink.module:29
+msgid "&1 can't be read."
+msgstr "&1 no se puede leer."
+
+#: DesignLink.module:33
+msgid ""
+"&1 has no quantities: save it again with a sumi-designer that writes them "
+"(file version 42 or later)."
+msgstr ""
+"&1 no tiene cantidades: guardalo de nuevo con un sumi-designer que las "
+"escriba (versión de archivo 42 o posterior)."
+
+#: DesignLink.module:119
+msgid ""
+"From the design (saved &1): &2 items new, &3 updated, &4 changed by hand "
+"kept."
+msgstr ""
+"Del diseño (guardado &1): &2 ítems nuevos, &3 actualizados, &4 cambiados a "
+"mano se mantienen."
+
+#: DesignLink.module:120
+msgid ""
+"&1 items measure things the design doesn't have anymore: their design "
+"quantity is now 0 (orange)."
+msgstr ""
+"&1 ítems miden cosas que el diseño ya no tiene: su cantidad del diseño ahora "
+"es 0 (naranja)."
+
+#: DesignLink.module:121
+msgid "Analyses the price book doesn't have: &1"
+msgstr "Análisis que no están en los precios: &1"
+
+#: DesignLink.module:123
+msgid ""
+"&1 rows of the design have no analyses yet (give them in sumi-designer, or "
+"here in From the design):"
+msgstr ""
+"&1 renglones del diseño todavía no tienen análisis (indicalos en sumi-"
+"designer, o acá en Del diseño):"
 
 #: fAbout.form:16
 msgid "About sumi-contract"
@@ -839,78 +901,90 @@ msgid "An item without analysis: cleaning, site office, permits, fees..."
 msgstr "Un ítem sin análisis: limpieza, obrador, permisos, honorarios..."
 
 #: FBudget.class:37
+msgid "From the design..."
+msgstr "Del diseño..."
+
+#: FBudget.class:37
+msgid ""
+"The quantities of the sumi-designer file (Project tab) and the analyses of "
+"each row"
+msgstr ""
+"Las cantidades del archivo de sumi-designer (pestaña Proyecto) y los "
+"análisis de cada renglón"
+
+#: FBudget.class:38
 msgid "Delete"
 msgstr "Borrar"
 
-#: FBudget.class:38
+#: FBudget.class:39
 msgid "Up"
 msgstr "Subir"
 
-#: FBudget.class:39
+#: FBudget.class:40
 msgid "Down"
 msgstr "Bajar"
 
-#: FBudget.class:48
+#: FBudget.class:49
 msgid "Code"
 msgstr "Código"
 
-#: FBudget.class:48
+#: FBudget.class:49
 msgid "Description"
 msgstr "Descripción"
 
-#: FBudget.class:48
+#: FBudget.class:49
 msgid "Unit"
 msgstr "Unidad"
 
-#: FBudget.class:48
+#: FBudget.class:49
 msgid "Quantity"
 msgstr "Cantidad"
 
-#: FBudget.class:48
+#: FBudget.class:49
 msgid "Unit cost"
 msgstr "Costo unitario"
 
-#: FBudget.class:48
+#: FBudget.class:49
 msgid "Unit price"
 msgstr "Precio unitario"
 
-#: FBudget.class:48
+#: FBudget.class:49
 msgid "Total"
 msgstr "Total"
 
-#: FBudget.class:48
+#: FBudget.class:49
 msgid "%"
 msgstr "%"
 
-#: FBudget.class:54
+#: FBudget.class:55
 msgid "Coefficients of the item"
 msgstr "Coeficientes del ítem"
 
-#: FBudget.class:57
+#: FBudget.class:58
 msgid "Reason"
 msgstr "Motivo"
 
-#: FBudget.class:58
+#: FBudget.class:59
 msgid "Add"
 msgstr "Agregar"
 
-#: FBudget.class:60
+#: FBudget.class:61
 msgid "Coefficients of the rubro"
 msgstr "Coeficientes del rubro"
 
-#: FBudget.class:92
+#: FBudget.class:93
 msgid "&1 coefficients"
 msgstr "&1 coeficientes"
 
-#: FBudget.class:122
+#: FBudget.class:123
 msgid "Direct cost &1 &2   Price &1 &3"
 msgstr "Costo directo &1 &2   Precio &1 &3"
 
-#: FBudget.class:123
+#: FBudget.class:124
 msgid "&1 &2 a m²"
 msgstr "&1 &2 por m²"
 
-#: FBudget.class:124
+#: FBudget.class:125
 msgid ""
 "Project coefficients: general expenses &1%, profit &2%, taxes &3% (× &4). "
 "Rubro and item coefficients go on top. Orange: a design quantity changed by "
@@ -920,23 +994,23 @@ msgstr ""
 "&3% (× &4). Los de rubro e ítem se suman encima. Naranja: una cantidad del "
 "diseño cambiada a mano."
 
-#: FBudget.class:198
+#: FBudget.class:199
 msgid "&1 is not a number."
 msgstr "&1 no es un número."
 
-#: FBudget.class:209
+#: FBudget.class:210
 msgid "Add an item to the budget"
 msgstr "Agregar un ítem al presupuesto"
 
-#: FBudget.class:225
+#: FBudget.class:226
 msgid "New manual item"
 msgstr "Ítem manual nuevo"
 
-#: FBudget.class:237
+#: FBudget.class:245
 msgid "Delete item &1 &2?"
 msgstr "¿Borrar el ítem &1 &2?"
 
-#: FBudget.class:291
+#: FBudget.class:299
 msgid "New coefficient"
 msgstr "Coeficiente nuevo"
 
@@ -1289,6 +1363,50 @@ msgstr "¿Borrar el certificado &1?"
 msgid "Delete this payment?"
 msgstr "¿Borrar este pago?"
 
+#: FDesign.form:7
+msgid "From the design"
+msgstr "Del diseño"
+
+#: FDesign.class:18
+msgid "Group"
+msgstr "Grupo"
+
+#: FDesign.class:18
+msgid "Analyses"
+msgstr "Análisis"
+
+#: FDesign.class:18
+msgid "From"
+msgstr "De"
+
+#: FDesign.class:20
+msgid ""
+"Analyses: codes of the Pricing tab, with a factor if needed (plaster on both "
+"faces: 79 x 2)."
+msgstr ""
+"Análisis: códigos de la pestaña Precios, con un factor si hace falta "
+"(revoque en las dos caras: 79 x 2)."
+
+#: FDesign.class:21
+msgid "Update the budget"
+msgstr "Actualizar el presupuesto"
+
+#: FDesign.class:41
+msgid "&1, saved &2: &3 rows"
+msgstr "&1, guardado &2: &3 renglones"
+
+#: FDesign.class:52
+msgid "sumi-designer"
+msgstr "sumi-designer"
+
+#: FDesign.class:55
+msgid "this project"
+msgstr "este proyecto"
+
+#: FDesign.class:57
+msgid "none"
+msgstr "ninguno"
+
 #: FGantt.class:32
 msgid "Suggest durations"
 msgstr "Sugerir duraciones"
@@ -1599,10 +1717,6 @@ msgid ""
 msgstr ""
 "Lo que cuesta un camión por km: un material con distancia y carga por camión "
 "suma costo/km × km / carga a su precio"
-
-#: FPricing.class:116
-msgid "Analyses"
-msgstr "Análisis"
 
 #: FPricing.class:117
 msgid "Resources"

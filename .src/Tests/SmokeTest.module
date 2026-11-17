@@ -33,6 +33,7 @@ Public Function Run() As Integer
     TestBudget()
     TestSchedule2()
     TestContracts()
+    TestDesignLink()
     TestIcons()
 
     Shell "rm -rf " & Shell$($sTemp) Wait
@@ -768,6 +769,57 @@ Private Sub TestReports()
     Check(h.TextWidth(h.Fit(String(200, "M"), 50, 9), 9) <= 50, "a long text is cut to fit")
     h.Text(10, 10, "Mampostería de ladrillo común, ñandú")
     Check(Not h.Save($sTemp &/ "accents.pdf") And InStr(File.Load($sTemp &/ "accents.pdf"), "Mamposter" & Chr(237) & "a") > 0, "accents go as Windows-1252")
+
+End
+
+Private Sub TestDesignLink()
+
+    Dim p As New Project
+    Dim c As Collection
+    Dim h As Budget
+    Dim sDesign As String = $sTemp &/ "house.designer-proj"
+    Dim sRow1 As String = "{\"key\":\"Walls|Solid brick 18\",\"group\":\"Muros\",\"item\":\"Ladrillo macizo 18\",\"unit\":\"m2\",\"qty\":"
+    Dim sRow2 As String = "{\"key\":\"Walls|Plaster\",\"group\":\"Muros\",\"item\":\"Revoque\",\"unit\":\"m2\",\"qty\":"
+    Dim sRow3 As String = "{\"key\":\"Openings|V1\",\"group\":\"Aberturas\",\"item\":\"V1\",\"unit\":\"u\",\"qty\":4}"
+
+    sumi.Project = p
+    p.OverheadPct = 0
+    p.ProfitPct = 0
+    p.TaxesPct = 0
+    Cmd.Run("resource.add", ["kind": "material", "name": "ladrillo", "unit": "u", "price": 1])
+    Cmd.Run("analysis.add", ["code": "52", "name": "muro", "unit": "m2", "rubro": 4, "lines": [["resource": "MAT-0001", "qty": 60]]])
+    Cmd.Run("analysis.add", ["code": "79", "name": "revoque", "unit": "m2", "rubro": 7, "lines": [["resource": "MAT-0001", "qty": 2]]])
+    h = p.Budget
+
+    Check(Cmd.Run("design.sync").Exist("error"), "no design file: an error")
+    File.Save(sDesign, "{\"format\":\"designer-e\",\"version\":41}")
+    Cmd.Run("project.set", ["designFile": sDesign])
+    Check(InStr(Cmd.Run("design.sync")["error"], "version 42") > 0, "an older designer file: it says to save it again")
+
+    ' the designer maps the brick; the project maps the plaster; the window has none
+    File.Save(sDesign, "{\"format\":\"designer-e\",\"version\":42,\"quantities\":{\"date\":\"2026-11-17 20:00:00\",\"rows\":[" & sRow1 & "100}," & sRow2 & "80}," & sRow3 & "]},\"analyses\":{\"Walls|Solid brick 18\":[{\"code\":\"52\",\"factor\":1}]}}")
+    c = Cmd.Run("design.rows")
+    Check(c["ok"] And c["rows"].Count = 3 And c["rows"][0]["fromDesigner"] And c["rows"][1]["analyses"].Count = 0, "design.rows: " & JSON.Encode(c["rows"][0]))
+    Check(Cmd.Run("design.map", ["key": "Walls|Plaster", "analyses": [["code": "79", "factor": 2]]])["ok"], "the project maps a row the designer doesn't")
+    c = Cmd.Run("design.sync")
+    Check(c["ok"] And h.Items.Count = 2, "items from the design: " & JSON.Encode(c["report"]))
+    Check(h.Items[0].Code = "4.01" And h.Items[0].Quantity = 100 And h.Items[0].QtySource = "design", "the brick: 100 m2 from the design")
+    Check(h.Items[1].Code = "7.01" And h.Items[1].Quantity = 160 And h.Items[1].DesignQty = 160, "the plaster: 80 m2 x 2 (both faces)")
+    Check(InStr(c["report"].Join("\n"), "V1") > 0, "the report lists the rows without analyses")
+
+    ' the design changes: items follow, unless changed by hand; a row that is gone is said
+    Cmd.Run("item.set", ["key": "7.01", "qty": 150])
+    File.Save(sDesign, "{\"format\":\"designer-e\",\"version\":42,\"quantities\":{\"date\":\"2026-11-18 09:00:00\",\"rows\":[" & sRow1 & "120}]},\"analyses\":{\"Walls|Solid brick 18\":[{\"code\":\"52\",\"factor\":1}]}}")
+    c = Cmd.Run("design.sync")
+    Check(h.Items[0].Quantity = 120 And h.Items.Count = 2, "a design quantity follows the design")
+    Check(h.Items[1].Quantity = 150 And h.Items[1].DesignQty = 0 And h.Items[1].Overridden(), "a hand change is kept, and the row that is gone is marked")
+    Check(InStr(c["report"].Join("\n"), "doesn't have anymore") > 0, "the report says what is gone")
+    ' the designer's map wins over the project's
+    File.Save(sDesign, "{\"format\":\"designer-e\",\"version\":42,\"quantities\":{\"date\":\"x\",\"rows\":[" & sRow2 & "10}]},\"analyses\":{\"Walls|Plaster\":[{\"code\":\"79\",\"factor\":1}]}}")
+    Cmd.Run("design.sync")
+    Check(h.Items[1].DesignQty = 10, "the designer's map wins: " & h.Items[1].DesignQty)
+    Cmd.Run("undo")
+    Check(sumi.Project.Budget.Items[1].DesignQty = 0, "undo a sync")
 
 End
 

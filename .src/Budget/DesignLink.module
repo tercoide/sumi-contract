@@ -1,0 +1,137 @@
+' Gambas module file
+
+'' The link with sumi-designer (decided with the user 2026-11-17): the .designer-proj has the building's quantities,
+'' written by sumi-designer on every save ("quantities": rows with a "key" that doesn't change with the language),
+'' and the analyses of each row ("analyses": key -> [{code, factor}...]); sumi-designer is the master of that map.
+'' While it has none for a row, the project's Budget.DesignMap can say it.
+'' Sync turns them into budget items: one for each row and analysis (DesignRef = "row key#analysis code"),
+'' QtySource "design", DesignQty = the row's quantity × the factor. An item changed by hand keeps its quantity
+'' (and stays marked); a row that is gone leaves its items with DesignQty 0, said in the report.
+
+Public Report As New String[]
+
+'' The design's quantities: {rows, map, date} or Null (Report says why)
+Public Function Read(sFile As String) As Collection
+
+    Dim c As Collection
+
+    Report.Clear
+    If Not sFile Then
+        Report.Add(("The project has no sumi-designer file: choose it in the Project tab."))
+        Return Null
+    Endif
+    If Not Exist(sFile) Then
+        Report.Add(Subst(("&1 doesn't exist."), sFile))
+        Return Null
+    Endif
+    Try c = JSON.Decode(File.Load(sFile))
+    If Not c Then
+        Report.Add(Subst(("&1 can't be read."), File.Name(sFile)))
+        Return Null
+    Endif
+    If Not c["quantities"] Or If Not c["quantities"]["rows"] Then
+        Report.Add(Subst(("&1 has no quantities: save it again with a sumi-designer that writes them (file version 42 or later)."), File.Name(sFile)))
+        Return Null
+    Endif
+    Return ["rows": c["quantities"]["rows"], "map": c["analyses"], "date": c["quantities"]["date"]]
+
+End
+
+'' The analyses of a row: the designer's, or else the project's; [] if none. bDesigner says whose.
+Public Function AnalysesOf(cDesign As Collection, sKey As String, ByRef bDesigner As Boolean) As Variant[]
+
+    bDesigner = False
+    If cDesign["map"] And If cDesign["map"].Exist(sKey) Then
+        bDesigner = True
+        Return cDesign["map"][sKey]
+    Endif
+    If sumi.Project.Budget.DesignMap.Exist(sKey) Then Return sumi.Project.Budget.DesignMap[sKey]
+    Return New Variant[]
+
+End
+
+'' Creates and updates the budget items from the design (the caller logs the change: Cmd design.sync)
+Public Sub Sync(cDesign As Collection)
+
+    Dim h As Budget = sumi.Project.Budget
+    Dim b As PriceBook = sumi.Project.Prices
+    Dim vRow, vA As Variant
+    Dim aAnalyses As Variant[]
+    Dim bDesigner As Boolean
+    Dim a As Analysis
+    Dim item As BudgetItem
+    Dim cSeen As New Collection
+    Dim sRef As String
+    Dim fQty, fFactor As Float
+    Dim nNew, nUpdated, nKept, nGone As Integer
+    Dim aUnmapped As New String[]
+    Dim aUnknown As New String[]
+
+    For Each vRow In cDesign["rows"]
+        aAnalyses = AnalysesOf(cDesign, vRow["key"], ByRef bDesigner)
+        If aAnalyses.Count = 0 Then
+            aUnmapped.Add(vRow["group"] & ": " & vRow["item"] & " (" & Format(vRow["qty"], "0.##") & " " & vRow["unit"] & ")")
+            Continue
+        Endif
+        For Each vA In aAnalyses
+            a = b.AnalysisByCode(CStr(vA["code"]))
+            If Not a Then
+                If Not aUnknown.Exist(CStr(vA["code"])) Then aUnknown.Add(CStr(vA["code"]))
+                Continue
+            Endif
+            fFactor = 1
+            If vA.Exist("factor") Then fFactor = vA["factor"]
+            fQty = vRow["qty"] * fFactor
+            sRef = vRow["key"] & "#" & a.Code
+            cSeen[sRef] = True
+            item = FindRef(sRef)
+            If item Then
+                If item.Overridden() Then
+                    Inc nKept
+                Else
+                    item.Quantity = fQty
+                    Inc nUpdated
+                Endif
+                item.DesignQty = fQty
+                item.Analysis = a.Id
+            Else
+                item = New BudgetItem
+                item.Analysis = a.Id
+                item.Rubro = a.Rubro
+                item.Quantity = fQty
+                item.QtySource = "design"
+                item.DesignQty = fQty
+                item.DesignRef = sRef
+                h.Items.Add(item, h.InsertPos(item.Rubro))
+                Inc nNew
+            Endif
+        Next
+    Next
+    ' what the design doesn't have anymore
+    For Each item In h.Items
+        If item.QtySource <> "design" Or If cSeen.Exist(item.DesignRef) Then Continue
+        If item.DesignQty <> 0 Then Inc nGone
+        item.DesignQty = 0
+    Next
+    h.Renumber()
+
+    Report.Clear
+    Report.Add(Subst(("From the design (saved &1): &2 items new, &3 updated, &4 changed by hand kept."), cDesign["date"], nNew, nUpdated, nKept))
+    If nGone Then Report.Add(Subst(("&1 items measure things the design doesn't have anymore: their design quantity is now 0 (orange)."), nGone))
+    If aUnknown.Count Then Report.Add(Subst(("Analyses the price book doesn't have: &1"), aUnknown.Join(", ")))
+    If aUnmapped.Count Then
+        Report.Add(Subst(("&1 rows of the design have no analyses yet (give them in sumi-designer, or here in From the design):"), aUnmapped.Count))
+        Report.Insert(aUnmapped)
+    Endif
+
+End
+
+Private Function FindRef(sRef As String) As BudgetItem
+
+    Dim item As BudgetItem
+
+    For Each item In sumi.Project.Budget.Items
+        If item.DesignRef = sRef Then Return item
+    Next
+
+End

@@ -7,6 +7,8 @@
 
 Public Items As New BudgetItem[]                '' in order: by rubro, then as people arranged them
 Public RubroCoefs As New Collection             '' Coef[] by CStr(rubro number)
+Public DesignMap As New Collection              '' the analyses of a design's quantities row ([{code, factor}...] by row key) while
+                                                '' sumi-designer has none for it: the designer's map wins (see DesignLink)
 
 '' THE NUMBERS
 
@@ -192,6 +194,11 @@ Public Function ToJson() As Collection
         cRub[RubroCoefs.Key] = Coef.ListToJson(v)
     Next
     c["rubroCoefs"] = cRub
+    cRub = New JSONCollection
+    For Each v In DesignMap
+        cRub[DesignMap.Key] = v
+    Next
+    c["designMap"] = cRub
     Return c
 
 End
@@ -202,7 +209,13 @@ Public Sub FromJson(c As Collection)
 
     Items.Clear
     RubroCoefs.Clear
+    DesignMap.Clear
     If Not c Then Return
+    If c.Exist("designMap") Then
+        For Each v In c["designMap"]
+            DesignMap[c["designMap"].Key] = v
+        Next
+    Endif
     If c.Exist("items") Then
         For Each v In c["items"]
             Items.Add(BudgetItem.FromJson(v))
