@@ -50,6 +50,15 @@ export class Store {
     return out.sort((a, b) => (a.modified < b.modified ? 1 : -1));
   }
 
+  /** Every project */
+  *all(): Iterable<Project> {
+    for (const f of fs.readdirSync(path.join(this.dir, "projects"))) {
+      if (!f.endsWith(".contract-proj")) continue;
+      const p = this.get(f.slice(0, -".contract-proj".length));
+      if (p) yield p;
+    }
+  }
+
   get(id: string): Project | undefined {
     let p = this.projects.get(id);
     if (p) return p;

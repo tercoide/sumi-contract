@@ -153,7 +153,18 @@ function Contract({ id, contractors, cur, onGone }: { id: string; contractors: a
           </Row>
         </div>
         <p className="strong">{tr("Amount &1 &2 · done &3 % · certified &1 &4 · paid &1 &5 · balance &1 &6", cur, fmt(k.amount), fmt(k.progress * 100, 1), fmt(k.certified), fmt(k.paid), fmt(k.balance))}</p>
-        <button onClick={remove}>{tr("Delete")}</button>
+        <div className="toolbar">
+          <button
+            onClick={async () => {
+              const r = await openReport(w.id, { kind: "account", contract: k.id });
+              w.setStatus(r.error ? { text: r.error, error: true } : { text: tr("&1: &2 pages", r.name, r.pages), error: false });
+            }}
+            title={tr("The contract's certificates, payments and balance, in PDF")}
+          >
+            <img className="icon" src="/icons/document-print.svg" alt="" /> {tr("Account")}
+          </button>
+          <button onClick={remove}>{tr("Delete")}</button>
+        </div>
       </section>
       <nav className="subtabs">
         {[

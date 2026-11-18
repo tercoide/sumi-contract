@@ -5,7 +5,7 @@
 
 import * as B from "./budget.ts";
 import { findContractor, type Company } from "./company.ts";
-import { findCert, findContract, measuredBefore, numbers, PROGRESS } from "./contracts.ts";
+import { amount, balance, findCert, findContract, measuredBefore, numbers, progress, PROGRESS } from "./contracts.ts";
 import { PdfDoc } from "./pdf.ts";
 import * as P from "./prices.ts";
 import { addDays } from "./dates.ts";
@@ -13,7 +13,7 @@ import { isWorkDay, type Project } from "./project.ts";
 import * as S from "./schedule.ts";
 import { locale, today, tr } from "./text.ts";
 
-export const REPORT_KINDS = ["budget", "summary", "analyses", "gantt", "certificate"];
+export const REPORT_KINDS = ["budget", "summary", "analyses", "gantt", "certificate", "account"];
 
 const MARGIN = 15;
 const LINE_H = 4.6; // mm a table row
@@ -51,6 +51,10 @@ export function makeReport(p: Project, company: Company, kind: string, contract 
       why = r.certificate(company, contract, cert);
       name = r.title;
       break;
+    case "account":
+      why = r.account(company, contract);
+      name = r.title;
+      break;
     default:
       return { error: tr("Unknown report &1.", kind) };
   }
@@ -65,7 +69,7 @@ export function makeReport(p: Project, company: Company, kind: string, contract 
 function fmt(f: number, min: number, max = min, grouping = true): string {
   return f.toLocaleString(locale(), { minimumFractionDigits: min, maximumFractionDigits: max, useGrouping: grouping ? "always" : false });
 }
-const money = (f: number) => fmt(f, 2);
+const money = (f: number) => fmt(Math.abs(f) < 0.005 ? 0 : f, 2); // (no "-0.00")
 const quantity = (f: number) => fmt(f, 1, 4);
 function share(part: number, whole: number): string {
   return whole === 0 ? "" : fmt((part / whole) * 100, 1) + "%";
@@ -364,6 +368,39 @@ class Report {
     this.gap(LINE_H);
     this.pdf.text(MARGIN + 30, this.y, tr("Site direction"), 8, false, "c");
     this.pdf.text(w - MARGIN - 30, this.y, tr("Contractor"), 8, false, "c");
+    return "";
+  }
+
+  // A CONTRACT'S ACCOUNT: its certificates, its payments, the balance (what the contractor asks for when they come to collect)
+
+  account(company: Company, contract: string): string {
+    const p = this.p;
+    const t = findContract(p.contracts, contract);
+    if (!t) return tr("There is no contract &1.", contract);
+    const k = findContractor(company, t.contractor);
+    this.start(tr("Account of contract &1", t.code));
+    this.note(tr("Contractor") + ": " + (k ? k.name + (k.taxId ? "  " + tr("Tax id") + " " + k.taxId : "") : "?"), 9, true);
+    this.note(tr("Contract &1: &2. Amount &3 &4, &5% certified.", t.code, t.title, p.currency, money(amount(t)), fmt(progress(t) * 100, 1)), 8.5);
+    this.gap(LINE_H * 0.5);
+    this.table([tr("Certificate"), tr("Kind"), tr("Period"), tr("Date"), tr("Status"), tr("Net")], [24, 0, 22, 24, 24, 34], ["l", "l", "c", "c", "c", "r"]);
+    for (const q of t.certificates) this.row([String(q.number), tr(q.kind), q.period, day(q.date), q.status === "issued" ? tr("Issued") : tr("DRAFT"), money(numbers(t, q)[4])]);
+    if (!t.certificates.length) this.row(["", tr("No certificates yet."), "", "", "", ""]);
+    this.endTable();
+    this.gap();
+    this.table([tr("Date"), tr("Means"), tr("Reference"), tr("Invoice"), tr("Certificate"), tr("Amount")], [24, 26, 0, 34, 24, 34], ["c", "l", "l", "l", "c", "r"]);
+    for (const y of t.payments) {
+      const q = t.certificates.find((x) => x.id === y.certificate);
+      this.row([day(y.date), tr(y.means), y.reference, y.invoice, q ? String(q.number) : tr("(on account)"), money(y.amount)]);
+    }
+    if (!t.payments.length) this.row(["", tr("No payments yet."), "", "", "", ""]);
+    this.endTable();
+    this.gap();
+    const [due, paid, left] = balance(t);
+    this.need(LINE_H * 4);
+    this.amount(tr("Issued certificates"), due);
+    this.amount(tr("Paid"), -paid);
+    this.pdf.line(this.pdf.pageW() - MARGIN - 70, this.y - 3.6, this.pdf.pageW() - MARGIN, this.y - 3.6, 0.3);
+    this.amount(tr("Balance") + " (" + p.currency + ")", left, true);
     return "";
   }
 

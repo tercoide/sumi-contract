@@ -43,6 +43,8 @@ export interface Session {
   group: string; // the action being made (beginGroup), or ""
   /** Called after a change is logged: what must be saved */
   changed?: (what: "project" | "company") => void;
+  /** Every project of the company (the server's), for what must look at all of them; else only the open one */
+  projects?: () => Iterable<Project>;
   /** The libraries shipped with the program (licita2003...): its files and its added files */
   library?: (name: string) => { files: LibraryFiles; added?: LibraryFiles } | undefined;
   /** Extra commands (prices.import, design.*, report.pdf) the server adds, with what they need */
@@ -608,7 +610,7 @@ export function help(): Record<string, string> {
     "design.rows": "{} -> the quantities of the last sumi-designer file loaded, each row with its key and its analyses (and whether they come from the designer)",
     "design.sync": "{} creates and updates the budget items from the design's quantities and the analyses of each row",
     "design.map": "{key (a row's key), analyses [{code, factor}...]} the analyses of a design row in this project, while sumi-designer has none for it",
-    "report.pdf": "{kind (budget, summary, analyses, gantt, certificate), contract? and cert? (for a certificate)} makes a PDF report -> {url (to download it), name, pages}",
+    "report.pdf": "{kind (budget, summary, analyses, gantt, certificate, account), contract? (certificate, account) and cert? (certificate)} makes a PDF report -> {url (to download it), name, pages}",
     "rubro.coefs": "{rubro, coefs [{name, pct}...]} the coefficients of a rubro in the budget (on top of the project's)",
     "role.list": "{} -> the roles (id, name, rights) and what each right lets do",
     "person.list": "{} -> the company's people, with their roles in every project",
@@ -640,6 +642,8 @@ function info(x: Op): Result {
     budgetItems: p.budget.items.length,
     budgetPrice: B.totals(p)[1],
     changes: p.changes.length,
+    modified: p.modified,
+    companyChanges: x.co.changes.length,
     you: x.s.who.name,
     via: x.s.who.via,
     rights: x.s.rights ? [...x.s.rights] : "all",
@@ -1274,9 +1278,10 @@ function contractorCmd(x: Op, command: string, c: Args): Result {
       break;
     }
     case "contractor.delete": {
-      // TODO with several projects on the server: check every project's contracts, not only the open one
-      const t = x.s.project?.contracts.find((t) => t.contractor === k.id);
-      if (t) return fail(tr("Contract &1 is with &2.", t.code, k.name));
+      for (const p of x.s.projects?.() ?? (x.s.project ? [x.s.project] : [])) {
+        const t = p.contracts.find((t) => t.contractor === k.id);
+        if (t) return fail(p === x.s.project ? tr("Contract &1 is with &2.", t.code, k.name) : tr("Contract &1 of &2 is with &3.", t.code, p.name || tr("Untitled"), k.name));
+      }
       x.start(command, c, tr("Contractor deleted: &1", k.name));
       x.touch("contractor:" + k.id);
       co.contractors.delete(k.id);

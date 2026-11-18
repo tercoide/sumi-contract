@@ -430,6 +430,8 @@ test("contracts, certificates, payments, the company", () => {
   assert.ok(near(bal[0], 600 + 2835 + 3120) && near(bal[1], 600) && near(bal[2], 5955), "balance: " + bal);
   assert.equal(t().payments[0].certificate, t().certificates[0].id, "the payment points to its certificate");
   assert.ok(fails(s, "contractor.delete", { key: juan }), "a contractor with contracts can't be deleted");
+  const other = { ...session(newProject("p-other"), s.company), projects: () => [newProject("p-x"), p] };
+  assert.match(String(run(other, "contractor.delete", { key: juan }).error), /C-01 of/, "nor when the contract is in another project");
   assert.ok(fails(s, "part.remove", { contract: "C-01", part: "4.01" }), "a part with certified work can't be removed");
 
   // undo: the newest of the project's log and the company's
@@ -559,7 +561,7 @@ test("the PDF reports", async () => {
   })();
   const out = process.env.SMOKE_PDF_DIR || fs.mkdtempSync(path.join(os.tmpdir(), "sumi-pdf-"));
   for (const kind of REPORT_KINDS) {
-    const r = makeReport(p, co, kind, "C-01", "3");
+    const r = makeReport(p, co, kind, "C-01", kind === "certificate" ? "3" : "");
     assert.ok(r.pdf && !r.error, `the ${kind} report: ${r.error ?? ""}`);
     const head = String.fromCharCode(...r.pdf.slice(0, 8));
     assert.ok(head.startsWith("%PDF-1.4") && r.pages! >= 1, `${kind}: a PDF`);

@@ -750,3 +750,14 @@ button.primary {
 section.design {
   margin-bottom: 12px;
 }
+section.due {
+  border-color: var(--error);
+  background: var(--error-soft);
+  margin-bottom: 12px;
+}
+section.due h2 {
+  color: var(--error);
+}
+section.due ul {
+  margin: 4px 0;
+}

@@ -216,6 +216,7 @@ function Projects() {
       </header>
       {error && <p className="error">{error}</p>}
       <main className="projects">
+        <DocsDue />
         <h1>{tr("Projects")}</h1>
         {list === null ? (
           <p className="muted">…</p>
@@ -281,6 +282,21 @@ function Workspace({ id, tab }: { id: string; tab: string }) {
   const work: Work = useMemo(() => ({ id, version, run, setStatus }), [id, version, run]);
   const info = useCommand(work, "info");
 
+  // what others change shows too: the project is looked at every few seconds, and read again if it changed
+  const seen = useRef("");
+  const stamp = (r: api.Result | null) => (r && !r.error ? `${r.changes}|${r.modified}|${r.companyChanges}` : "");
+  useEffect(() => {
+    seen.current = stamp(info);
+  }, [info]);
+  useEffect(() => {
+    const t = setInterval(async () => {
+      if (document.hidden) return;
+      const k = stamp(await api.run(id, "info"));
+      if (k && seen.current && k !== seen.current) setVersion((v) => v + 1);
+    }, 8000);
+    return () => clearInterval(t);
+  }, [id]);
+
   useEffect(() => {
     document.title = (info?.name || tr("Untitled")) + " — sumi-contract";
   }, [info?.name]);
@@ -331,5 +347,27 @@ function Workspace({ id, tab }: { id: string; tab: string }) {
         {aiOpen && can("ai") && <AssistantPanel project={id} onChanged={() => setVersion((v) => v + 1)} onClose={() => showAi(false)} />}
       </div>
     </Ctx.Provider>
+  );
+}
+
+/** The contractors' documents expired or expiring within 15 days (insurance, ART, taxes...): who can't work */
+function DocsDue() {
+  const [list, setList] = useState<api.Result[]>([]);
+  useEffect(() => {
+    api.run("", "contractor.list").then((r) => setList((r.contractors ?? []).filter((k: api.Result) => k.docsDue.length)));
+  }, []);
+  if (!list.length) return null;
+  return (
+    <section className="due">
+      <h2>{tr("Contractors' documents expired or about to")}</h2>
+      <ul>
+        {list.map((k) => (
+          <li key={k.id}>
+            <strong>{k.name}</strong>: {k.docsDue.join(", ")}
+          </li>
+        ))}
+      </ul>
+      <p className="muted small">{tr("Renew them in a project's Contracts tab, Contractors...")}</p>
+    </section>
   );
 }

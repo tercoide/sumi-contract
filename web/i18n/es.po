@@ -408,3 +408,36 @@ msgstr "Las cantidades del edificio, de un archivo de sumi-designer"
 msgid "analyses is a list of {code, factor}"
 msgstr "analyses es una lista de {code, factor}"
 
+msgid "Contract &1 of &2 is with &3."
+msgstr "El contrato &1 de &2 es con &3."
+
+msgid "Account"
+msgstr "Cuenta"
+
+msgid "Account of contract &1"
+msgstr "Cuenta del contrato &1"
+
+msgid "Contract &1: &2. Amount &3 &4, &5% certified."
+msgstr "Contrato &1: &2. Monto &3 &4, &5% certificado."
+
+msgid "Issued certificates"
+msgstr "Certificados emitidos"
+
+msgid "No certificates yet."
+msgstr "Todavía no hay certificados."
+
+msgid "No payments yet."
+msgstr "Todavía no hay pagos."
+
+msgid "Paid"
+msgstr "Pagado"
+
+msgid "The contract's certificates, payments and balance, in PDF"
+msgstr "Los certificados, pagos y saldo del contrato, en PDF"
+
+msgid "Contractors' documents expired or about to"
+msgstr "Documentos de contratistas vencidos o por vencer"
+
+msgid "Renew them in a project's Contracts tab, Contractors..."
+msgstr "Renovalos en la pestaña Contratos de un proyecto, Contratistas..."
+

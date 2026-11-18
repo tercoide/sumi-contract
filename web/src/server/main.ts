@@ -36,7 +36,7 @@ import { RIGHT_NAMES, type Right } from "../model/roles.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url)); // dist/src/server
 const root = path.resolve(here, "../../.."); // web/
-const port = Number(process.env.SUMI_PORT || 8064);
+const port = Number(process.env.SUMI_PORT || process.env.PORT || 8064); // PORT: Cloud Run's
 const store = new Store(process.env.SUMI_DATA || path.join(root, "data"));
 const clientDir = path.join(root, "dist/client");
 let auth: Auth | null = null;
@@ -137,6 +137,7 @@ function session(projectId: string, person: Person | null): Session {
     rights: rights(person, project),
     group: "",
     library,
+    projects: () => store.all(),
     extra: {
       // the PDF is made to see it can be; the screens (or the person the AI works for) download it from the url
       "report.pdf": (_x, c) => {
@@ -258,7 +259,7 @@ const server = http.createServer((req, res) => {
   handle(req, res).catch((e) => send(res, 500, { error: e instanceof Error ? e.message : String(e) }));
 });
 // SUMI_HOST=0.0.0.0 to be reached from other computers (only with logins on)
-const host = process.env.SUMI_HOST || "127.0.0.1";
+const host = process.env.SUMI_HOST || (process.env.K_SERVICE ? "0.0.0.0" : "127.0.0.1"); // K_SERVICE: on Cloud Run
 if (!auth && host !== "127.0.0.1" && host !== "localhost") {
   console.error("sumi-contract: without Google sign-in it only listens on this computer (see src/server/auth.ts)");
   process.exit(1);

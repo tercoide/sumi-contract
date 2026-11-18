@@ -213,6 +213,12 @@ try {
   await shot("design");
   check(errors.length === 0, "the design link: " + errors.join("; "));
 
+  // a change made elsewhere (another person, another window) shows by itself
+  const first = (await api("budget.list")).items[0];
+  await api("item.set", { key: first.id, description: "Cambiado en otra ventana" });
+  await page.waitForFunction(() => [...document.querySelectorAll("table.budget input")].some((i) => i.value === "Cambiado en otra ventana"), null, { timeout: 15000 });
+  check(true, "another window's change shows by itself");
+
   // people and roles: someone added, a role given; the project's team
   await page.goto(`${base}/#/people`);
   await page.waitForSelector(".people table.grid");
