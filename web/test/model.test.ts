@@ -535,3 +535,43 @@ test("the licita2003 import", async () => {
   must(s, "undo");
   assert.equal(s.project!.prices.analyses.size, 0, "undo the import");
 });
+
+test("the PDF reports", async () => {
+  const fs = await import("node:fs");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const { execFileSync } = await import("node:child_process");
+  const { makeReport, REPORT_KINDS } = await import("../src/model/reports.ts");
+  const { PdfDoc } = await import("../src/model/pdf.ts");
+  const dir = new URL("../../test/gambas/", import.meta.url);
+  const p = projectFromJson(JSON.parse(fs.readFileSync(new URL("contracts.contract-proj", dir), "utf8")).project, "p-pdf");
+  const co = Co.companyFromFiles({ "contractors.json": JSON.parse(fs.readFileSync(new URL("contractors.json", dir), "utf8")) });
+  const pdf = new PdfDoc();
+  assert.ok(pdf.textWidth("W", 10) > pdf.textWidth("i", 10) && pdf.fit("a long text that doesn't fit", 10, 9).endsWith("..."), "text widths and cutting");
+  // pdfinfo and pdftotext read them, when the computer has them (poppler-utils); SMOKE_PDF_DIR keeps them
+  const has = (() => {
+    try {
+      execFileSync("pdfinfo", ["-v"], { stdio: "ignore" });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  const out = process.env.SMOKE_PDF_DIR || fs.mkdtempSync(path.join(os.tmpdir(), "sumi-pdf-"));
+  for (const kind of REPORT_KINDS) {
+    const r = makeReport(p, co, kind, "C-01", "3");
+    assert.ok(r.pdf && !r.error, `the ${kind} report: ${r.error ?? ""}`);
+    const head = String.fromCharCode(...r.pdf.slice(0, 8));
+    assert.ok(head.startsWith("%PDF-1.4") && r.pages! >= 1, `${kind}: a PDF`);
+    if (!has) continue;
+    const file = path.join(out, kind + ".pdf");
+    fs.writeFileSync(file, r.pdf);
+    const info = execFileSync("pdfinfo", [file], { encoding: "utf8" });
+    assert.match(info, new RegExp(`Pages:\\s+${r.pages}\\b`), `${kind}: pdfinfo reads it`);
+    const text = execFileSync("pdftotext", ["-layout", file, "-"], { encoding: "utf8" });
+    assert.ok(text.includes(p.name) && text.includes(`1 of ${r.pages}`), `${kind}: its header and footer`);
+    if (kind === "certificate") assert.ok(text.includes("Juan Pérez") && text.includes("3,120.00"), "the certificate: the contractor (an accent) and the net");
+  }
+  assert.ok(makeReport(p, co, "certificate", "C-01", "99").error && makeReport(p, co, "nothing").error && makeReport(newProject(), co, "budget").error, "what can't be made says why");
+  if (!process.env.SMOKE_PDF_DIR) fs.rmSync(out, { recursive: true });
+});

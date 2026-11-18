@@ -10,6 +10,11 @@ export function setCatalog(c: Map<string, string> | null): void {
   catalog = c;
 }
 
+/** The locale numbers and dates are written in: Spanish (Argentina) when the Spanish catalog is loaded */
+export function locale(): string {
+  return catalog ? "es-AR" : "en-US";
+}
+
 export function tr(text: string, ...args: unknown[]): string {
   const s = catalog?.get(text) || text;
   return s.replace(/&(\d)/g, (m, d) => {

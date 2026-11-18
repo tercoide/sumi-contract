@@ -553,7 +553,7 @@ export function help(): Record<string, string> {
     "design.rows": "{} -> the quantities of the sumi-designer file (Project tab), each row with its key and its analyses (and whether they come from the designer)",
     "design.sync": "{} creates and updates the budget items from the design's quantities and the analyses of each row",
     "design.map": "{key (a row's key), analyses [{code, factor}...]} the analyses of a design row in this project, while sumi-designer has none for it",
-    "report.pdf": "{kind (budget, summary, analyses, gantt, certificate), contract? and cert? (for a certificate)} makes a PDF report",
+    "report.pdf": "{kind (budget, summary, analyses, gantt, certificate), contract? and cert? (for a certificate)} makes a PDF report -> {url (to download it), name, pages}",
     "rubro.coefs": "{rubro, coefs [{name, pct}...]} the coefficients of a rubro in the budget (on top of the project's)",
   };
 }

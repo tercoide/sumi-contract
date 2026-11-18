@@ -5,6 +5,7 @@
 // are the company's (ContractorsPanel). Every change goes through the commands.
 
 import { Fragment, useState } from "react";
+import { openReport } from "../api.ts";
 import { Num, Row, Text } from "../fields.tsx";
 import { fmt, qty, tr } from "../tr.ts";
 import { useCommand, useWork } from "../work.ts";
@@ -309,6 +310,17 @@ function Certificates({ k }: { k: any }) {
             <Row label={tr("Status")}>
               <button onClick={() => w.run("cert.set", { contract: k.id, cert: q.number, status: q.status === "issued" ? "draft" : "issued" })}>
                 {q.status === "issued" ? tr("issued: back to draft") : tr("draft: issue it")}
+              </button>
+            </Row>
+            <Row label="PDF">
+              <button
+                onClick={async () => {
+                  const r = await openReport(w.id, { kind: "certificate", contract: k.id, cert: q.number });
+                  w.setStatus(r.error ? { text: r.error, error: true } : { text: tr("&1: &2 pages", r.name, r.pages), error: false });
+                }}
+                title={tr("The certificate in PDF, to print and sign")}
+              >
+                <img className="icon" src="/icons/document-print.svg" alt="" /> {tr("Certificate")}
               </button>
             </Row>
           </div>
