@@ -719,6 +719,12 @@ Private Sub TestContracts()
 
     ' the file, and the company's data read again
     Check(Not JsonFile.SaveFile(sFile, sumi.Project), "save the contracts")
+    ' SMOKE_KEEP_DIR=<dir> keeps the file and the company's data (the web version's tests read them)
+    If Env["SMOKE_KEEP_DIR"] Then
+        Try Copy sFile To Env["SMOKE_KEEP_DIR"] &/ "contracts.contract-proj"
+        Try Copy Company.Folder() &/ "contractors.json" To Env["SMOKE_KEEP_DIR"] &/ "contractors.json"
+        Try Copy Company.Folder() &/ "log.json" To Env["SMOKE_KEEP_DIR"] &/ "log.json"
+    Endif
     q = JsonFile.LoadFile(sFile)
     sumi.Project = q
     Check(q.Contracts.Items.Count = 2 And Abs(q.Contracts.Find("C-01").Numbers(q.Contracts.Find("C-01").Certs[2])[4] - 3120) < 1e-9, "the contracts after load")

@@ -1,0 +1,20 @@
+{
+  "name": "sumi-contract",
+  "version": "0.1.0",
+  "description": "The paperwork of a building work: prices, budget, Gantt, contracts (web version)",
+  "license": "GPL-3.0-or-later",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "tsc && node --test --enable-source-maps \"dist/test/**/*.test.js\"",
+    "start": "tsc && node --enable-source-maps dist/src/server/main.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "@types/node": "^22.19.0"
+  }
+}
