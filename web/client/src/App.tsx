@@ -11,6 +11,7 @@ import { HistoryTab } from "./tabs/HistoryTab.tsx";
 import { PricingTab } from "./tabs/PricingTab.tsx";
 import { GanttTab } from "./tabs/GanttTab.tsx";
 import { ContractsTab } from "./tabs/ContractsTab.tsx";
+import { AssistantPanel } from "./Assistant.tsx";
 
 const TABS = [
   { id: "project", label: () => tr("Project") },
@@ -229,6 +230,19 @@ function Workspace({ id, tab }: { id: string; tab: string }) {
     },
     [id],
   );
+  const [aiOpen, setAiOpen] = useState(() => {
+    try {
+      return localStorage.getItem("sumi.ai") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const showAi = (on: boolean) => {
+    setAiOpen(on);
+    try {
+      localStorage.setItem("sumi.ai", on ? "1" : "0");
+    } catch {}
+  };
   const work: Work = useMemo(() => ({ id, version, run, setStatus }), [id, version, run]);
   const info = useCommand(work, "info");
 
@@ -238,7 +252,7 @@ function Workspace({ id, tab }: { id: string; tab: string }) {
 
   return (
     <Ctx.Provider value={work}>
-      <div className="page">
+      <div className={"page" + (aiOpen ? " with-assistant" : "")}>
         <header className="bar">
           <a className="brand" href="#/" title={tr("Projects")}>
             sumi-contract
@@ -254,6 +268,9 @@ function Workspace({ id, tab }: { id: string; tab: string }) {
             <Icon name="document-export" /> {tr("Download")}
           </a>
           <PdfMenu id={id} setStatus={setStatus} />
+          <button className={aiOpen ? "on" : ""} onClick={() => showAi(!aiOpen)} title={tr("Claude works on the project for you: prices from the web, analyses, the budget...")}>
+            <Icon name="light-bulb" /> {tr("AI assistant")}
+          </button>
           <span className="grow" />
           <LangSwitch />
           <You />
@@ -276,6 +293,7 @@ function Workspace({ id, tab }: { id: string; tab: string }) {
         <footer className={"status" + (status.error ? " error" : "")}>
           {status.text || (info ? tr("&1 items, &2 changes in the log", info.budgetItems, info.changes) : "")}
         </footer>
+        {aiOpen && <AssistantPanel project={id} onChanged={() => setVersion((v) => v + 1)} onClose={() => showAi(false)} />}
       </div>
     </Ctx.Provider>
   );

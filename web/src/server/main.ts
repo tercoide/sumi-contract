@@ -8,6 +8,9 @@
 //   GET  /api/projects/<id>/report/<kind>?contract=&cert=&lang=   a PDF report (model/reports.ts)
 //   POST /api/run {project?, command, args}   a command (see model/cmd.ts) -> its result
 //   GET  /api/me                         who is signed in, and whether logins are on
+//   GET  /api/assistant?project=         the AI assistant: its settings and the conversation shown
+//   POST /api/assistant {project, prompt}   a request to it: what it does streams back as JSON lines
+//   POST /api/assistant/stop|new {project}   stop it, or forget the conversation (assistant.ts)
 //   /auth/login, /auth/callback, /auth/logout   signing in with Google (auth.ts)
 //
 // Who: the person signed in with Google (their company account), when the Google keys are there (see auth.ts);
@@ -23,6 +26,7 @@ import { run, type Session } from "../model/cmd.ts";
 import { makeId } from "../model/ids.ts";
 import { isObj, setCatalog, str, tr } from "../model/text.ts";
 import { makeReport } from "../model/reports.ts";
+import { apiSender, cannedSender, Chat, hasKey, loadAIConfig, type Sender } from "./assistant.ts";
 import { Auth, loadAuth, type Person } from "./auth.ts";
 import { Store } from "./store.ts";
 
@@ -39,6 +43,17 @@ try {
   console.error("sumi-contract: " + (e instanceof Error ? e.message : String(e)));
   process.exit(1);
 }
+const ai = loadAIConfig(store.dir);
+const sender: Sender = process.env.SUMI_AI_CANNED ? cannedSender(process.env.SUMI_AI_CANNED) : apiSender(ai);
+const chats = new Map<string, Chat>(); // by person and project
+
+function chatOf(w: Who, project: string): Chat {
+  const key = w.userId + "|" + project;
+  let c = chats.get(key);
+  if (!c) chats.set(key, (c = new Chat(ai, sender)));
+  return c;
+}
+
 const spanish = new Map<string, string>(Object.entries(JSON.parse(fs.readFileSync(path.join(root, "src/i18n/es.json"), "utf8"))));
 
 /** The texts of a request in the person's language (the screens send it; else the browser's) */
@@ -167,6 +182,30 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     if (r.error || !r.pdf) return send(res, 400, r.error ?? "?", "text/plain; charset=utf-8");
     res.writeHead(200, { "content-type": "application/pdf", "content-length": r.pdf.length, "cache-control": "no-store", "content-disposition": `inline; filename*=UTF-8''${encodeURIComponent(r.name!)}` });
     return void res.end(r.pdf);
+  }
+  if (parts[1] === "assistant") {
+    const q = new URL(url, "http://x").searchParams;
+    const body = req.method === "POST" ? JSON.parse((await readBody(req)) || "{}") : {};
+    const projectId = str(q.get("project") || body.project);
+    const s = session(projectId, person);
+    if (!s.project) return send(res, 404, { error: tr("Open a project first.") });
+    const chat = chatOf(s.who, projectId);
+    if (req.method === "GET") return send(res, 200, { model: ai.model, effort: ai.effort, webSearch: ai.webSearch, key: hasKey(ai), busy: chat.busy, entries: chat.entries });
+    if (parts[2] === "stop") return send(res, 200, (chat.stop(), { ok: true }));
+    if (parts[2] === "new") return send(res, 200, chat.newChat() ? { ok: true } : { error: tr("The assistant is still working on the last request.") });
+    const prompt = str(body.prompt).trim();
+    if (!prompt) return send(res, 400, { error: "no prompt" });
+    if (chat.busy) return send(res, 409, { error: tr("The assistant is still working on the last request.") });
+    // what happens, as JSON lines; the person's language is kept for the whole turn
+    res.writeHead(200, { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store", "x-accel-buffering": "no" });
+    res.on("close", () => !res.writableEnded && chat.stop()); // the page closed: the turn stops
+    await chat.ask(
+      s,
+      prompt,
+      (e) => !res.writableEnded && res.write(JSON.stringify(e) + "\n"),
+      () => language(req), // other requests may have changed the language while it waited
+    );
+    return void res.end();
   }
   if (req.method === "POST" && url === "/api/run") {
     const body = JSON.parse((await readBody(req)) || "{}");

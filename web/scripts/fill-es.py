@@ -79,6 +79,11 @@ ES = {
     "The reports, in PDF": "Los informes, en PDF",
     "The sign-in took too long or was started elsewhere: try again.": "El inicio de sesión tardó demasiado o se empezó en otro lado: probá de nuevo.",
     "You couldn't sign in": "No pudiste iniciar sesión",
+    "Ask the assistant (Enter sends, Shift+Enter a new line)": "Pedile algo al asistente (Enter envía, Shift+Enter nueva línea)",
+    "Claude works on the project for you: prices from the web, analyses, the budget...": "Claude trabaja en el proyecto por vos: precios de la web, análisis, el presupuesto...",
+    "The API answered: &1": "La API respondió: &1",
+    "The assistant is still working on the last request.": "El asistente todavía está trabajando en el pedido anterior.",
+    "There is no API key: put it in the ANTHROPIC_API_KEY variable, or in data/ai.json, and start the server again.": "No hay clave de API: ponela en la variable ANTHROPIC_API_KEY, o en data/ai.json, y volvé a iniciar el servidor.",
 }
 
 path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "i18n", "es.po")

@@ -59,3 +59,38 @@ export async function openReport(project: string, args: Record<string, unknown>)
 export const newProject = () => post("/api/projects", {});
 export const importProject = (text: string) => post("/api/projects/import", text, true);
 export const fileUrl = (id: string) => `/api/projects/${id}/file`;
+
+// THE AI ASSISTANT
+
+export async function assistantState(project: string): Promise<Result> {
+  const r = await fetch("/api/assistant?project=" + encodeURIComponent(project), { headers: { "x-sumi-lang": lang } });
+  signedOut(r);
+  return r.json();
+}
+
+export const assistantStop = (project: string) => post("/api/assistant/stop", { project });
+export const assistantNew = (project: string) => post("/api/assistant/new", { project });
+
+/** A request to the assistant; onEvent gets what it does as it happens ({type: text|step|round|done}) */
+export async function askAssistant(project: string, prompt: string, onEvent: (e: Result) => void): Promise<void> {
+  const r = await fetch("/api/assistant", { method: "POST", headers: { "content-type": "application/json", "x-sumi-lang": lang }, body: JSON.stringify({ project, prompt }) });
+  signedOut(r);
+  if (!r.ok || !r.body) {
+    let why = `HTTP ${r.status}`;
+    try {
+      why = (await r.json()).error ?? why;
+    } catch {}
+    onEvent({ type: "done", entry: { who: "ai", text: "", steps: [], error: why } });
+    return;
+  }
+  const reader = r.body.pipeThrough(new TextDecoderStream()).getReader();
+  let rest = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    rest += value;
+    const lines = rest.split("\n");
+    rest = lines.pop() ?? "";
+    for (const l of lines) if (l.trim()) onEvent(JSON.parse(l));
+  }
+}

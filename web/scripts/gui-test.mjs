@@ -26,14 +26,21 @@ function check(ok, what) {
   }
 }
 
-const server = spawn(process.execPath, ["dist/src/server/main.js"], { cwd: web, env: { ...process.env, GOOGLE_CLIENT_ID: "", SUMI_GOOGLE_KEYS: "/nonexistent", SUMI_DATA: data, SUMI_PORT: String(port), SUMI_USER: "Tester" }, stdio: ["ignore", "pipe", "inherit"] });
+// the AI assistant answers with canned replies: a command, then a text
+const canned = path.join(data, "ai-replies.json");
+const msg = (stop, content) => ({ id: "msg", type: "message", role: "assistant", model: "claude-opus-5-5", content, stop_reason: stop, stop_sequence: null, usage: {} });
+fs.writeFileSync(canned, JSON.stringify([
+  msg("tool_use", [{ type: "text", text: "Agrego el insumo.", citations: null }, { type: "tool_use", id: "toolu_1", name: "sumi", input: { command: "resource.add", args: { kind: "material", name: "Arena gruesa IA", unit: "m3", price: 30000 } } }]),
+  msg("end_turn", [{ type: "text", text: "Listo: agregué Arena gruesa IA.", citations: null }]),
+]));
+const server = spawn(process.execPath, ["dist/src/server/main.js"], { cwd: web, env: { ...process.env, GOOGLE_CLIENT_ID: "", SUMI_GOOGLE_KEYS: "/nonexistent", SUMI_DATA: data, SUMI_PORT: String(port), SUMI_USER: "Tester", SUMI_AI_CANNED: canned }, stdio: ["ignore", "pipe", "inherit"] });
 await new Promise((ok) => server.stdout.once("data", ok));
 
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1300, height: 900 }, locale: lang === "es" ? "es-AR" : "en-US" });
   const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
+  page.on("pageerror", (e) => (errors.push(e.message), process.env.GUI_VERBOSE && console.log("PAGE ERROR", e.stack)));
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   const shot = async (name) => shots && (await page.screenshot({ path: path.join(shots, name + ".png") }));
   const api = async (command, args = {}) => (await fetch(base + "/api/run", { method: "POST", body: JSON.stringify({ project: id, command, args }) })).json();
@@ -167,6 +174,26 @@ try {
   await page.waitForTimeout(300);
   check((await api("contract.get", { key: c3.id })).contract.payments.length === 1, "a payment");
   check(errors.length === 0, "the Gantt and Contracts tabs: " + errors.join("; "));
+
+  // the AI assistant: a request, the command it runs is logged as the AI, undo takes it back
+  await page.goto(`${base}/#/p/${id}/project`);
+  await page.click(".bar button:has(img[src*='light-bulb'])");
+  await shot("assistant-open");
+  await page.waitForSelector("aside.assistant textarea");
+  await page.fill("aside.assistant textarea", "agregá arena gruesa");
+  await page.press("aside.assistant textarea", "Enter");
+  await page.waitForSelector("aside.assistant .said.ai .text:has-text('Listo')");
+  const added = (await api("resource.list", { text: "Arena gruesa IA" })).resources ?? [];
+  check(added.length === 1, "the assistant added a resource: " + JSON.stringify(added).slice(0, 200));
+  check((await page.textContent("aside.assistant .steps")).includes("resource.add"), "the panel shows what it did");
+  const logAi = (await api("log", { limit: 1 })).changes?.[0];
+  check(logAi?.via?.startsWith("ai"), "logged as the AI: " + JSON.stringify(logAi).slice(0, 200));
+  await shot("assistant");
+  await page.click(".bar button:first-of-type");
+  await page.waitForTimeout(300);
+  check(((await api("resource.list", { text: "Arena gruesa IA" })).resources ?? []).length === 0, "undo takes the assistant's answer back");
+  await page.click("aside.assistant header button:last-child");
+  check(errors.length === 0, "the assistant's panel: " + errors.join("; "));
 
   // the History tab shows it, with its before and after
   await page.goto(`${base}/#/p/${id}/history`);
