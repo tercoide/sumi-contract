@@ -575,3 +575,48 @@ test("the PDF reports", async () => {
   assert.ok(makeReport(p, co, "certificate", "C-01", "99").error && makeReport(p, co, "nothing").error && makeReport(newProject(), co, "budget").error, "what can't be made says why");
   if (!process.env.SMOKE_PDF_DIR) fs.rmSync(out, { recursive: true });
 });
+
+test("the design link (sumi-designer's quantities)", () => {
+  const s = session();
+  const p = s.project!;
+  must(s, "project.set", { overheadPct: 0, profitPct: 0, taxesPct: 0 });
+  must(s, "resource.add", { kind: "material", name: "ladrillo", unit: "u", price: 1 });
+  must(s, "analysis.add", { code: "52", name: "muro", unit: "m2", rubro: 4, lines: [{ resource: "MAT-0001", qty: 60 }] });
+  must(s, "analysis.add", { code: "79", name: "revoque", unit: "m2", rubro: 7, lines: [{ resource: "MAT-0001", qty: 2 }] });
+  const row1 = (q: number) => ({ key: "Walls|Solid brick 18", group: "Muros", item: "Ladrillo macizo 18", unit: "m2", qty: q });
+  const row2 = (q: number) => ({ key: "Walls|Plaster", group: "Muros", item: "Revoque", unit: "m2", qty: q });
+  const row3 = { key: "Openings|V1", group: "Aberturas", item: "V1", unit: "u", qty: 4 };
+  const file = (date: string, rows: unknown[], map: unknown) => JSON.stringify({ format: "designer-e", version: 42, quantities: { date, rows }, analyses: map });
+  const load = (text: string) => run(s, "design.load", { name: "house.designer-proj", text });
+
+  assert.ok(fails(s, "design.sync"), "no design yet: an error");
+  assert.match(String(load(JSON.stringify({ format: "designer-e", version: 41 })).error), /version 42/, "an older designer file: it says to save it again");
+  assert.ok(load(file("2026-11-17 20:00:00", [row1(100), row2(80), row3], { "Walls|Solid brick 18": [{ code: "52", factor: 1 }] })).ok);
+  assert.ok(!("text" in p.changes[p.changes.length - 1].args), "the file's text isn't kept in the log");
+  let c = must(s, "design.rows");
+  assert.ok(c.rows.length === 3 && c.rows[0].fromDesigner && c.rows[1].analyses.length === 0, "design.rows");
+  must(s, "design.map", { key: "Walls|Plaster", analyses: [{ code: "79", factor: 2 }] });
+  c = must(s, "design.sync");
+  const h = p.budget;
+  assert.equal(h.items.length, 2, "items from the design: " + c.report.join(" | "));
+  assert.ok(h.items[0].code === "4.01" && h.items[0].qty === 100 && h.items[0].qtySource === "design", "the brick: 100 m2 from the design");
+  assert.ok(h.items[1].code === "7.01" && h.items[1].qty === 160 && h.items[1].designQty === 160, "the plaster: 80 m2 × 2 (both faces)");
+  assert.ok(c.report.join("\n").includes("V1"), "the report lists the rows without analyses");
+
+  // the design changes: items follow, unless changed by hand; a row that is gone is said
+  must(s, "item.set", { key: "7.01", qty: 150 });
+  load(file("2026-11-18 09:00:00", [row1(120)], { "Walls|Solid brick 18": [{ code: "52", factor: 1 }] }));
+  c = must(s, "design.sync");
+  assert.ok(p.budget.items[0].qty === 120 && p.budget.items.length === 2, "a design quantity follows the design");
+  assert.ok(p.budget.items[1].qty === 150 && p.budget.items[1].designQty === 0 && B.overridden(p.budget.items[1]), "a hand change is kept, and the row that is gone is marked");
+  assert.ok(c.report.join("\n").includes("doesn't have anymore"), "the report says what is gone");
+  // the designer's map wins over the project's
+  load(file("x", [row2(10)], { "Walls|Plaster": [{ code: "79", factor: 1 }] }));
+  must(s, "design.sync");
+  assert.equal(s.project!.budget.items[1].designQty, 10, "the designer's map wins");
+  must(s, "undo");
+  assert.equal(s.project!.budget.items[1].designQty, 0, "undo a sync");
+  must(s, "undo");
+  assert.equal(s.project!.design!.date, "2026-11-18 09:00:00", "undo a load");
+  assert.equal(reload(s.project!).design!.rows.length, 1, "the design's quantities are in the file");
+});

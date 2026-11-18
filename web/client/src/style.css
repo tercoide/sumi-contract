@@ -743,3 +743,10 @@ button.primary {
 .people .grid input {
   margin: 0;
 }
+.toolbar.right {
+  justify-content: flex-end;
+  margin-bottom: 0;
+}
+section.design {
+  margin-bottom: 12px;
+}

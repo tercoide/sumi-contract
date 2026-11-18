@@ -99,6 +99,7 @@ const BY_COMMAND: Record<string, Right> = {
   "item.move": "budget",
   "rubro.coefs": "budget",
   "design.sync": "budget",
+  "design.load": "budget",
   "design.map": "budget",
   "task.set": "schedule",
   "schedule.suggest": "schedule",

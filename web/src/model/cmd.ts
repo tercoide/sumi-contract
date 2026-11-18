@@ -20,11 +20,12 @@ import { todayDay } from "./dates.ts";
 import * as P from "./prices.ts";
 import { CERTIFICATE_PERIODS, CONTRACT_MODES, endDate, fieldsToJson, PROJECT_FIELDS, setFields, USAGES, WORK_TYPES, type Project } from "./project.ts";
 import * as S from "./schedule.ts";
-import { isObj, num, str, tr } from "./text.ts";
+import { isObj, nowStamp, num, str, tr } from "./text.ts";
 import { makeId } from "./ids.ts";
 import { importLibrary, type LibraryFiles } from "./library.ts";
 import { needs, RIGHT_NAMES, RIGHT_TEXTS, rightsOf, roleIds, ROLES, type Right } from "./roles.ts";
 import { membersFromJson, membersToJson } from "./project.ts";
+import * as D from "./design.ts";
 
 export const ABSENT = "~absent~"; // a snapshot of something that didn't exist
 export const COALESCE_SECONDS = 120; // edits of the same field in a row become one change
@@ -204,6 +205,8 @@ export function snapshot(s: Session, target: string): unknown {
       return K.contractsToJson(p.contracts);
     case "members":
       return membersToJson(p.members);
+    case "design":
+      return p.design ? D.designToJson(p.design) : ABSENT;
     case "budget":
       return B.budgetToJson(p.budget);
     case "schedule":
@@ -265,6 +268,9 @@ export function restore(s: Session, target: string, v: unknown): void {
       break;
     case "members":
       p.members = membersFromJson(v);
+      break;
+    case "design":
+      p.design = isAbsent(v) ? null : D.designFromJson(v);
       break;
     case "budget":
       p.budget = B.budgetFromJson(v);
@@ -437,6 +443,11 @@ function dispatch(x: Op, command: string, c: Args): Result {
     case "member.list":
     case "member.set":
       return memberCmd(x, command, c);
+    case "design.load":
+    case "design.rows":
+    case "design.sync":
+    case "design.map":
+      return designCmd(x, command, c);
     case "log":
       return logList(x, c);
     case "change.get":
@@ -593,7 +604,8 @@ export function help(): Record<string, string> {
     "payment.add": "{contract, amount, date?, means? (transfer, cheque, cash, other), reference?, certificate? (number), invoice?, invoiceDate?, note?} -> its index",
     "payment.set": "{contract, index, field: value...}",
     "payment.delete": "{contract, index}",
-    "design.rows": "{} -> the quantities of the sumi-designer file (Project tab), each row with its key and its analyses (and whether they come from the designer)",
+    "design.load": "{name (the file's), text (the .designer-proj)} keeps the quantities of a sumi-designer file in the project (until the next one) -> how many rows",
+    "design.rows": "{} -> the quantities of the last sumi-designer file loaded, each row with its key and its analyses (and whether they come from the designer)",
     "design.sync": "{} creates and updates the budget items from the design's quantities and the analyses of each row",
     "design.map": "{key (a row's key), analyses [{code, factor}...]} the analyses of a design row in this project, while sumi-designer has none for it",
     "report.pdf": "{kind (budget, summary, analyses, gantt, certificate), contract? and cert? (for a certificate)} makes a PDF report -> {url (to download it), name, pages}",
@@ -1272,6 +1284,44 @@ function contractorCmd(x: Op, command: string, c: Args): Result {
     }
   }
   return ok();
+}
+
+// THE DESIGN (sumi-designer)
+
+function designCmd(x: Op, command: string, c: Args): Result {
+  const p = x.p;
+  if (command === "design.load") {
+    const name = str(c.name) || "design.designer-proj";
+    const r = D.readDesign(name, str(c.text), nowStamp());
+    if (r.error) return fail(r.error);
+    // the file's text is not kept in the log (the quantities are, in the after)
+    x.start(command, { name }, tr("Design loaded: &1 (saved &2), &3 rows", name, r.design!.date, r.design!.rows.length));
+    x.touch("design");
+    p.design = r.design!;
+    return ok({ rows: p.design.rows.length, date: p.design.date });
+  }
+  if (command === "design.map") {
+    const key = str(c.key);
+    if (!key) return fail(tr("It needs the row's key."));
+    if (c.analyses !== undefined && !Array.isArray(c.analyses)) return fail(tr("analyses is a list of {code, factor}"));
+    x.start(command, c, tr("Design row &1: its analyses", key));
+    x.touch("budget");
+    if (Array.isArray(c.analyses) && c.analyses.length) p.budget.designMap[key] = structuredClone(c.analyses);
+    else delete p.budget.designMap[key];
+    return ok();
+  }
+  const d = p.design;
+  if (!d) return fail(tr("No sumi-designer file has been loaded yet: load one in the Budget tab (From the design)."));
+  if (command === "design.rows") {
+    const rows = d.rows.map((r) => {
+      const a = D.analysesOf(d, p.budget, r.key);
+      return { ...r, analyses: a.list, fromDesigner: a.fromDesigner };
+    });
+    return ok({ rows, date: d.date, name: d.name, loaded: d.loaded });
+  }
+  x.start(command, c, tr("Budget: quantities from the design"));
+  x.touch("budget");
+  return ok({ report: D.syncDesign(d, p.budget, p.prices) });
 }
 
 // PEOPLE AND ROLES

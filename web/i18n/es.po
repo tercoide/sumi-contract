@@ -393,3 +393,18 @@ msgstr "roles: &1"
 msgid "their Google address"
 msgstr "su dirección de Google"
 
+msgid "Design loaded: &1 (saved &2), &3 rows"
+msgstr "Diseño cargado: &1 (guardado &2), &3 renglones"
+
+msgid "Load a sumi-designer file..."
+msgstr "Cargar un archivo de sumi-designer..."
+
+msgid "No sumi-designer file has been loaded yet: load one in the Budget tab (From the design)."
+msgstr "Todavía no se cargó un archivo de sumi-designer: cargá uno en la pestaña Presupuesto (Del diseño)."
+
+msgid "The quantities of the building, from a sumi-designer file"
+msgstr "Las cantidades del edificio, de un archivo de sumi-designer"
+
+msgid "analyses is a list of {code, factor}"
+msgstr "analyses es una lista de {code, factor}"
+

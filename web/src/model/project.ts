@@ -4,6 +4,7 @@
 import { budgetFromJson, budgetToJson, newBudget, type Budget, type Pricing } from "./budget.ts";
 import { changeFromJson, changeToJson, type Change } from "./change.ts";
 import { contractsFromJson, contractsToJson, type Contract } from "./contracts.ts";
+import { designFromJson, designToJson, type Design } from "./design.ts";
 import { addDays, isDay, isoWeekDay, parseDay, todayDay } from "./dates.ts";
 import { bookFromJson, bookToJson, newBook, type PriceBook } from "./prices.ts";
 import { newSchedule, scheduleFromJson, scheduleToJson, type Schedule } from "./schedule.ts";
@@ -75,6 +76,7 @@ export interface Member {
 export interface Project extends ProjectFields, Pricing {
   id: string;
   members: Member[];
+  design: Design | null; // the quantities of the last .designer-proj uploaded (design.load)
   prices: PriceBook;
   budget: Budget;
   schedule: Schedule;
@@ -90,6 +92,7 @@ export function newProject(id = ""): Project {
     ...projectDefaults(),
     id,
     members: [],
+    design: null,
     prices: newBook(),
     budget: newBudget(),
     schedule: newSchedule(),
@@ -182,6 +185,7 @@ export function projectToJson(p: Project): Record<string, unknown> {
     contracts: contractsToJson(p.contracts),
     // (only when there are: the Gambas version doesn't know them)
     ...(p.members.length ? { members: membersToJson(p.members) } : {}),
+    ...(p.design ? { design: designToJson(p.design) } : {}),
     changes: p.changes.map(changeToJson),
     created: p.created,
     modified: p.modified,
@@ -206,6 +210,7 @@ export function projectFromJson(c: unknown, id = ""): Project {
   if ("schedule" in c) p.schedule = scheduleFromJson(c.schedule);
   if ("contracts" in c) p.contracts = contractsFromJson(c.contracts);
   p.members = membersFromJson(c.members);
+  p.design = designFromJson(c.design);
   if (Array.isArray(c.changes)) p.changes = c.changes.map(changeFromJson);
   if (c.created) p.created = str(c.created);
   if (c.modified) p.modified = str(c.modified);

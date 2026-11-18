@@ -135,6 +135,11 @@ ES = {
     "Payments": "Pagos",
     "Contractors": "Contratistas",
     "Site direction": "Dirección de obra",
+    "Design loaded: &1 (saved &2), &3 rows": "Diseño cargado: &1 (guardado &2), &3 renglones",
+    "Load a sumi-designer file...": "Cargar un archivo de sumi-designer...",
+    "No sumi-designer file has been loaded yet: load one in the Budget tab (From the design).": "Todavía no se cargó un archivo de sumi-designer: cargá uno en la pestaña Presupuesto (Del diseño).",
+    "The quantities of the building, from a sumi-designer file": "Las cantidades del edificio, de un archivo de sumi-designer",
+    "analyses is a list of {code, factor}": "analyses es una lista de {code, factor}",
 }
 
 path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "i18n", "es.po")

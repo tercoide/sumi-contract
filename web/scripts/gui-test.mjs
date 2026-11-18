@@ -195,6 +195,24 @@ try {
   await page.click("aside.assistant header button:last-child");
   check(errors.length === 0, "the assistant's panel: " + errors.join("; "));
 
+  // the design link: a sumi-designer file uploaded, a row mapped here, the budget updated
+  const a1code = (await api("analysis.list", { limit: 1 })).analyses[0].code;
+  const designer = JSON.stringify({ format: "designer-e", version: 42, quantities: { date: "2026-11-18 10:00:00", rows: [{ key: "Walls|Brick", group: "Muros", item: "Ladrillo", unit: "m2", qty: 50 }, { key: "Openings|V1", group: "Aberturas", item: "V1", unit: "u", qty: 4 }] }, analyses: { "Walls|Brick": [{ code: a1code, factor: 1 }] } });
+  await page.goto(`${base}/#/p/${id}/budget`);
+  await page.click(".toolbar.right button");
+  await page.setInputFiles("section.design input[type=file]", { name: "casa.designer-proj", mimeType: "application/json", buffer: Buffer.from(designer) });
+  await page.waitForSelector("section.design table.grid");
+  const before = (await api("budget.list")).items.length;
+  await page.fill("section.design tr.problem input", a1code + " x 2");
+  await page.press("section.design tr.problem input", "Enter");
+  await page.waitForTimeout(300);
+  await page.click("section.design button.primary");
+  await page.waitForSelector("section.design .report pre");
+  const after = (await api("budget.list")).items;
+  check(after.length === before + 2 && after.some((b) => b.qty === 8), "the budget from the design: " + (after.length - before) + " items");
+  await shot("design");
+  check(errors.length === 0, "the design link: " + errors.join("; "));
+
   // people and roles: someone added, a role given; the project's team
   await page.goto(`${base}/#/people`);
   await page.waitForSelector(".people table.grid");
