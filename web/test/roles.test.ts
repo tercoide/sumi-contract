@@ -79,3 +79,21 @@ test("people and project members", () => {
   const files = Co.companyToFiles(co);
   assert.equal(Co.companyFromFiles(files).people.size, 2, "people.json");
 });
+
+test("the company's data and people survive a restart of the server", async () => {
+  const fs = await import("node:fs");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const { Store } = await import("../src/server/store.ts");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sumi-store-"));
+  let store = new Store(dir);
+  const s: Session = { project: null, company: store.company, who: { name: "Ana", userId: "u-ana", via: PERSON, model: "" }, rights: rightsOf(["admin"]), group: "", changed: () => store.saveCompany() };
+  must(s, "person.add", { email: "juan@empresa.com", roles: ["treasury"] });
+  must(s, "company.set", { name: "Constructora Sur SA", taxId: "30-12345678-9", address: "Corrientes" });
+  assert.ok(run({ ...s, rights: rightsOf(["estimator"]) }, "company.set", { name: "x" }).error, "only administrators change it");
+  assert.ok(run(s, "company.set", { color: "red" }).error, "only its fields");
+  store = new Store(dir);
+  assert.deepEqual([...store.company.people.values()].map((k) => k.roles), [["treasury"]], "people.json is read again");
+  assert.equal(store.company.info.name, "Constructora Sur SA", "company.json is read again");
+  fs.rmSync(dir, { recursive: true });
+});

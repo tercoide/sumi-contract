@@ -157,7 +157,7 @@ function finish(s: Session): void {
 
 /** Does a change touch only the company's data (contractors, the standard library)? */
 export function isCompany(h: Change): boolean {
-  return h.targets.length > 0 && h.targets.every((t) => t.startsWith("contractor:") || t.startsWith("person:") || t === "standard");
+  return h.targets.length > 0 && h.targets.every((t) => t.startsWith("contractor:") || t.startsWith("person:") || t === "standard" || t === "company");
 }
 
 function stampTime(s: string): number {
@@ -191,6 +191,7 @@ export function snapshot(s: Session, target: string): unknown {
     const k = co.people.get(target.slice(7));
     return k ? Co.personToJson(k) : ABSENT;
   }
+  if (target === "company") return { ...co.info };
   const p = s.project;
   if (!p) return ABSENT;
   const b = p.prices;
@@ -240,6 +241,10 @@ export function restore(s: Session, target: string, v: unknown): void {
   }
   if (target === "standard") {
     co.standard = isAbsent(v) ? null : P.bookFromJson({ ...P.newBook(), charges: [] }, v);
+    return;
+  }
+  if (target === "company") {
+    co.info = Co.infoFromJson(v);
     return;
   }
   if (target.startsWith("person:")) {
@@ -424,6 +429,18 @@ function dispatch(x: Op, command: string, c: Args): Result {
       return undo(x, false);
     case "redo":
       return undo(x, true);
+    case "company.get":
+      return ok({ company: { ...x.co.info } });
+    case "company.set": {
+      const set = without(c);
+      const bad = keys(set).find((f) => !(Co.INFO_FIELDS as readonly string[]).includes(f));
+      if (bad) return fail(tr("The company has no field &1.", bad));
+      if (!keys(set).length) return fail(tr("Nothing to set."));
+      x.start(command, c, tr("The company: &1", keys(set).join(", ")));
+      x.touch("company");
+      for (const f of keys(set)) x.co.info[f as (typeof Co.INFO_FIELDS)[number]] = str(set[f]).trim();
+      return ok();
+    }
     case "role.list":
       return ok({ roles: ROLES.map((r) => ({ id: r.id, name: tr(r.name), rights: r.rights })), rights: Object.fromEntries(Object.entries(RIGHT_TEXTS).map(([k, v]) => [k, { name: tr(RIGHT_NAMES[k as Right]), text: tr(v) }])) });
     case "person.list":
@@ -613,6 +630,8 @@ export function help(): Record<string, string> {
     "report.pdf": "{kind (budget, summary, analyses, gantt, certificate, account), contract? (certificate, account) and cert? (certificate)} makes a PDF report -> {url (to download it), name, pages}",
     "rubro.coefs": "{rubro, coefs [{name, pct}...]} the coefficients of a rubro in the budget (on top of the project's)",
     "role.list": "{} -> the roles (id, name, rights) and what each right lets do",
+    "company.get": "{} -> the company's own data (what its papers say of it)",
+    "company.set": "{name?, taxId?, address?, phone?, email?, web?} the company's own data (shown on every PDF)",
     "person.list": "{} -> the company's people, with their roles in every project",
     "person.add": "{email, name?, roles? [role ids], note?} someone of the company who may sign in -> their id",
     "person.set": "{key (id, email or name), name?, email?, roles? [role ids], note?}",

@@ -4,7 +4,7 @@
 // the language of the catalog loaded (see text.ts).
 
 import * as B from "./budget.ts";
-import { findContractor, type Company } from "./company.ts";
+import { findContractor, infoLine, type Company } from "./company.ts";
 import { amount, balance, findCert, findContract, measuredBefore, numbers, progress, PROGRESS } from "./contracts.ts";
 import { PdfDoc } from "./pdf.ts";
 import * as P from "./prices.ts";
@@ -60,6 +60,7 @@ export function makeReport(p: Project, company: Company, kind: string, contract 
   }
   if (why) return { error: why };
   r.pdf.footer = tr("Page &1 of &2") + " - sumi-contract - " + r.workTitle;
+  r.pdf.leftFooter = infoLine(company.info);
   const pages = r.pdf.pageCount();
   return { pdf: r.pdf.bytes(), pages, name: `${r.workTitle} - ${name}.pdf`.replace(/[\\/:*?"<>|]/g, "_") };
 }

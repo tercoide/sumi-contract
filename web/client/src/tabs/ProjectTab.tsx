@@ -174,7 +174,7 @@ function Team() {
   return (
     <section>
       <h2>{tr("Project team")}</h2>
-      <p className="muted small">{tr("Roles in this project only, besides each person's roles in the company (People and roles, in the projects list).")}</p>
+      <p className="muted small">{tr("Roles in this project only, besides each person's roles in the company (The company, in the projects list).")}</p>
       {list.map((m) => (
         <div key={m.person} className="member">
           <strong>{m.name}</strong>

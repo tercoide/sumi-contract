@@ -36,7 +36,8 @@ function rgb(color: number): string {
 
 export class PdfDoc {
   landscape: boolean;
-  footer = ""; // written at the foot of every page when saving: &1 the page, &2 how many
+  footer = ""; // written at the foot of every page when saving, at the right: &1 the page, &2 how many
+  leftFooter = ""; // and this at the left (the company)
   private pages: string[] = []; // the content stream of each page (characters 0-255)
   private page = "";
   private open = false;
@@ -120,12 +121,14 @@ export class PdfDoc {
       this.open = false;
     }
     if (this.pages.length === 0) this.pages.push("");
-    if (this.footer) {
+    if (this.footer || this.leftFooter) {
       const n = this.pages.length;
       for (let i = 0; i < n; i++) {
         this.page = "";
         this.open = true;
-        this.text(this.pageW() - 15, this.pageH() - 8, this.footer.replace("&1", String(i + 1)).replace("&2", String(n)), 7, false, "r", 0x808080);
+        const right = this.footer.replace("&1", String(i + 1)).replace("&2", String(n));
+        this.text(this.pageW() - 15, this.pageH() - 8, right, 7, false, "r", 0x808080);
+        if (this.leftFooter) this.text(15, this.pageH() - 8, this.fit(this.leftFooter, this.pageW() - 36 - this.textWidth(right, 7), 7), 7, false, "l", 0x808080);
         this.pages[i] += this.page;
         this.open = false;
       }

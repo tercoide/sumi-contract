@@ -70,7 +70,7 @@ export function rightsOf(roles: Iterable<string>): Set<Right> {
 }
 
 /** The commands that only read: anyone may run them */
-const READING = new Set(["help", "info", "log", "change.get", "project.get", "book.get", "resource.list", "resource.get", "analysis.list", "analysis.get", "budget.list", "schedule.get", "contractor.list", "contractor.get", "contract.list", "contract.get", "design.rows", "report.pdf", "person.list", "member.list", "role.list"]);
+const READING = new Set(["company.get", "help", "info", "log", "change.get", "project.get", "book.get", "resource.list", "resource.get", "analysis.list", "analysis.get", "budget.list", "schedule.get", "contractor.list", "contractor.get", "contract.list", "contract.get", "design.rows", "report.pdf", "person.list", "member.list", "role.list"]);
 
 const BY_COMMAND: Record<string, Right> = {
   "project.set": "project",
@@ -119,6 +119,7 @@ const BY_COMMAND: Record<string, Right> = {
   "contractor.set": "contractors",
   "contractor.delete": "contractors",
   "standard.export": "standard",
+  "company.set": "admin",
   "person.add": "admin",
   "person.set": "admin",
   "person.delete": "admin",

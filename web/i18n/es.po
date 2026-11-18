@@ -441,3 +441,30 @@ msgstr "Documentos de contratistas vencidos o por vencer"
 msgid "Renew them in a project's Contracts tab, Contractors..."
 msgstr "Renovalos en la pestaña Contratos de un proyecto, Contratistas..."
 
+msgid "CUIT"
+msgstr "CUIT"
+
+msgid "The company"
+msgstr "La empresa"
+
+msgid "The company has no field &1."
+msgstr "La empresa no tiene el campo &1."
+
+msgid "The company: &1"
+msgstr "La empresa: &1"
+
+msgid "Web"
+msgstr "Web"
+
+msgid "What the papers say of it: it goes at the foot of every PDF."
+msgstr "Lo que dicen de ella los papeles: va al pie de cada PDF."
+
+msgid "Its data"
+msgstr "Sus datos"
+
+msgid "The company's data, who may sign in, and what each may change"
+msgstr "Los datos de la empresa, quién puede entrar y qué puede cambiar cada uno"
+
+msgid "Roles in this project only, besides each person's roles in the company (The company, in the projects list)."
+msgstr "Roles solo en este proyecto, además de los roles de cada persona en la empresa (La empresa, en la lista de proyectos)."
+

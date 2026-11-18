@@ -151,6 +151,15 @@ ES = {
     "The contract's certificates, payments and balance, in PDF": "Los certificados, pagos y saldo del contrato, en PDF",
     "Contractors' documents expired or about to": "Documentos de contratistas vencidos o por vencer",
     "Renew them in a project's Contracts tab, Contractors...": "Renovalos en la pestaña Contratos de un proyecto, Contratistas...",
+    "CUIT": "CUIT",
+    "The company": "La empresa",
+    "The company has no field &1.": "La empresa no tiene el campo &1.",
+    "The company: &1": "La empresa: &1",
+    "Web": "Web",
+    "What the papers say of it: it goes at the foot of every PDF.": "Lo que dicen de ella los papeles: va al pie de cada PDF.",
+    "Its data": "Sus datos",
+    "The company's data, who may sign in, and what each may change": "Los datos de la empresa, quién puede entrar y qué puede cambiar cada uno",
+    "Roles in this project only, besides each person's roles in the company (The company, in the projects list).": "Roles solo en este proyecto, además de los roles de cada persona en la empresa (La empresa, en la lista de proyectos).",
 }
 
 path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "i18n", "es.po")

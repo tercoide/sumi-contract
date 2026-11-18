@@ -41,7 +41,35 @@ export interface Person {
   note: string;
 }
 
+/** The company itself: what its papers say of it */
+export interface CompanyInfo {
+  name: string;
+  taxId: string; // CUIT
+  address: string;
+  phone: string;
+  email: string;
+  web: string;
+}
+
+export const INFO_FIELDS = ["name", "taxId", "address", "phone", "email", "web"] as const;
+
+export function newInfo(): CompanyInfo {
+  return { name: "", taxId: "", address: "", phone: "", email: "", web: "" };
+}
+
+export function infoFromJson(c: unknown): CompanyInfo {
+  const k = newInfo();
+  if (isObj(c)) for (const f of INFO_FIELDS) k[f] = str(c[f]);
+  return k;
+}
+
+/** One line for the papers: "Name · CUIT ... · address · phone · email" */
+export function infoLine(k: CompanyInfo): string {
+  return [k.name, k.taxId && "CUIT " + k.taxId, k.address, k.phone, k.email, k.web].filter(Boolean).join(" · ");
+}
+
 export interface Company {
+  info: CompanyInfo;
   people: Map<string, Person>; // by id
   contractors: Map<string, Contractor>;
   standard: PriceBook | null; // the standard library (null = there is none yet)
@@ -49,7 +77,7 @@ export interface Company {
 }
 
 export function newCompany(): Company {
-  return { people: new Map(), contractors: new Map(), standard: null, changes: [] };
+  return { info: newInfo(), people: new Map(), contractors: new Map(), standard: null, changes: [] };
 }
 
 export function newContractor(): Contractor {
@@ -141,6 +169,7 @@ export function companyToFiles(co: Company): Record<string, unknown> {
     "contractors.json": { contractors: [...co.contractors.values()].map(contractorToJson) },
     "log.json": { changes: co.changes.map(changeToJson) },
   };
+  if (INFO_FIELDS.some((f) => co.info[f])) out["company.json"] = { ...co.info };
   if (co.people.size) out["people.json"] = { people: [...co.people.values()].map(personToJson) };
   if (co.standard) out["standard.json"] = bookToJson(co.standard);
   return out;
@@ -155,6 +184,7 @@ export function companyFromFiles(files: Record<string, unknown>): Company {
       co.contractors.set(k.id, k);
     }
   if (isObj(files["standard.json"])) co.standard = bookFromJson(newBook(), files["standard.json"]);
+  co.info = infoFromJson(files["company.json"]);
   const pp = files["people.json"];
   if (isObj(pp) && Array.isArray(pp.people))
     for (const v of pp.people) {

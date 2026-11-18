@@ -206,8 +206,8 @@ function Projects() {
             </button>
           </>
         )}
-        <a className="button" href="#/people" title={tr("Who may sign in, and what each may change")}>
-          <Icon name="configure" /> {tr("People and roles")}
+        <a className="button" href="#/people" title={tr("The company's data, who may sign in, and what each may change")}>
+          <Icon name="configure" /> {tr("The company")}
         </a>
         <input ref={file} type="file" accept=".contract-proj,application/json" hidden onChange={(e) => open(e.target.files?.[0])} />
         <span className="grow" />

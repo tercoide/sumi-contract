@@ -26,7 +26,7 @@ export class Store {
     fs.mkdirSync(path.join(dir, "projects"), { recursive: true });
     fs.mkdirSync(path.join(dir, "company"), { recursive: true });
     const files: Record<string, unknown> = {};
-    for (const name of ["contractors.json", "standard.json", "log.json"]) {
+    for (const name of ["contractors.json", "standard.json", "log.json", "people.json", "company.json"]) {
       const v = readJson(path.join(dir, "company", name));
       if (v !== undefined) files[name] = v;
     }

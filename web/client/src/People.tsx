@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react";
 import * as api from "./api.ts";
-import { Text } from "./fields.tsx";
+import { Row, Text } from "./fields.tsx";
 import { tr } from "./tr.ts";
 
 export function useRoles(): api.Result | null {
@@ -32,14 +32,16 @@ export function RoleChecks({ roles, all, onChange }: { roles: string[]; all: api
 export function People({ bar }: { bar: React.ReactNode }) {
   const [version, setVersion] = useState(0);
   const [people, setPeople] = useState<api.Result[] | null>(null);
+  const [company, setCompany] = useState<api.Result | null>(null);
   const [status, setStatus] = useState({ text: "", error: false });
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const roles = useRoles();
 
   useEffect(() => {
-    document.title = tr("People and roles") + " — sumi-contract";
+    document.title = tr("The company") + " — sumi-contract";
     api.run("", "person.list").then((r) => setPeople(r.people ?? []));
+    api.run("", "company.get").then((r) => setCompany(r.company ?? null));
   }, [version]);
 
   const run = async (command: string, args: Record<string, unknown>) => {
@@ -60,7 +62,28 @@ export function People({ bar }: { bar: React.ReactNode }) {
     <div className="page">
       {bar}
       <main className="projects people">
-        <h1>{tr("People and roles")}</h1>
+        <h1>{tr("The company")}</h1>
+        {company && (
+          <section>
+            <h2>{tr("Its data")}</h2>
+            <p className="muted small">{tr("What the papers say of it: it goes at the foot of every PDF.")}</p>
+            {(
+              [
+                ["name", tr("Name")],
+                ["taxId", tr("CUIT")],
+                ["address", tr("Address")],
+                ["phone", tr("Phone")],
+                ["email", tr("Email")],
+                ["web", tr("Web")],
+              ] as const
+            ).map(([f, label]) => (
+              <Row key={f} label={label}>
+                <Text value={company[f]} onCommit={(v) => run("company.set", { [f]: v })} />
+              </Row>
+            ))}
+          </section>
+        )}
+        <h2>{tr("People and roles")}</h2>
         <p className="muted">
           {tr("The company's people: who may sign in with Google, and what each may change in every project. Everyone can look at everything. A project can give someone more roles, in its Project tab.")}
         </p>
