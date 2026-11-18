@@ -1,0 +1,381 @@
+/* sumi-contract: a quiet working screen, close to the desktop version. Light and dark follow the system. */
+
+:root {
+  --bg: #f6f6f4;
+  --panel: #ffffff;
+  --text: #1d1f21;
+  --muted: #6b6f73;
+  --line: #dcdcd8;
+  --accent: #0066b3;
+  --accent-soft: #e5f0f9;
+  --rubro: #eef1f4;
+  --error: #b3261e;
+  --error-soft: #fbeceb;
+  --orange: #c25e00;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17191b;
+    --panel: #1f2225;
+    --text: #e4e4e2;
+    --muted: #9a9ea3;
+    --line: #34383c;
+    --accent: #5aa9e6;
+    --accent-soft: #1d3446;
+    --rubro: #262a2e;
+    --error: #ff8a80;
+    --error-soft: #3a2020;
+    --orange: #ffab52;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* the top bar */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+.brand {
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  margin-right: 8px;
+}
+.title {
+  font-weight: 600;
+  margin-right: 12px;
+  max-width: 30ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.grow {
+  flex: 1;
+}
+.icon {
+  width: 18px;
+  height: 18px;
+  vertical-align: -4px;
+}
+
+button,
+.button {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 3px 9px;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+button:hover,
+.button:hover {
+  border-color: var(--accent);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 3px 6px;
+  min-width: 0;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--accent-soft);
+  border-color: var(--accent);
+}
+textarea {
+  width: 100%;
+  resize: vertical;
+}
+input.num {
+  text-align: right;
+  width: 9em;
+}
+input.short {
+  width: 5em;
+}
+input.search {
+  width: min(36em, 100%);
+}
+
+/* the tabs */
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+.tabs a {
+  padding: 7px 14px;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+.tabs a.on {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+  font-weight: 500;
+}
+.tab,
+.projects {
+  flex: 1;
+  padding: 12px 16px 40px;
+  max-width: 1400px;
+  width: 100%;
+}
+
+/* the status bar */
+.status {
+  position: sticky;
+  bottom: 0;
+  padding: 4px 12px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  min-height: 26px;
+}
+.status.error,
+.error {
+  color: var(--error);
+}
+
+/* forms */
+.columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 16px;
+}
+section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+h1 {
+  font-size: 20px;
+  margin: 6px 0 12px;
+}
+h2 {
+  font-size: 14px;
+  margin: 0 0 8px;
+  color: var(--accent);
+}
+.row {
+  display: grid;
+  grid-template-columns: 13em 1fr;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+.row > span {
+  color: var(--muted);
+}
+.row input:not(.num),
+.row select {
+  width: 100%;
+}
+.inline {
+  display: flex;
+  gap: 6px;
+}
+.note {
+  color: var(--muted);
+  margin: 6px 0;
+}
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 12px;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.chip {
+  background: var(--accent-soft);
+  border-radius: 10px;
+  padding: 1px 4px 1px 8px;
+}
+.chip button {
+  border: none;
+  background: none;
+  padding: 0 4px;
+}
+
+/* tables */
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.grid th,
+.grid td {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+.grid th {
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--panel);
+  position: sticky;
+  top: 41px;
+}
+.grid .num,
+.grid th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.grid td input {
+  width: 100%;
+  border-color: transparent;
+  background: transparent;
+}
+.grid td input:hover {
+  border-color: var(--line);
+}
+.grid td.num input {
+  text-align: right;
+}
+.grid tr.link {
+  cursor: pointer;
+}
+.grid tr.link:hover {
+  background: var(--accent-soft);
+}
+.grid tr.rubro td {
+  background: var(--rubro);
+  font-weight: 600;
+}
+.grid tr.problem td:first-child {
+  box-shadow: inset 3px 0 var(--error);
+}
+.grid td.overridden input {
+  color: var(--orange);
+  font-weight: 600;
+}
+.grid tr.undone td {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.grid tfoot td {
+  font-weight: 600;
+  border-top: 2px solid var(--line);
+}
+.grid .actions {
+  white-space: nowrap;
+  width: 1%;
+}
+.grid .actions button {
+  padding: 0 6px;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.strong {
+  font-weight: 700;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  position: relative;
+}
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 5;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.15);
+  min-width: min(36em, 100%);
+  max-height: 60vh;
+  overflow: auto;
+}
+.dropdown > div {
+  padding: 4px 10px;
+}
+.dropdown .link:hover {
+  background: var(--accent-soft);
+  cursor: pointer;
+}
+
+.detail pre {
+  max-height: 300px;
+  overflow: auto;
+  font-size: 12px;
+  background: var(--bg);
+  padding: 6px;
+  border-radius: 4px;
+  margin: 2px 0 8px;
+}
+.beforeafter {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.lang {
+  width: auto;
+}
+
+@media (max-width: 700px) {
+  .row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .bar button span,
+  .beforeafter {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,56 @@
+# The Spanish of the web version's own texts (those not in ../.lang/es.po). npm run i18n
+
+msgid "The project has no field &1 (or a bad value)."
+msgstr "El proyecto no tiene el campo &1 (o el valor no sirve)."
+
+msgid "There is no change &1."
+msgstr "No hay un cambio &1."
+
+msgid "There is no project &1."
+msgstr "No hay un proyecto &1."
+
+msgid "&1 items, &2 changes in the log"
+msgstr "&1 ítems, &2 cambios en el registro"
+
+msgid "A .contract-proj file, from here or from the desktop version"
+msgstr "Un archivo .contract-proj, de acá o de la versión de escritorio"
+
+msgid "Add an item: search an analysis by code or name"
+msgstr "Agregar un ítem: buscar un análisis por código o nombre"
+
+msgid "Changed"
+msgstr "Modificado"
+
+msgid "Download"
+msgstr "Descargar"
+
+msgid "Language"
+msgstr "Idioma"
+
+msgid "No analysis has that."
+msgstr "Ningún análisis tiene eso."
+
+msgid "Open a file"
+msgstr "Abrir un archivo"
+
+msgid "Projects"
+msgstr "Proyectos"
+
+msgid "Redo what you undid"
+msgstr "Rehacer lo que deshiciste"
+
+msgid "Rubro &1"
+msgstr "Rubro &1"
+
+msgid "The .contract-proj file, also for the desktop version"
+msgstr "El archivo .contract-proj, también para la versión de escritorio"
+
+msgid "The budget has no items yet: add them from the analyses of the Pricing tab, or manual ones."
+msgstr "El presupuesto todavía no tiene ítems: agregalos desde los análisis de la pestaña Precios, o manuales."
+
+msgid "There are no projects yet: make a new one, or open a file."
+msgstr "Todavía no hay proyectos: hacé uno nuevo o abrí un archivo."
+
+msgid "This tab comes next in the web version."
+msgstr "Esta pestaña viene a continuación en la versión web."
+

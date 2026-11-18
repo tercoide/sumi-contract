@@ -1,6 +1,6 @@
 // Texts people read, and reading values that come from people or the AI.
 //
-// tr("...&1...", a) marks a text for translation and puts the arguments in (&1, &2... as Gambas's Subst), so the
+// tr(text, a...) marks a text for translation and puts the arguments in (&1, &2... as Gambas's Subst), so the
 // texts are the same as the Gambas version's and its Spanish (.lang/es.po) can be reused. The catalog is
 // loaded by the server (setCatalog); without one the English text is used.
 

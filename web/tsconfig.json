@@ -19,5 +19,9 @@
   "include": [
     "src",
     "test"
+  ],
+  "exclude": [
+    "client",
+    "vite.config.ts"
   ]
 }

@@ -13,12 +13,12 @@
 // it touched is put back (the Gambas version didn't).
 
 import * as B from "./budget.ts";
-import { newChange, type Change, type Who } from "./change.ts";
+import { changeToJson, newChange, type Change, type Who } from "./change.ts";
 import * as Co from "./company.ts";
 import * as K from "./contracts.ts";
 import { todayDay } from "./dates.ts";
 import * as P from "./prices.ts";
-import { endDate, fieldsToJson, PROJECT_FIELDS, setFields, type Project } from "./project.ts";
+import { CERTIFICATE_PERIODS, CONTRACT_MODES, endDate, fieldsToJson, PROJECT_FIELDS, setFields, USAGES, WORK_TYPES, type Project } from "./project.ts";
 import * as S from "./schedule.ts";
 import { isObj, num, str, tr } from "./text.ts";
 import { makeId } from "./ids.ts";
@@ -336,6 +336,13 @@ function lastChangeOf(log: Change[], target: string, after: Change): string {
   return "?";
 }
 
+function changeGet(x: Op, c: Args): Result {
+  const id = str(c.id);
+  const h = x.p.changes.find((h) => h.id === id) ?? x.co.changes.find((h) => h.id === id);
+  if (!h) return fail(tr("There is no change &1.", id));
+  return ok({ change: changeToJson(h) });
+}
+
 function logList(x: Op, c: Args): Result {
   const out: Result[] = [];
   const limit = "limit" in c ? num(c.limit, "limit") : 50;
@@ -386,6 +393,10 @@ function dispatch(x: Op, command: string, c: Args): Result {
       return info(x);
     case "log":
       return logList(x, c);
+    case "change.get":
+      return changeGet(x, c);
+    case "project.get":
+      return projectGet(x);
     case "project.set":
       return projectSet(x, c);
     case "book.set":
@@ -473,6 +484,8 @@ export function help(): Record<string, string> {
   return {
     info: "{} -> the project, its counts and who you are",
     log: "{limit?, who?, target?} -> the last changes",
+    "change.get": "{id} -> a change of the log (the project's or the company's) with its arguments, and its targets before and after",
+    "project.get": "{} -> the Project tab's fields, the end date, the price factor and the choices of the lists",
     undo: "{} -> undoes your last action",
     redo: "{} -> redoes what you undid last",
     "project.set": "{field: value...} the Project tab's fields, as in the file: name, code, workType, use, location, city, province, parcel, plotArea, coveredArea, semiCoveredArea, floors, client, clientTaxId, clientPhone, clientEmail, startDate (yyyy-mm-dd), durationDays, workDaysPerWeek, hoursPerDay, holidays [yyyy-mm-dd...], currency, overheadPct, profitPct, taxesPct, contractMode, advancePct, retentionPct, certificatePeriod, adjustmentIndex, adjustmentBase, guaranteeDays, professionals [{role, name, registration, phone, email}...], notes, designFile",
@@ -557,6 +570,11 @@ function info(x: Op): Result {
     you: x.s.who.name,
     via: x.s.who.via,
   });
+}
+
+function projectGet(x: Op): Result {
+  const p = x.p;
+  return ok({ project: fieldsToJson(p), id: p.id, endDate: endDate(p), priceFactor: p.priceFactor, created: p.created, modified: p.modified, choices: { workType: WORK_TYPES, use: USAGES, contractMode: CONTRACT_MODES, certificatePeriod: CERTIFICATE_PERIODS } });
 }
 
 function projectSet(x: Op, c: Args): Result {
