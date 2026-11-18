@@ -26,6 +26,7 @@ import { importLibrary, type LibraryFiles } from "./library.ts";
 import { needs, RIGHT_NAMES, RIGHT_TEXTS, rightsOf, roleIds, ROLES, type Right } from "./roles.ts";
 import { membersFromJson, membersToJson } from "./project.ts";
 import * as D from "./design.ts";
+import * as E from "./sitebook.ts";
 
 export const ABSENT = "~absent~"; // a snapshot of something that didn't exist
 export const COALESCE_SECONDS = 120; // edits of the same field in a row become one change
@@ -210,6 +211,8 @@ export function snapshot(s: Session, target: string): unknown {
       return membersToJson(p.members);
     case "design":
       return p.design ? D.designToJson(p.design) : ABSENT;
+    case "sitebook":
+      return E.siteBookToJson(p.siteBook);
     case "budget":
       return B.budgetToJson(p.budget);
     case "schedule":
@@ -278,6 +281,9 @@ export function restore(s: Session, target: string, v: unknown): void {
       break;
     case "design":
       p.design = isAbsent(v) ? null : D.designFromJson(v);
+      break;
+    case "sitebook":
+      p.siteBook = E.siteBookFromJson(v);
       break;
     case "budget":
       p.budget = B.budgetFromJson(v);
@@ -462,6 +468,12 @@ function dispatch(x: Op, command: string, c: Args): Result {
     case "member.list":
     case "member.set":
       return memberCmd(x, command, c);
+    case "entry.list":
+    case "entry.get":
+    case "entry.add":
+    case "entry.set":
+    case "entry.delete":
+      return entryCmd(x, command, c);
     case "design.load":
     case "design.rows":
     case "design.sync":
@@ -631,6 +643,11 @@ export function help(): Record<string, string> {
     "rubro.coefs": "{rubro, coefs [{name, pct}...]} the coefficients of a rubro in the budget (on top of the project's)",
     "role.list": "{} -> the roles (id, name, rights) and what each right lets do",
     "company.get": "{} -> the company's own data (what its papers say of it)",
+    "entry.list": "{kind? (daily, order, request), contract? (key), from?, to? (dates), text?} -> the site book's entries (newest first), the orders and requests still open or late, and the workable and lost days",
+    "entry.get": "{id} -> an entry of the site book, whole",
+    "entry.add": "{kind (daily: the daily report; order: a service order to a contractor; request: a contractor's request), contract? (key; orders and requests are numbered per contract), date? (today), subject?, text?, weather? (sunny, cloudy, rain, storm, wind, cold, heat), workable? (the day counted), crews? [{contractor (key, \"\" = own people), people}], due?} -> its id and number",
+    "entry.set": "{id, field: value...} the fields of entry.add, status (draft, issued), reply, replied (date), closed. Issued: only reply, replied, closed",
+    "entry.delete": "{id} a draft, the last of its numbering",
     "company.set": "{name?, taxId?, address?, phone?, email?, web?} the company's own data (shown on every PDF)",
     "person.list": "{} -> the company's people, with their roles in every project",
     "person.add": "{email, name?, roles? [role ids], note?} someone of the company who may sign in -> their id",
@@ -1307,6 +1324,124 @@ function contractorCmd(x: Op, command: string, c: Args): Result {
       break;
     }
   }
+  return ok();
+}
+
+// THE SITE BOOK
+
+function describeEntry(x: Op, e: E.SiteEntry, whole = false): Result {
+  const k = e.contract ? K.findContract(x.p.contracts, e.contract) : undefined;
+  const out: Result = { id: e.id, kind: e.kind, number: e.number, contract: e.contract, contractCode: k?.code ?? "", date: e.date, subject: e.subject, status: e.status, closed: e.closed, due: e.due, author: e.author, replied: e.replied };
+  if (e.kind === E.DAILY) Object.assign(out, { weather: e.weather, workable: e.workable, people: e.crews.reduce((f, c) => f + c.people, 0) });
+  if (whole) Object.assign(out, { text: e.text, reply: e.reply, crews: e.crews.map((c) => ({ ...c, name: c.contractor ? (Co.findContractor(x.co, c.contractor)?.name ?? tr("(unknown contractor)")) : tr("Own people") })) });
+  return out;
+}
+
+/** An entry's crews with the contractors by key (name or id) -> ids; or a contractor that doesn't exist */
+function crewsOf(x: Op, v: unknown): { crews?: E.Crew[]; bad?: string } {
+  if (!Array.isArray(v)) return { bad: tr("crews is a list of {contractor, people}") };
+  const crews: E.Crew[] = [];
+  for (const c of v.filter(isObj)) {
+    const key = str(c.contractor);
+    const k = key ? Co.findContractor(x.co, key) : undefined;
+    if (key && !k) return { bad: tr("There is no contractor &1.", key) };
+    crews.push({ contractor: k?.id ?? "", people: num(c.people, "people") });
+  }
+  return { crews };
+}
+
+function entryLabel(e: E.SiteEntry, x: Op): string {
+  const k = e.contract ? K.findContract(x.p.contracts, e.contract) : undefined;
+  const kind = e.kind === E.DAILY ? tr("Daily report") : e.kind === E.ORDER ? tr("Service order") : tr("Request");
+  return k ? `${kind} ${e.number} (${k.code})` : `${kind} ${e.number}`;
+}
+
+function entryCmd(x: Op, command: string, c: Args): Result {
+  const p = x.p;
+  const book = p.siteBook;
+  if (command === "entry.list") {
+    let k: K.Contract | undefined;
+    if (c.contract) {
+      k = K.findContract(p.contracts, str(c.contract));
+      if (!k) return fail(tr("There is no contract &1.", c.contract));
+    }
+    const text = str(c.text).toLowerCase();
+    const list = book
+      .filter((e) => !c.kind || e.kind === c.kind)
+      .filter((e) => !k || e.contract === k.id)
+      .filter((e) => !c.from || e.date >= str(c.from))
+      .filter((e) => !c.to || e.date <= str(c.to))
+      .filter((e) => !text || `${e.subject} ${e.text} ${e.reply}`.toLowerCase().includes(text))
+      .sort((a, b) => (a.date === b.date ? b.number - a.number : a.date < b.date ? 1 : -1));
+    const pend = E.pending(book, todayDay());
+    return ok({ entries: list.map((e) => describeEntry(x, e)), open: pend.open.length, late: pend.late.map((e) => entryLabel(e, x)), days: E.dayCount(book) });
+  }
+  if (command === "entry.add") {
+    const kind = str(c.kind) || E.DAILY;
+    if (!E.ENTRY_KINDS.includes(kind)) return fail(tr("Unknown kind of entry &1 (daily, order, request).", kind));
+    const e = E.newEntry(kind);
+    let contract = "";
+    if (c.contract) {
+      const k = K.findContract(p.contracts, str(c.contract));
+      if (!k) return fail(tr("There is no contract &1.", c.contract));
+      contract = k.id;
+    }
+    const set: Args = without(c, "kind", "contract", "number", "status", "author", "id");
+    if (has(set, "crews")) {
+      const r = crewsOf(x, set.crews);
+      if (r.bad) return fail(r.bad);
+      set.crews = r.crews;
+    }
+    if (has(set, "weather") && set.weather && !E.WEATHER.includes(str(set.weather))) return fail(tr("The weather is one of &1.", E.WEATHER.join(", ")));
+    const bad = E.applyEntry(e, set);
+    if (bad) return fail(tr("Site book entries have no field &1 (or a bad value).", bad));
+    e.contract = contract;
+    e.date ||= todayDay();
+    e.author = x.s.who.name;
+    e.number = E.nextNumber(book, kind, contract);
+    x.start(command, c, tr("Site book: &1", entryLabel(e, x)) + (e.subject ? ": " + e.subject : ""));
+    x.touch("sitebook");
+    book.push(e);
+    return ok({ id: e.id, number: e.number });
+  }
+  const e = E.findEntry(book, str(c.id));
+  if (!e) return fail(tr("The site book has no entry &1.", c.id));
+  if (command === "entry.get") return ok({ entry: describeEntry(x, e, true) });
+  if (command === "entry.delete") {
+    if (e.status === "issued") return fail(tr("&1 is issued: it can't be deleted.", entryLabel(e, x)));
+    if (e.number !== E.nextNumber(book, e.kind, e.contract) - 1) return fail(tr("Only the last of its numbering can be deleted."));
+    x.start(command, c, tr("Site book: &1 deleted", entryLabel(e, x)));
+    x.touch("sitebook");
+    p.siteBook = book.filter((y) => y !== e);
+    return ok();
+  }
+  // entry.set: check everything first
+  const set: Args = without(c, "id");
+  if (!keys(set).length) return fail(tr("Nothing to set."));
+  for (const f of ["number", "author", "kind", "contract"]) if (has(set, f)) return fail(tr("The &1 of an entry can't change.", f));
+  if (e.status === "issued") {
+    const locked = keys(set).filter((f) => E.LOCKED.includes(f));
+    if (locked.length) return fail(tr("&1 is issued: only its reply and whether it is closed can change.", entryLabel(e, x)));
+    if (set.status === "draft" && e.reply) return fail(tr("&1 has a reply: it can't go back to draft.", entryLabel(e, x)));
+  }
+  // who writes what: an order and the reply to a request are the site direction's
+  const replying = keys(set).every((f) => ["reply", "replied", "closed"].includes(f));
+  const rights = x.s.rights;
+  if (rights && ((e.kind === E.ORDER && !replying) || (e.kind === E.REQUEST && replying && has(set, "reply"))) && !rights.has("orders"))
+    return fail(tr("You can't do that: it needs the right &1. An administrator can give you a role that has it.", tr(RIGHT_NAMES.orders)));
+  if (has(set, "crews")) {
+    const r = crewsOf(x, set.crews);
+    if (r.bad) return fail(r.bad);
+    set.crews = r.crews;
+  }
+  if (has(set, "weather") && set.weather && !E.WEATHER.includes(str(set.weather))) return fail(tr("The weather is one of &1.", E.WEATHER.join(", ")));
+  const test = E.entryFromJson(E.entryToJson(e));
+  const bad = E.applyEntry(test, set);
+  if (bad) return fail(tr("Site book entries have no field &1 (or a bad value).", bad));
+  if (has(set, "reply") && str(set.reply) && !has(set, "replied") && !e.replied) set.replied = todayDay();
+  x.start(command, c, tr("Site book: &1: &2", entryLabel(e, x), keys(set).join(", ")));
+  x.touch("sitebook");
+  E.applyEntry(e, set);
   return ok();
 }
 

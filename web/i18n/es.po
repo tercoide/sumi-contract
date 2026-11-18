@@ -468,3 +468,99 @@ msgstr "Los datos de la empresa, quién puede entrar y qué puede cambiar cada u
 msgid "Roles in this project only, besides each person's roles in the company (The company, in the projects list)."
 msgstr "Roles solo en este proyecto, además de los roles de cada persona en la empresa (La empresa, en la lista de proyectos)."
 
+msgid "&1 has a reply: it can't go back to draft."
+msgstr "&1 tiene respuesta: no puede volver a borrador."
+
+msgid "&1 is issued: it can't be deleted."
+msgstr "&1 está emitida: no se puede borrar."
+
+msgid "&1 is issued: only its reply and whether it is closed can change."
+msgstr "&1 está emitida: solo pueden cambiar su respuesta y si está cerrada."
+
+msgid "Daily report"
+msgstr "Parte diario"
+
+msgid "Daily reports and requests in the site book; replying to orders"
+msgstr "Partes diarios y notas de pedido en el libro de obra; responder órdenes"
+
+msgid "Issue service orders to the contractors; replying to requests"
+msgstr "Emitir órdenes de servicio a los contratistas; responder notas de pedido"
+
+msgid "Only the last of its numbering can be deleted."
+msgstr "Solo se puede borrar la última de su numeración."
+
+msgid "Own people"
+msgstr "Personal propio"
+
+msgid "Request"
+msgstr "Nota de pedido"
+
+msgid "Service order"
+msgstr "Orden de servicio"
+
+msgid "Service orders"
+msgstr "Órdenes de servicio"
+
+msgid "Site book"
+msgstr "Libro de obra"
+
+msgid "Site book entries have no field &1 (or a bad value)."
+msgstr "Las entradas del libro de obra no tienen el campo &1 (o el valor no sirve)."
+
+msgid "Site book: &1"
+msgstr "Libro de obra: &1"
+
+msgid "Site book: &1 deleted"
+msgstr "Libro de obra: &1 borrada"
+
+msgid "Site book: &1: &2"
+msgstr "Libro de obra: &1: &2"
+
+msgid "Site manager"
+msgstr "Jefe de obra"
+
+msgid "The &1 of an entry can't change."
+msgstr "El campo &1 de una entrada no puede cambiar."
+
+msgid "The site book has no entry &1."
+msgstr "El libro de obra no tiene la entrada &1."
+
+msgid "The weather is one of &1."
+msgstr "El clima es uno de &1."
+
+msgid "Unknown kind of entry &1 (daily, order, request)."
+msgstr "Tipo de entrada desconocido &1 (daily, order, request)."
+
+msgid "cloudy"
+msgstr "nublado"
+
+msgid "cold"
+msgstr "frío"
+
+msgid "crews is a list of {contractor, people}"
+msgstr "crews es una lista de {contractor, people}"
+
+msgid "daily"
+msgstr "parte diario"
+
+msgid "heat"
+msgstr "calor"
+
+msgid "order"
+msgstr "orden de servicio"
+
+msgid "rain"
+msgstr "lluvia"
+
+msgid "request"
+msgstr "nota de pedido"
+
+msgid "storm"
+msgstr "tormenta"
+
+msgid "sunny"
+msgstr "soleado"
+
+msgid "wind"
+msgstr "viento"
+

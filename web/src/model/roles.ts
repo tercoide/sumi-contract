@@ -11,7 +11,7 @@
 
 import { isObj } from "./text.ts";
 
-export const RIGHTS = ["project", "prices", "budget", "schedule", "contracts", "certify", "payments", "contractors", "standard", "ai", "admin"] as const;
+export const RIGHTS = ["project", "prices", "budget", "schedule", "contracts", "certify", "payments", "contractors", "standard", "sitebook", "orders", "ai", "admin"] as const;
 export type Right = (typeof RIGHTS)[number];
 
 /** Each right's name, for people (shown with tr(): listed in scripts/i18n.mjs's RUNTIME) */
@@ -25,6 +25,8 @@ export const RIGHT_NAMES: Record<Right, string> = {
   payments: "Payments",
   contractors: "Contractors",
   standard: "Standard library",
+  sitebook: "Site book",
+  orders: "Service orders",
   ai: "AI assistant",
   admin: "People and roles",
 };
@@ -40,6 +42,8 @@ export const RIGHT_TEXTS: Record<Right, string> = {
   payments: "Payments to the contractors",
   contractors: "The company's contractors and their documents",
   standard: "The company's standard price library",
+  sitebook: "Daily reports and requests in the site book; replying to orders",
+  orders: "Issue service orders to the contractors; replying to requests",
   ai: "Ask the AI assistant (it can do what the person can)",
   admin: "People, roles and project members",
 };
@@ -53,7 +57,8 @@ export interface Role {
 /** The roles (fixed for now; the user may want to make their own: a question for them) */
 export const ROLES: Role[] = [
   { id: "admin", name: "Administrator", rights: [...RIGHTS] },
-  { id: "director", name: "Site direction", rights: ["project", "budget", "schedule", "contracts", "certify", "ai"] },
+  { id: "director", name: "Site direction", rights: ["project", "budget", "schedule", "contracts", "certify", "sitebook", "orders", "ai"] },
+  { id: "site", name: "Site manager", rights: ["schedule", "contracts", "sitebook", "ai"] },
   { id: "estimator", name: "Estimator", rights: ["project", "prices", "budget", "standard", "ai"] },
   { id: "planner", name: "Planner", rights: ["schedule", "ai"] },
   { id: "contracts", name: "Contracts administration", rights: ["contracts", "contractors", "ai"] },
@@ -70,7 +75,7 @@ export function rightsOf(roles: Iterable<string>): Set<Right> {
 }
 
 /** The commands that only read: anyone may run them */
-const READING = new Set(["company.get", "help", "info", "log", "change.get", "project.get", "book.get", "resource.list", "resource.get", "analysis.list", "analysis.get", "budget.list", "schedule.get", "contractor.list", "contractor.get", "contract.list", "contract.get", "design.rows", "report.pdf", "person.list", "member.list", "role.list"]);
+const READING = new Set(["entry.list", "entry.get", "company.get", "help", "info", "log", "change.get", "project.get", "book.get", "resource.list", "resource.get", "analysis.list", "analysis.get", "budget.list", "schedule.get", "contractor.list", "contractor.get", "contract.list", "contract.get", "design.rows", "report.pdf", "person.list", "member.list", "role.list"]);
 
 const BY_COMMAND: Record<string, Right> = {
   "project.set": "project",
@@ -120,6 +125,9 @@ const BY_COMMAND: Record<string, Right> = {
   "contractor.delete": "contractors",
   "standard.export": "standard",
   "company.set": "admin",
+  "entry.add": "sitebook",
+  "entry.set": "sitebook",
+  "entry.delete": "sitebook",
   "person.add": "admin",
   "person.set": "admin",
   "person.delete": "admin",
@@ -132,6 +140,8 @@ export function needs(command: string, args: Record<string, unknown> = {}): Righ
   const c = command.toLowerCase();
   if (READING.has(c) || c === "undo" || c === "redo") return [];
   // issuing a certificate, or taking it back to draft; measuring it too is the contracts' right
+  // an order is the site direction's (the command checks the rest: who replies to what)
+  if (c === "entry.add" && isObj(args) && args.kind === "order") return ["sitebook", "orders"];
   if (c === "cert.set" && isObj(args) && "status" in args) return Object.keys(args).some((k) => !["contract", "cert", "status"].includes(k)) ? ["certify", "contracts"] : ["certify"];
   return [BY_COMMAND[c] ?? "admin"];
 }
