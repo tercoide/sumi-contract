@@ -118,6 +118,8 @@ export class Auth {
 
   /** Addresses the company added (its people, see roles): they may come in too */
   known: (email: string) => boolean = () => false;
+  /** Called after waiting for Google (the server sets the request's language again) */
+  resume: (req: http.IncomingMessage) => void = () => {};
 
   constructor(config: AuthConfig, dataDir: string) {
     this.config = config;
@@ -224,11 +226,14 @@ export class Auth {
         }),
       });
       const body = (await r.json()) as Record<string, unknown>;
+      this.resume(req);
       if (!r.ok || typeof body.id_token !== "string") return fail(tr("Google said: &1", String(body.error_description ?? body.error ?? r.status)));
       claims = JSON.parse(Buffer.from(body.id_token.split(".")[1] ?? "", "base64url").toString("utf8"));
     } catch (e) {
+      this.resume(req);
       return fail(tr("Google can't be reached: &1", e instanceof Error ? e.message : String(e)));
     }
+    this.resume(req);
     const why = checkClaims(this.config, claims, pending.nonce, Date.now(), this.known);
     if (why) return fail(why);
     const token = random();

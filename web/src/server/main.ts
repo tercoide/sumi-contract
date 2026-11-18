@@ -45,6 +45,7 @@ try {
   if (c) {
     auth = new Auth(c, store.dir);
     auth.known = (email) => !!Co.findPerson(store.company, email);
+    auth.resume = language;
   }
 } catch (e) {
   console.error("sumi-contract: " + (e instanceof Error ? e.message : String(e)));
@@ -157,6 +158,7 @@ function send(res: http.ServerResponse, status: number, body: unknown, type = "a
   res.end(text);
 }
 
+/** The request's body. (The texts' language is set again after it: other requests may have changed it meanwhile.) */
 async function readBody(req: http.IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
   let size = 0;
@@ -165,6 +167,7 @@ async function readBody(req: http.IncomingMessage): Promise<string> {
     if (size > 64 * 1024 * 1024) throw new Error("too big");
     chunks.push(c);
   }
+  language(req);
   return Buffer.concat(chunks).toString("utf8");
 }
 
