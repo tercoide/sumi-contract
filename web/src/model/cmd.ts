@@ -23,6 +23,8 @@ import * as S from "./schedule.ts";
 import { isObj, num, str, tr } from "./text.ts";
 import { makeId } from "./ids.ts";
 import { importLibrary, type LibraryFiles } from "./library.ts";
+import { needs, RIGHT_NAMES, RIGHT_TEXTS, rightsOf, roleIds, ROLES, type Right } from "./roles.ts";
+import { membersFromJson, membersToJson } from "./project.ts";
 
 export const ABSENT = "~absent~"; // a snapshot of something that didn't exist
 export const COALESCE_SECONDS = 120; // edits of the same field in a row become one change
@@ -35,6 +37,8 @@ export interface Session {
   project: Project | null;
   company: Company;
   who: Who;
+  /** What this person may change (roles.ts), in this project; undefined = everything (no logins, tests) */
+  rights?: Set<Right>;
   group: string; // the action being made (beginGroup), or ""
   /** Called after a change is logged: what must be saved */
   changed?: (what: "project" | "company") => void;
@@ -69,7 +73,8 @@ export function run(s: Session, command: string, args?: Args): Result {
   let out: Result;
   s.depth = (s.depth ?? 0) + 1;
   try {
-    out = dispatch(x, command.toLowerCase(), c);
+    const missing = lacking(s, command, c);
+    out = missing ? fail(missing) : dispatch(x, command.toLowerCase(), c);
   } catch (e) {
     out = fail(e instanceof Error ? e.message : String(e));
   }
@@ -82,6 +87,14 @@ export function run(s: Session, command: string, args?: Args): Result {
     }
   } else if (s.pending && s.depth === 0) finish(s);
   return out;
+}
+
+/** Why the person can't run a command (a right they don't have), or "" */
+function lacking(s: Session, command: string, c: Args): string {
+  if (!s.rights) return "";
+  const missing = needs(command, c).filter((r) => !s.rights!.has(r));
+  if (!missing.length) return "";
+  return tr("You can't do that: it needs the right &1. An administrator can give you a role that has it.", missing.map((r) => tr(RIGHT_NAMES[r])).join(", "));
 }
 
 /** What a command handler gets: the session, and how to log */
@@ -141,7 +154,7 @@ function finish(s: Session): void {
 
 /** Does a change touch only the company's data (contractors, the standard library)? */
 export function isCompany(h: Change): boolean {
-  return h.targets.length > 0 && h.targets.every((t) => t.startsWith("contractor:") || t === "standard");
+  return h.targets.length > 0 && h.targets.every((t) => t.startsWith("contractor:") || t.startsWith("person:") || t === "standard");
 }
 
 function stampTime(s: string): number {
@@ -171,6 +184,10 @@ export function snapshot(s: Session, target: string): unknown {
     return k ? Co.contractorToJson(k) : ABSENT;
   }
   if (target === "standard") return co.standard ? P.bookToJson(co.standard) : ABSENT;
+  if (target.startsWith("person:")) {
+    const k = co.people.get(target.slice(7));
+    return k ? Co.personToJson(k) : ABSENT;
+  }
   const p = s.project;
   if (!p) return ABSENT;
   const b = p.prices;
@@ -185,6 +202,8 @@ export function snapshot(s: Session, target: string): unknown {
   switch (target) {
     case "contracts":
       return K.contractsToJson(p.contracts);
+    case "members":
+      return membersToJson(p.members);
     case "budget":
       return B.budgetToJson(p.budget);
     case "schedule":
@@ -218,6 +237,12 @@ export function restore(s: Session, target: string, v: unknown): void {
     co.standard = isAbsent(v) ? null : P.bookFromJson({ ...P.newBook(), charges: [] }, v);
     return;
   }
+  if (target.startsWith("person:")) {
+    const id = target.slice(7);
+    if (isAbsent(v)) co.people.delete(id);
+    else co.people.set(id, Co.personFromJson(v));
+    return;
+  }
   const p = s.project;
   if (!p) return;
   const b = p.prices;
@@ -237,6 +262,9 @@ export function restore(s: Session, target: string, v: unknown): void {
   switch (target) {
     case "contracts":
       p.contracts = K.contractsFromJson(v);
+      break;
+    case "members":
+      p.members = membersFromJson(v);
       break;
     case "budget":
       p.budget = B.budgetFromJson(v);
@@ -302,6 +330,11 @@ function findUndo(s: Session, log: Change[], redo: boolean): Change | undefined 
 function undoIn(s: Session, log: Change[], found: Change, redo: boolean, company: boolean): Result {
   // its whole group, newest first
   const group = found.group ? log.filter((h) => h.group === found.group && !h.undoneBy && h.command !== "undo").reverse() : [found];
+  // undoing (or redoing) needs the rights of what is undone: a person whose role was taken away can't
+  for (const h of redo ? log.filter((x) => x.undoneBy === found.id) : group) {
+    const missing = lacking(s, h.command, h.args);
+    if (missing) return fail(missing);
+  }
   // nobody changed those things since (where the after is known)
   for (const h of group)
     for (const t of h.targets) {
@@ -383,6 +416,13 @@ function dispatch(x: Op, command: string, c: Args): Result {
       return undo(x, false);
     case "redo":
       return undo(x, true);
+    case "role.list":
+      return ok({ roles: ROLES.map((r) => ({ id: r.id, name: tr(r.name), rights: r.rights })), rights: Object.fromEntries(Object.entries(RIGHT_TEXTS).map(([k, v]) => [k, { name: tr(RIGHT_NAMES[k as Right]), text: tr(v) }])) });
+    case "person.list":
+    case "person.add":
+    case "person.set":
+    case "person.delete":
+      return personCmd(x, command, c);
     case "contractor.list":
     case "contractor.get":
     case "contractor.add":
@@ -394,6 +434,9 @@ function dispatch(x: Op, command: string, c: Args): Result {
   switch (command) {
     case "info":
       return info(x);
+    case "member.list":
+    case "member.set":
+      return memberCmd(x, command, c);
     case "log":
       return logList(x, c);
     case "change.get":
@@ -555,6 +598,13 @@ export function help(): Record<string, string> {
     "design.map": "{key (a row's key), analyses [{code, factor}...]} the analyses of a design row in this project, while sumi-designer has none for it",
     "report.pdf": "{kind (budget, summary, analyses, gantt, certificate), contract? and cert? (for a certificate)} makes a PDF report -> {url (to download it), name, pages}",
     "rubro.coefs": "{rubro, coefs [{name, pct}...]} the coefficients of a rubro in the budget (on top of the project's)",
+    "role.list": "{} -> the roles (id, name, rights) and what each right lets do",
+    "person.list": "{} -> the company's people, with their roles in every project",
+    "person.add": "{email, name?, roles? [role ids], note?} someone of the company who may sign in -> their id",
+    "person.set": "{key (id, email or name), name?, email?, roles? [role ids], note?}",
+    "person.delete": "{key} (their changes stay in the logs, with their name)",
+    "member.list": "{} -> the people with roles in this project only (besides their company roles)",
+    "member.set": "{person (key), roles [role ids]} a person's roles in this project only ([] = none)",
   };
 }
 
@@ -580,6 +630,7 @@ function info(x: Op): Result {
     changes: p.changes.length,
     you: x.s.who.name,
     via: x.s.who.via,
+    rights: x.s.rights ? [...x.s.rights] : "all",
   });
 }
 
@@ -1221,6 +1272,91 @@ function contractorCmd(x: Op, command: string, c: Args): Result {
     }
   }
   return ok();
+}
+
+// PEOPLE AND ROLES
+
+const describePerson = (k: Co.Person) => ({ id: k.id, email: k.email, name: k.name, roles: [...k.roles], note: k.note });
+
+/** Unknown role ids, or "" */
+function badRoles(v: unknown): string {
+  if (!Array.isArray(v)) return tr("roles is a list of role ids");
+  const bad = v.map(String).filter((r) => !roleIds().includes(r));
+  return bad.length ? tr("There is no role &1 (the roles: &2).", bad.join(", "), roleIds().join(", ")) : "";
+}
+
+const admins = (co: Company) => [...co.people.values()].filter((k) => k.roles.includes("admin"));
+
+function personCmd(x: Op, command: string, c: Args): Result {
+  const co = x.co;
+  if (command === "person.list") return ok({ people: Co.sortedPeople(co).map(describePerson) });
+  if (command === "person.add") {
+    const email = str(c.email).trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail(tr("A person needs their Google address."));
+    if (Co.findPerson(co, email)) return fail(tr("&1 is already in the company.", email));
+    if (c.roles !== undefined && badRoles(c.roles)) return fail(badRoles(c.roles));
+    const k: Co.Person = { id: makeId("u"), email, name: str(c.name).trim(), roles: Array.isArray(c.roles) ? [...new Set(c.roles.map(String))] : [], note: str(c.note) };
+    x.start(command, c, tr("Person added: &1", k.name || k.email));
+    x.touch("person:" + k.id);
+    co.people.set(k.id, k);
+    return ok({ id: k.id });
+  }
+  const k = Co.findPerson(co, str(c.key));
+  if (!k) return fail(tr("There is no person &1.", c.key));
+  const lastAdmin = admins(co).length === 1 && k.roles.includes("admin");
+  if (command === "person.delete") {
+    if (lastAdmin) return fail(tr("&1 is the only administrator: give the role to someone else first.", k.name || k.email));
+    x.start(command, c, tr("Person deleted: &1", k.name || k.email));
+    x.touch("person:" + k.id);
+    co.people.delete(k.id);
+    return ok();
+  }
+  // person.set
+  const set = without(c, "key");
+  if (keys(set).length === 0) return fail(tr("Nothing to set."));
+  for (const f of keys(set)) if (!["name", "email", "roles", "note"].includes(f)) return fail(tr("People have no field &1.", f));
+  if ("roles" in set) {
+    if (badRoles(set.roles)) return fail(badRoles(set.roles));
+    if (lastAdmin && !(set.roles as unknown[]).map(String).includes("admin")) return fail(tr("&1 is the only administrator: give the role to someone else first.", k.name || k.email));
+  }
+  if ("email" in set) {
+    const e = str(set.email).trim().toLowerCase();
+    const other = Co.findPerson(co, e);
+    if (other && other !== k) return fail(tr("&1 is already in the company.", e));
+  }
+  const what = keys(set).map((f) => (f === "roles" ? tr("roles: &1", (set.roles as unknown[]).map((r) => tr(ROLES.find((x) => x.id === String(r))!.name)).join(", ") || "-") : f));
+  x.start(command, c, tr("Person &1: &2", k.name || k.email, what.join("; ")));
+  x.touch("person:" + k.id);
+  if ("name" in set) k.name = str(set.name).trim();
+  if ("email" in set) k.email = str(set.email).trim().toLowerCase();
+  if ("note" in set) k.note = str(set.note);
+  if ("roles" in set) k.roles = [...new Set((set.roles as unknown[]).map(String))];
+  return ok();
+}
+
+function memberCmd(x: Op, command: string, c: Args): Result {
+  const p = x.p;
+  const name = (id: string) => {
+    const k = x.co.people.get(id);
+    return k ? k.name || k.email : tr("(unknown person)");
+  };
+  if (command === "member.list") return ok({ members: p.members.map((m) => ({ person: m.person, name: name(m.person), roles: [...m.roles] })) });
+  const k = Co.findPerson(x.co, str(c.person));
+  if (!k) return fail(tr("There is no person &1.", c.person));
+  if (badRoles(c.roles)) return fail(badRoles(c.roles));
+  const roles = [...new Set((c.roles as unknown[]).map(String))];
+  x.start(command, c, tr("Project member &1: &2", k.name || k.email, roles.map((r) => tr(ROLES.find((y) => y.id === r)!.name)).join(", ") || "-"));
+  x.touch("members");
+  p.members = p.members.filter((m) => m.person !== k.id);
+  if (roles.length) p.members.push({ person: k.id, roles });
+  return ok();
+}
+
+/** A person's rights in a project: their company roles and their roles as its member */
+export function rightsIn(co: Company, p: Project | null, personId: string, extraRoles: string[] = []): Set<Right> {
+  const k = co.people.get(personId);
+  const roles = [...(k?.roles ?? []), ...extraRoles, ...(p?.members.find((m) => m.person === personId)?.roles ?? [])];
+  return rightsOf(roles);
 }
 
 /** Copies what from has into to: resources and analyses by id (replaced or added), rubros, and the labor charges */

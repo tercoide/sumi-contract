@@ -26,6 +26,7 @@ export interface AuthConfig {
   url: string; // where people reach the program: the redirect URI is url + /auth/callback
   domains: string[]; // Google Workspace domains whose accounts may come in
   allowed: string[]; // and these addresses
+  admins: string[]; // addresses that are always administrators (and may come in): the first ones, before any role is given
   authUrl: string; // Google's (tests use their own)
   tokenUrl: string;
 }
@@ -74,11 +75,12 @@ export function loadAuth(dataDir: string, port: number, env = process.env): Auth
     url: String(env.SUMI_URL || login.url || `http://localhost:${port}`).replace(/\/+$/, ""),
     domains: list(env.SUMI_DOMAINS ?? login.domains),
     allowed: list(env.SUMI_ALLOWED ?? login.allowed),
+    admins: list(env.SUMI_ADMINS ?? login.admins),
     authUrl: env.SUMI_GOOGLE_AUTH_URL || "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: env.SUMI_GOOGLE_TOKEN_URL || "https://oauth2.googleapis.com/token",
   };
-  if (!c.domains.length && !c.allowed.length)
-    throw new Error("Google sign-in is set up but nobody may come in: list the company's domains or the addresses (login.json, SUMI_DOMAINS, SUMI_ALLOWED)");
+  if (!c.domains.length && !c.allowed.length && !c.admins.length)
+    throw new Error("Google sign-in is set up but nobody may come in: list the company's domains, the addresses or the admins (login.json, SUMI_DOMAINS, SUMI_ALLOWED, SUMI_ADMINS)");
   return c;
 }
 
@@ -96,7 +98,7 @@ export function cookies(req: http.IncomingMessage): Record<string, string> {
 }
 
 /** May the person of these ID token claims come in? "" or why not */
-export function checkClaims(c: AuthConfig, claims: Record<string, unknown>, nonce: string, now = Date.now()): string {
+export function checkClaims(c: AuthConfig, claims: Record<string, unknown>, nonce: string, now = Date.now(), known: (email: string) => boolean = () => false): string {
   if (claims.iss !== "https://accounts.google.com" && claims.iss !== "accounts.google.com") return "the token is not Google's";
   if (claims.aud !== c.clientId) return "the token is for another program";
   if (typeof claims.exp !== "number" || claims.exp * 1000 < now - 60_000) return "the token has expired";
@@ -104,7 +106,7 @@ export function checkClaims(c: AuthConfig, claims: Record<string, unknown>, nonc
   const email = String(claims.email ?? "").toLowerCase();
   if (!email || claims.email_verified !== true) return tr("Google hasn't verified the address &1.", email);
   const hd = String(claims.hd ?? "").toLowerCase();
-  if (!(hd && c.domains.includes(hd)) && !c.allowed.includes(email)) return tr("&1 can't come in: it isn't an account of the company.", email);
+  if (!(hd && c.domains.includes(hd)) && !c.allowed.includes(email) && !c.admins.includes(email) && !known(email)) return tr("&1 can't come in: it isn't an account of the company.", email);
   return "";
 }
 
@@ -113,6 +115,9 @@ export class Auth {
   private file: string;
   private sessions = new Map<string, Session>(); // by the cookie's hash
   private logins = new Map<string, { nonce: string; verifier: string; back: string; expires: number }>(); // by state
+
+  /** Addresses the company added (its people, see roles): they may come in too */
+  known: (email: string) => boolean = () => false;
 
   constructor(config: AuthConfig, dataDir: string) {
     this.config = config;
@@ -224,7 +229,7 @@ export class Auth {
     } catch (e) {
       return fail(tr("Google can't be reached: &1", e instanceof Error ? e.message : String(e)));
     }
-    const why = checkClaims(this.config, claims, pending.nonce);
+    const why = checkClaims(this.config, claims, pending.nonce, Date.now(), this.known);
     if (why) return fail(why);
     const token = random();
     const email = String(claims.email).toLowerCase();

@@ -12,6 +12,12 @@ import { fileURLToPath } from "node:url";
 
 const web = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const RUNTIME = [
+  // the roles and rights (model/roles.ts)
+  "Administrator", "Site direction", "Estimator", "Planner", "Contracts administration", "Treasury", "Viewer",
+  "Project data", "Prices", "Budget", "Gantt", "Contracts", "Issue certificates", "Payments", "Contractors", "Standard library", "AI assistant", "People and roles",
+  "The project's data; new projects", "Resources, analyses, rubros, labor charges, imports", "Budget items and coefficients, the design's quantities", "The Gantt",
+  "Contracts, their items and the certificates' measurements", "Issue certificates (and take them back to draft)", "Payments to the contractors",
+  "The company's contractors and their documents", "The company's standard price library", "Ask the AI assistant (it can do what the person can)", "People, roles and project members",
   // the choices of the Project tab's lists (model/project.ts) and its professionals' roles
   "New building", "Extension", "Renovation", "Extension and renovation", "Demolition", "Infrastructure",
   "Housing", "Multi-family housing", "Commercial", "Offices", "Industrial", "Educational", "Health", "Mixed", "Other",

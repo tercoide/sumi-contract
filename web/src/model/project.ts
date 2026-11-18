@@ -66,8 +66,15 @@ export function projectDefaults() {
 export type ProjectFields = ReturnType<typeof projectDefaults>;
 export const PROJECT_FIELDS = Object.keys(projectDefaults()) as (keyof ProjectFields)[];
 
+/** A person's roles in this project only (besides their roles in the company) */
+export interface Member {
+  person: string; // the person's id (company data)
+  roles: string[];
+}
+
 export interface Project extends ProjectFields, Pricing {
   id: string;
+  members: Member[];
   prices: PriceBook;
   budget: Budget;
   schedule: Schedule;
@@ -82,6 +89,7 @@ export function newProject(id = ""): Project {
   const p: Project = {
     ...projectDefaults(),
     id,
+    members: [],
     prices: newBook(),
     budget: newBudget(),
     schedule: newSchedule(),
@@ -172,10 +180,18 @@ export function projectToJson(p: Project): Record<string, unknown> {
     budget: budgetToJson(p.budget),
     schedule: scheduleToJson(p.schedule),
     contracts: contractsToJson(p.contracts),
+    // (only when there are: the Gambas version doesn't know them)
+    ...(p.members.length ? { members: membersToJson(p.members) } : {}),
     changes: p.changes.map(changeToJson),
     created: p.created,
     modified: p.modified,
   };
+}
+
+export const membersToJson = (list: Member[]) => list.map((m) => ({ person: m.person, roles: [...m.roles] }));
+
+export function membersFromJson(v: unknown): Member[] {
+  return Array.isArray(v) ? v.filter(isObj).map((m) => ({ person: str(m.person), roles: Array.isArray(m.roles) ? m.roles.map(String) : [] })).filter((m) => m.person) : [];
 }
 
 /** A project from a file's JSON; what is missing keeps its default */
@@ -189,6 +205,7 @@ export function projectFromJson(c: unknown, id = ""): Project {
   if ("budget" in c) p.budget = budgetFromJson(c.budget);
   if ("schedule" in c) p.schedule = scheduleFromJson(c.schedule);
   if ("contracts" in c) p.contracts = contractsFromJson(c.contracts);
+  p.members = membersFromJson(c.members);
   if (Array.isArray(c.changes)) p.changes = c.changes.map(changeFromJson);
   if (c.created) p.created = str(c.created);
   if (c.modified) p.modified = str(c.modified);

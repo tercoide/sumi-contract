@@ -12,6 +12,7 @@ import { PricingTab } from "./tabs/PricingTab.tsx";
 import { GanttTab } from "./tabs/GanttTab.tsx";
 import { ContractsTab } from "./tabs/ContractsTab.tsx";
 import { AssistantPanel } from "./Assistant.tsx";
+import { People } from "./People.tsx";
 
 const TABS = [
   { id: "project", label: () => tr("Project") },
@@ -42,11 +43,36 @@ export function App() {
   if (!me) return null;
   if (me.login && !me.person) return <SignIn />;
   return (
-    <MeCtx.Provider value={me}>{h[0] === "p" && h[1] ? <Workspace id={h[1]} tab={h[2] || "project"} /> : <Projects />}</MeCtx.Provider>
+    <MeCtx.Provider value={me}>
+      {h[0] === "p" && h[1] ? (
+        <Workspace id={h[1]} tab={h[2] || "project"} />
+      ) : h[0] === "people" ? (
+        <People
+          bar={
+            <header className="bar">
+              <a className="brand" href="#/" title={tr("Projects")}>
+                sumi-contract
+              </a>
+              <span className="grow" />
+              <LangSwitch />
+              <You />
+            </header>
+          }
+        />
+      ) : (
+        <Projects />
+      )}
+    </MeCtx.Provider>
   );
 }
 
 const MeCtx = createContext<api.Result>({});
+
+/** May the person do this (in the company)? (Each command checks again, with the project's roles too.) */
+function useCan(): (right: string) => boolean {
+  const me = useContext(MeCtx);
+  return (right) => me.rights === "all" || (Array.isArray(me.rights) && me.rights.includes(right));
+}
 
 // SIGNING IN (with the company's Google account, when the server has the keys)
 
@@ -147,6 +173,7 @@ function Projects() {
   const [list, setList] = useState<api.Result[] | null>(null);
   const [error, setError] = useState("");
   const file = useRef<HTMLInputElement>(null);
+  const can = useCan();
 
   useEffect(() => {
     document.title = "sumi-contract";
@@ -169,12 +196,19 @@ function Projects() {
     <div className="page">
       <header className="bar">
         <span className="brand">sumi-contract</span>
-        <button onClick={create}>
-          <Icon name="document-new" /> {tr("New")}
-        </button>
-        <button onClick={() => file.current?.click()} title={tr("A .contract-proj file, from here or from the desktop version")}>
-          <Icon name="document-import" /> {tr("Open a file")}
-        </button>
+        {can("project") && (
+          <>
+            <button onClick={create}>
+              <Icon name="document-new" /> {tr("New")}
+            </button>
+            <button onClick={() => file.current?.click()} title={tr("A .contract-proj file, from here or from the desktop version")}>
+              <Icon name="document-import" /> {tr("Open a file")}
+            </button>
+          </>
+        )}
+        <a className="button" href="#/people" title={tr("Who may sign in, and what each may change")}>
+          <Icon name="configure" /> {tr("People and roles")}
+        </a>
         <input ref={file} type="file" accept=".contract-proj,application/json" hidden onChange={(e) => open(e.target.files?.[0])} />
         <span className="grow" />
         <LangSwitch />
@@ -230,6 +264,7 @@ function Workspace({ id, tab }: { id: string; tab: string }) {
     },
     [id],
   );
+  const can = useCan();
   const [aiOpen, setAiOpen] = useState(() => {
     try {
       return localStorage.getItem("sumi.ai") === "1";
@@ -268,9 +303,9 @@ function Workspace({ id, tab }: { id: string; tab: string }) {
             <Icon name="document-export" /> {tr("Download")}
           </a>
           <PdfMenu id={id} setStatus={setStatus} />
-          <button className={aiOpen ? "on" : ""} onClick={() => showAi(!aiOpen)} title={tr("Claude works on the project for you: prices from the web, analyses, the budget...")}>
+          {can("ai") && <button className={aiOpen ? "on" : ""} onClick={() => showAi(!aiOpen)} title={tr("Claude works on the project for you: prices from the web, analyses, the budget...")}>
             <Icon name="light-bulb" /> {tr("AI assistant")}
-          </button>
+          </button>}
           <span className="grow" />
           <LangSwitch />
           <You />
@@ -293,7 +328,7 @@ function Workspace({ id, tab }: { id: string; tab: string }) {
         <footer className={"status" + (status.error ? " error" : "")}>
           {status.text || (info ? tr("&1 items, &2 changes in the log", info.budgetItems, info.changes) : "")}
         </footer>
-        {aiOpen && <AssistantPanel project={id} onChanged={() => setVersion((v) => v + 1)} onClose={() => showAi(false)} />}
+        {aiOpen && can("ai") && <AssistantPanel project={id} onChanged={() => setVersion((v) => v + 1)} onClose={() => showAi(false)} />}
       </div>
     </Ctx.Provider>
   );

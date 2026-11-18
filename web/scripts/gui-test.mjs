@@ -195,6 +195,27 @@ try {
   await page.click("aside.assistant header button:last-child");
   check(errors.length === 0, "the assistant's panel: " + errors.join("; "));
 
+  // people and roles: someone added, a role given; the project's team
+  await page.goto(`${base}/#/people`);
+  await page.waitForSelector(".people table.grid");
+  await page.fill(".people input[type=email]", "juan@empresa.com.ar");
+  await page.fill(".people .toolbar input:not([type=email])", "Juan");
+  await page.click(".people .toolbar button:first-of-type");
+  await page.waitForSelector(".people td:has-text('juan@empresa.com.ar')");
+  const juanRow = page.locator(".people tbody tr", { hasText: "juan@empresa.com.ar" });
+  await juanRow.locator(".rolechecks label").nth(2).locator("input").click();
+  await page.waitForTimeout(300);
+  const juan = (await api("person.list")).people.find((k) => k.email === "juan@empresa.com.ar");
+  check(juan?.roles?.includes("estimator"), "a person added and given a role: " + JSON.stringify(juan));
+  await shot("people");
+  await page.goto(`${base}/#/p/${id}/project`);
+  await page.waitForSelector("text=" + (lang === "es" ? "Equipo del proyecto" : "Project team"));
+  await page.selectOption("section:has(h2:has-text('" + (lang === "es" ? "Equipo del proyecto" : "Project team") + "')) select", { label: "Juan" });
+  await page.click("section:has(h2:has-text('" + (lang === "es" ? "Equipo del proyecto" : "Project team") + "')) .toolbar button");
+  await page.waitForTimeout(300);
+  check((await api("member.list")).members?.[0]?.name === "Juan", "a member of the project's team");
+  check(errors.length === 0, "people and roles: " + errors.join("; "));
+
   // the History tab shows it, with its before and after
   await page.goto(`${base}/#/p/${id}/history`);
   await page.fill("input.search", "4.01: qty");

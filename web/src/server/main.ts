@@ -29,6 +29,10 @@ import { makeReport } from "../model/reports.ts";
 import { apiSender, cannedSender, Chat, hasKey, loadAIConfig, type Sender } from "./assistant.ts";
 import { Auth, loadAuth, type Person } from "./auth.ts";
 import { Store } from "./store.ts";
+import * as Co from "../model/company.ts";
+import type { Project } from "../model/project.ts";
+import { rightsIn } from "../model/cmd.ts";
+import { RIGHT_NAMES, type Right } from "../model/roles.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url)); // dist/src/server
 const root = path.resolve(here, "../../.."); // web/
@@ -38,7 +42,10 @@ const clientDir = path.join(root, "dist/client");
 let auth: Auth | null = null;
 try {
   const c = loadAuth(store.dir, port);
-  if (c) auth = new Auth(c, store.dir);
+  if (c) {
+    auth = new Auth(c, store.dir);
+    auth.known = (email) => !!Co.findPerson(store.company, email);
+  }
 } catch (e) {
   console.error("sumi-contract: " + (e instanceof Error ? e.message : String(e)));
   process.exit(1);
@@ -63,21 +70,42 @@ function language(req: http.IncomingMessage): void {
   setCatalog(l.toLowerCase().startsWith("es") ? spanish : null);
 }
 
-/** The person making the request: signed in with Google (by their address), or the computer's user */
-function who(person: Person | null): Who {
+/** The company's record of the person making the request (signed in with Google, by their address; or the
+ *  computer's user, by name). Someone who comes in for the first time gets one, without roles. */
+function personOf(person: Person | null): Co.Person {
+  const co = store.company;
   const name = person ? person.name : process.env.SUMI_USER || os.userInfo().username;
-  const key = person ? person.email : name;
-  const file = path.join(store.dir, "people.json");
-  let people: Record<string, string> = {};
-  try {
-    people = JSON.parse(fs.readFileSync(file, "utf8"));
-  } catch {}
-  if (!people[key]) {
-    people[key] = makeId("u");
-    fs.writeFileSync(file, JSON.stringify(people, null, 1));
+  let k = person ? Co.findPerson(co, person.email) : [...co.people.values()].find((x) => !x.email && x.name === name);
+  if (!k) {
+    // the ids the first web version kept in data/people.json (by address or name), so the logs still match
+    let old: Record<string, string> = {};
+    try {
+      old = JSON.parse(fs.readFileSync(path.join(store.dir, "people.json"), "utf8"));
+    } catch {}
+    const key = person ? person.email : name;
+    k = { id: old[key] || makeId("u"), email: person?.email ?? "", name, roles: [], note: "" };
+    co.people.set(k.id, k);
+    store.saveCompany();
+  } else if (person && !k.name && person.name) {
+    k.name = person.name; // added by an admin with the address only: Google says the name
+    store.saveCompany();
   }
-  return { name, userId: people[key], via: PERSON, model: "" };
+  return k;
 }
+
+function who(person: Person | null): Who {
+  const k = personOf(person);
+  return { name: k.name || k.email, userId: k.id, via: PERSON, model: "" };
+}
+
+/** What the person may change in a project (or in the company, project null); undefined = everything (no logins) */
+function rights(person: Person | null, project: Project | null): Set<Right> | undefined {
+  if (!auth) return undefined;
+  const k = personOf(person);
+  return rightsIn(store.company, project, k.id, auth.config.admins.includes(k.email) ? ["admin"] : []);
+}
+
+const may = (person: Person | null, right: Right) => rights(person, null)?.has(right) ?? true;
 
 /** A library shipped with the program: library/<name>/*.csv, and library/added */
 function library(name: string) {
@@ -106,6 +134,7 @@ function session(projectId: string, person: Person | null): Session {
     project,
     company: store.company,
     who: who(person),
+    rights: rights(person, project),
     group: "",
     library,
     extra: {
@@ -160,14 +189,20 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   const parts = url.split("?")[0].split("/").filter(Boolean); // ["api", ...]
   language(req);
   const person = auth ? auth.person(req) : null;
-  if (req.method === "GET" && url === "/api/me") return send(res, 200, { login: !!auth, person: auth ? person : { name: who(null).name, email: "", picture: "" } });
+  if (req.method === "GET" && url === "/api/me") {
+    if (auth && !person) return send(res, 200, { login: true, person: null });
+    const r = rights(person, null);
+    const k = personOf(person);
+    return send(res, 200, { login: !!auth, person: { ...(person ?? { email: "", picture: "" }), name: k.name || k.email, id: k.id, roles: k.roles }, rights: r ? [...r] : "all" });
+  }
   if (auth && !person) return send(res, 401, { error: tr("Sign in first."), login: true });
   // with logins, only the program's own pages may send changes (the cookie is SameSite=Lax too)
   const origin = req.headers.origin;
   if (auth && req.method !== "GET" && origin && new URL(origin).host !== req.headers.host) return send(res, 403, { error: "forbidden" });
   if (req.method === "GET" && url === "/api/projects") return send(res, 200, { projects: store.list(), you: who(person).name });
-  if (req.method === "POST" && url === "/api/projects") return send(res, 200, { id: store.create().id });
-  if (req.method === "POST" && url === "/api/projects/import") return send(res, 200, { id: store.importFile(await readBody(req)).id });
+  const cant = (right: Right) => send(res, 403, { error: tr("You can't do that: it needs the right &1. An administrator can give you a role that has it.", tr(RIGHT_NAMES[right])) });
+  if (req.method === "POST" && url === "/api/projects") return may(person, "project") ? send(res, 200, { id: store.create().id }) : cant("project");
+  if (req.method === "POST" && url === "/api/projects/import") return may(person, "project") ? send(res, 200, { id: store.importFile(await readBody(req)).id }) : cant("project");
   if (req.method === "GET" && parts[1] === "projects" && parts[3] === "file") {
     const p = store.get(parts[2]);
     if (!p) return send(res, 404, { error: "no such project" });
@@ -195,6 +230,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     if (parts[2] === "new") return send(res, 200, chat.newChat() ? { ok: true } : { error: tr("The assistant is still working on the last request.") });
     const prompt = str(body.prompt).trim();
     if (!prompt) return send(res, 400, { error: "no prompt" });
+    if (s.rights && !s.rights.has("ai")) return cant("ai");
     if (chat.busy) return send(res, 409, { error: tr("The assistant is still working on the last request.") });
     // what happens, as JSON lines; the person's language is kept for the whole turn
     res.writeHead(200, { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store", "x-accel-buffering": "no" });

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Choice, DateField, Num, Row, Text } from "../fields.tsx";
 import { fmt, tr } from "../tr.ts";
 import { useCommand, useWork } from "../work.ts";
+import { RoleChecks, useRoles } from "../People.tsx";
 
 interface Professional {
   role: string;
@@ -121,6 +122,7 @@ export function ProjectTab() {
           <Row label={tr("Index base month")}>{text("adjustmentBase")}</Row>
           <Row label={tr("Guarantee period (days)")}>{num("guaranteeDays")}</Row>
         </section>
+        <Team />
         <section>
           <h2>{tr("Professionals")}</h2>
           <table className="grid edit">
@@ -156,5 +158,42 @@ export function ProjectTab() {
         <p className="muted small">{tr("Created &1, modified &2", r.created.slice(0, 16), r.modified.slice(0, 16))}</p>
       </div>
     </div>
+  );
+}
+
+/** The people with roles in this project only (besides their roles in the company: People and roles) */
+function Team() {
+  const w = useWork();
+  const members = useCommand(w, "member.list");
+  const people = useCommand(w, "person.list");
+  const roles = useRoles();
+  const [who, setWho] = useState("");
+  if (!members || !people || !roles) return null;
+  const list: { person: string; name: string; roles: string[] }[] = members.members ?? [];
+  const others = (people.people ?? []).filter((k: { id: string }) => !list.some((m) => m.person === k.id));
+  return (
+    <section>
+      <h2>{tr("Project team")}</h2>
+      <p className="muted small">{tr("Roles in this project only, besides each person's roles in the company (People and roles, in the projects list).")}</p>
+      {list.map((m) => (
+        <div key={m.person} className="member">
+          <strong>{m.name}</strong>
+          <RoleChecks roles={m.roles} all={roles.roles} onChange={(r) => w.run("member.set", { person: m.person, roles: r })} />
+        </div>
+      ))}
+      <div className="toolbar">
+        <select value={who} onChange={(e) => setWho(e.target.value)}>
+          <option value="">{tr("Add someone to the team...")}</option>
+          {others.map((k: { id: string; name: string; email: string }) => (
+            <option key={k.id} value={k.id}>
+              {k.name || k.email}
+            </option>
+          ))}
+        </select>
+        <button disabled={!who} onClick={async () => !(await w.run("member.set", { person: who, roles: ["viewer"] })).error && setWho("")}>
+          {tr("Add")}
+        </button>
+      </div>
+    </section>
   );
 }

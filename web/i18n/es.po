@@ -252,3 +252,144 @@ msgstr "El asistente todavía está trabajando en el pedido anterior."
 msgid "There is no API key: put it in the ANTHROPIC_API_KEY variable, or in data/ai.json, and start the server again."
 msgstr "No hay clave de API: ponela en la variable ANTHROPIC_API_KEY, o en data/ai.json, y volvé a iniciar el servidor."
 
+msgid "&1 is already in the company."
+msgstr "&1 ya está en la empresa."
+
+msgid "&1 is the only administrator: give the role to someone else first."
+msgstr "&1 es el único administrador: primero dale el rol a otra persona."
+
+msgid "(this computer)"
+msgstr "(esta computadora)"
+
+msgid "(unknown person)"
+msgstr "(persona desconocida)"
+
+msgid "A person needs their Google address."
+msgstr "Una persona necesita su dirección de Google."
+
+msgid "Add someone to the team..."
+msgstr "Agregar a alguien al equipo..."
+
+msgid "Administrator"
+msgstr "Administrador"
+
+msgid "Ask the AI assistant (it can do what the person can)"
+msgstr "Pedirle al asistente IA (puede hacer lo que puede la persona)"
+
+msgid "Budget items and coefficients, the design's quantities"
+msgstr "Ítems y coeficientes del presupuesto, las cantidades del diseño"
+
+msgid "Contracts administration"
+msgstr "Administración de contratos"
+
+msgid "Contracts, their items and the certificates' measurements"
+msgstr "Contratos, sus ítems y las mediciones de los certificados"
+
+msgid "Delete &1? Their changes stay in the logs."
+msgstr "¿Borrar a &1? Sus cambios quedan en los registros."
+
+msgid "Estimator"
+msgstr "Presupuestista"
+
+msgid "Google account"
+msgstr "Cuenta de Google"
+
+msgid "Issue certificates"
+msgstr "Emitir certificados"
+
+msgid "Issue certificates (and take them back to draft)"
+msgstr "Emitir certificados (y volverlos a borrador)"
+
+msgid "Only looks"
+msgstr "Solo mira"
+
+msgid "Payments to the contractors"
+msgstr "Pagos a los contratistas"
+
+msgid "People and roles"
+msgstr "Personas y roles"
+
+msgid "People have no field &1."
+msgstr "Las personas no tienen el campo &1."
+
+msgid "People, roles and project members"
+msgstr "Personas, roles y equipos de los proyectos"
+
+msgid "Person &1: &2"
+msgstr "Persona &1: &2"
+
+msgid "Person added: &1"
+msgstr "Persona agregada: &1"
+
+msgid "Person deleted: &1"
+msgstr "Persona borrada: &1"
+
+msgid "Planner"
+msgstr "Planificación"
+
+msgid "Prices"
+msgstr "Precios"
+
+msgid "Project data"
+msgstr "Datos del proyecto"
+
+msgid "Project member &1: &2"
+msgstr "Equipo del proyecto, &1: &2"
+
+msgid "Project team"
+msgstr "Equipo del proyecto"
+
+msgid "Resources, analyses, rubros, labor charges, imports"
+msgstr "Insumos, análisis, rubros, cargas sociales, importaciones"
+
+msgid "Roles in every project"
+msgstr "Roles en todos los proyectos"
+
+msgid "Roles in this project only, besides each person's roles in the company (People and roles, in the projects list)."
+msgstr "Roles solo en este proyecto, además de los roles de cada persona en la empresa (Personas y roles, en la lista de proyectos)."
+
+msgid "Standard library"
+msgstr "Biblioteca estándar"
+
+msgid "The Gantt"
+msgstr "El Gantt"
+
+msgid "The company's people: who may sign in with Google, and what each may change in every project. Everyone can look at everything. A project can give someone more roles, in its Project tab."
+msgstr "La gente de la empresa: quién puede entrar con Google y qué puede cambiar cada uno en todos los proyectos. Todos pueden mirar todo. Un proyecto puede darle más roles a alguien, en su pestaña Proyecto."
+
+msgid "The company's standard price library"
+msgstr "La biblioteca de precios estándar de la empresa"
+
+msgid "The project's data; new projects"
+msgstr "Los datos del proyecto; proyectos nuevos"
+
+msgid "The roles"
+msgstr "Los roles"
+
+msgid "There is no person &1."
+msgstr "No hay una persona &1."
+
+msgid "There is no role &1 (the roles: &2)."
+msgstr "No hay un rol &1 (los roles: &2)."
+
+msgid "Treasury"
+msgstr "Tesorería"
+
+msgid "Viewer"
+msgstr "Lector"
+
+msgid "Who may sign in, and what each may change"
+msgstr "Quién puede entrar, y qué puede cambiar cada uno"
+
+msgid "You can't do that: it needs the right &1. An administrator can give you a role that has it."
+msgstr "No podés hacer eso: necesita el permiso &1. Un administrador puede darte un rol que lo tenga."
+
+msgid "roles is a list of role ids"
+msgstr "roles es una lista de ids de roles"
+
+msgid "roles: &1"
+msgstr "roles: &1"
+
+msgid "their Google address"
+msgstr "su dirección de Google"
+

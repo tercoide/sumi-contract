@@ -143,3 +143,11 @@ test("what ends a turn badly", async () => {
   const last = send3.requests[0].messages[send3.requests[0].messages.length - 1];
   assert.ok(last.role === "user" && (last.content as any[])[0].type === "tool_result" && (last.content as any[]).at(-1).type === "text", "after the limit, the request goes with the last tool results");
 });
+
+test("the AI can do what its person can, no more", async () => {
+  const { rightsOf } = await import("../src/model/roles.ts");
+  const s = { ...session(), rights: rightsOf(["planner"]) };
+  const chat = new Chat(config, canned(reply("tool_use", call("resource.add", { kind: "material", name: "X", unit: "u" })), reply("end_turn", text("No puedo."))));
+  const e = await chat.ask(s, "agregá X", () => {});
+  assert.ok(s.project!.prices.resources.size === 0 && e.steps[0].startsWith("✗ resource.add") && e.steps[0].includes("needs the right"), "refused as the person would be: " + e.steps[0]);
+});

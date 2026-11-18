@@ -43,6 +43,8 @@ test("the configuration", () => {
   assert.ok(checkClaims(c, { ...claims, exp: now / 1000 - 600 }, "n"), "expired");
   assert.ok(checkClaims(c, claims, "m"), "another sign-in's nonce");
   assert.ok(checkClaims(c, { ...claims, email_verified: false }, "n"), "an address Google hasn't verified");
+  assert.equal(checkClaims(c, { ...claims, hd: undefined, email: "new@gmail.com" }, "n", now, (e) => e === "new@gmail.com"), "", "someone the company added");
+  assert.equal(checkClaims({ ...c, admins: ["boss@gmail.com"] }, { ...claims, hd: undefined, email: "boss@gmail.com" }, "n"), "", "an admin");
 });
 
 test("signing in with a fake Google", async () => {
@@ -58,7 +60,7 @@ test("signing in with a fake Google", async () => {
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ id_token: `${b64({ alg: "RS256" })}.${b64(token)}.sig` }));
   });
-  const config: AuthConfig = { clientId: "cid", clientSecret: "secret", url: "", domains: ["empresa.com.ar"], allowed: [], authUrl: "https://accounts.google.com/o/oauth2/v2/auth", tokenUrl: google.url };
+  const config: AuthConfig = { clientId: "cid", clientSecret: "secret", url: "", domains: ["empresa.com.ar"], allowed: [], admins: [], authUrl: "https://accounts.google.com/o/oauth2/v2/auth", tokenUrl: google.url };
   const auth = new Auth(config, dir);
   const app = await listen(async (req, res) => {
     if (await auth.handle(req, res)) return;

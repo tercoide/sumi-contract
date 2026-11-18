@@ -714,3 +714,32 @@ button.primary {
     width: 100%;
   }
 }
+
+/* people and roles */
+.rolechecks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+}
+.rolechecks label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.rolechecks input {
+  margin: 0;
+}
+.member {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.small {
+  font-size: 12px;
+}
+.people .grid input {
+  margin: 0;
+}
