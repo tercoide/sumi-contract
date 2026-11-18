@@ -8,6 +8,7 @@ import { lang, setLang, tr } from "./tr.ts";
 import { ProjectTab } from "./tabs/ProjectTab.tsx";
 import { BudgetTab } from "./tabs/BudgetTab.tsx";
 import { HistoryTab } from "./tabs/HistoryTab.tsx";
+import { PricingTab } from "./tabs/PricingTab.tsx";
 
 const TABS = [
   { id: "project", label: () => tr("Project") },
@@ -174,7 +175,8 @@ function Workspace({ id, tab }: { id: string; tab: string }) {
           {tab === "project" && <ProjectTab />}
           {tab === "budget" && <BudgetTab />}
           {tab === "history" && <HistoryTab />}
-          {!["project", "budget", "history"].includes(tab) && <p className="muted">{tr("This tab comes next in the web version.")}</p>}
+          {tab === "pricing" && <PricingTab />}
+          {!["project", "budget", "history", "pricing"].includes(tab) && <p className="muted">{tr("This tab comes next in the web version.")}</p>}
         </main>
         <footer className={"status" + (status.error ? " error" : "")}>
           {status.text || (info ? tr("&1 items, &2 changes in the log", info.budgetItems, info.changes) : "")}

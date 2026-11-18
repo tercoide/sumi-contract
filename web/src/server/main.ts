@@ -49,6 +49,19 @@ function who(): Who {
   return { name, userId: people[name], via: PERSON, model: "" };
 }
 
+/** A library shipped with the program: library/<name>/*.csv, and library/added */
+function library(name: string) {
+  const read = (dir: string) => {
+    if (!/^[\w-]+$/.test(path.basename(dir)) || !fs.existsSync(dir)) return undefined;
+    const files: Record<string, string> = {};
+    for (const f of fs.readdirSync(dir)) if (f.endsWith(".csv")) files[f] = fs.readFileSync(path.join(dir, f), "utf8");
+    return files;
+  };
+  if (!/^[\w-]+$/.test(name) || name === "added") return undefined;
+  const files = read(path.join(root, "library", name));
+  return files && { files, added: read(path.join(root, "library", "added")) };
+}
+
 function session(projectId: string): Session {
   const project = projectId ? (store.get(projectId) ?? null) : null;
   return {
@@ -56,6 +69,7 @@ function session(projectId: string): Session {
     company: store.company,
     who: who(),
     group: "",
+    library,
     changed: (what) => (what === "company" ? store.saveCompany() : project && store.saveProject(project)),
   };
 }

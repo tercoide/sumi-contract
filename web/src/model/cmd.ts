@@ -22,6 +22,7 @@ import { CERTIFICATE_PERIODS, CONTRACT_MODES, endDate, fieldsToJson, PROJECT_FIE
 import * as S from "./schedule.ts";
 import { isObj, num, str, tr } from "./text.ts";
 import { makeId } from "./ids.ts";
+import { importLibrary, type LibraryFiles } from "./library.ts";
 
 export const ABSENT = "~absent~"; // a snapshot of something that didn't exist
 export const COALESCE_SECONDS = 120; // edits of the same field in a row become one change
@@ -37,6 +38,8 @@ export interface Session {
   group: string; // the action being made (beginGroup), or ""
   /** Called after a change is logged: what must be saved */
   changed?: (what: "project" | "company") => void;
+  /** The libraries shipped with the program (licita2003...): its files and its added files */
+  library?: (name: string) => { files: LibraryFiles; added?: LibraryFiles } | undefined;
   /** Extra commands (prices.import, design.*, report.pdf) the server adds, with what they need */
   extra?: Record<string, (x: Op, c: Args) => Result>;
   // the change being made
@@ -399,6 +402,8 @@ function dispatch(x: Op, command: string, c: Args): Result {
       return projectGet(x);
     case "project.set":
       return projectSet(x, c);
+    case "book.get":
+      return bookGet(x);
     case "book.set":
       return bookSet(x, c);
     case "rubro.set":
@@ -437,6 +442,8 @@ function dispatch(x: Op, command: string, c: Args): Result {
       return lineCmd(x, command, c);
     case "analysis.flatten":
       return analysisFlatten(x, c);
+    case "prices.import":
+      return pricesImport(x, c);
     case "budget.list":
       return budgetList(x, c);
     case "item.add":
@@ -489,13 +496,14 @@ export function help(): Record<string, string> {
     undo: "{} -> undoes your last action",
     redo: "{} -> redoes what you undid last",
     "project.set": "{field: value...} the Project tab's fields, as in the file: name, code, workType, use, location, city, province, parcel, plotArea, coveredArea, semiCoveredArea, floors, client, clientTaxId, clientPhone, clientEmail, startDate (yyyy-mm-dd), durationDays, workDaysPerWeek, hoursPerDay, holidays [yyyy-mm-dd...], currency, overheadPct, profitPct, taxesPct, contractMode, advancePct, retentionPct, certificatePeriod, adjustmentIndex, adjustmentBase, guaranteeDays, professionals [{role, name, registration, phone, email}...], notes, designFile",
+    "book.get": "{} -> the price book: update coefficient, freight a km, source, labor charges (with the total %), rubros, counts",
     "book.set": "{updateCoef?, freightPerKm?} the price book's coefficients",
     "rubro.set": "{number, name}",
     "rubro.delete": "{number, force?}",
     "charge.add": "{name, pct?, amount?, hours?} a labor charge: % of the wage, or an amount over some hours",
     "charge.set": "{index, name?, pct?, amount?, hours?}",
     "charge.delete": "{index}",
-    "resource.list": "{kind?, text?, limit?} -> resources with their unit price",
+    "resource.list": "{kind?, text?, limit?, full?} -> resources with their unit price (full: every field, the calculated price and the freight)",
     "resource.get": "{key} -> a resource (key = id or code), its prices and the analyses using it",
     "resource.add": "{kind, name, unit, code?, price?, wage?, machine?, loss?, origin?, distance?, truckLoad?, source?} -> its id and code",
     "resource.set": "{key, field: value...} fields: code, name, unit, kind, price, override, wage, loss, origin, distance, truckLoad, updated, source, machine (null removes it), machine.<power|cost|residualPct|lifeHours|hoursPerYear|interestPct|repairsPct|fuel|fuelPrice|fuelUse|lubricantPct>",
@@ -510,7 +518,7 @@ export function help(): Record<string, string> {
     "analysis.setline": "{key, index, qty}",
     "analysis.removeline": "{key, index}",
     "analysis.flatten": "{key} sub-analyses become their resources (the link is lost)",
-    "prices.import": "{folder, added?} imports a CSV library (Tincho's licita2003 format)",
+    "prices.import": "{library: \"licita2003\" (shipped with the program), added? (default true: its added files too)} or {files: {\"resources.csv\": text, ...}, added?: {files}} imports a CSV library (Tincho's licita2003 format) -> the report",
     "budget.list": "{rubro?} -> the budget: items (code, description, unit, qty, unit direct cost, unit price, total, problem) and totals by rubro and overall",
     "item.add": "{analysis: key | description + unitCost (a manual item), qty?, rubro? (default: the analysis's), unit?, note?} -> its id and code",
     "item.set": "{key (id or code like 3.02), field: value...} fields: qty, description, unit, unitCost, rubro, analysis, note, coefs [{name, pct}...] (the item's own coefficients), qtySource, designQty, designRef",
@@ -592,6 +600,20 @@ function projectSet(x: Op, c: Args): Result {
 
 // THE PRICE BOOK
 
+function bookGet(x: Op): Result {
+  const b = x.p.prices;
+  return ok({
+    updateCoef: b.updateCoef,
+    freightPerKm: b.freightPerKm,
+    source: b.source,
+    charges: b.charges.map((h) => ({ ...h })),
+    chargesPct: P.chargesPct(b),
+    rubros: P.rubrosToJson(b).sort((p, q) => Number(p.number) - Number(q.number)),
+    resources: b.resources.size,
+    analyses: b.analyses.size,
+  });
+}
+
 function bookSet(x: Op, c: Args): Result {
   const b = x.p.prices;
   if (keys(c).length === 0) return fail(tr("Nothing to set."));
@@ -664,6 +686,10 @@ export function describeResource(b: P.PriceBook, r: P.Resource): Result {
   if (P.hasCalculation(r)) c.calculated = P.calculatedPrice(b, r);
   const f = P.freight(b, r);
   if (f) c.freight = f;
+  if (r.machine) {
+    const m = r.machine;
+    c.machineCost = { depreciation: P.machine.depreciation(m), interest: P.machine.interest(m), repairs: P.machine.repairs(m), fuel: P.machine.fuelCost(m), lubricants: P.machine.lubricants(m), perHour: P.machine.perHour(m) };
+  }
   return c;
 }
 
@@ -675,7 +701,7 @@ function resourceList(x: Op, c: Args): Result {
   for (const r of P.sortedByCode(b.resources.values())) {
     if (c.kind && r.kind !== c.kind) continue;
     if (text && !`${r.code} ${r.name}`.toLowerCase().includes(text)) continue;
-    out.push({ id: r.id, code: r.code, name: r.name, unit: r.unit, kind: r.kind, unitPrice: P.priceOf(b, r) });
+    out.push(c.full ? describeResource(b, r) : { id: r.id, code: r.code, name: r.name, unit: r.unit, kind: r.kind, unitPrice: P.priceOf(b, r) });
     if (out.length >= limit) break;
   }
   return ok({ resources: out });
@@ -913,6 +939,37 @@ function analysisFlatten(x: Op, c: Args): Result {
   x.touch("analysis:" + a.id);
   P.flatten(x.p.prices, a);
   return ok();
+}
+
+// IMPORT
+
+function pricesImport(x: Op, c: Args): Result {
+  let files: LibraryFiles;
+  let added: LibraryFiles | undefined;
+  let name: string;
+  const textFiles = (v: unknown): LibraryFiles => Object.fromEntries(Object.entries(isObj(v) ? v : {}).map(([k, t]) => [k.split("/").pop()!.toLowerCase(), str(t)]));
+  if (c.library) {
+    name = str(c.library);
+    const lib = x.s.library?.(name);
+    if (!lib) return fail(tr("There is no library &1.", name));
+    files = lib.files;
+    if (c.added !== false) added = lib.added;
+  } else if (isObj(c.files)) {
+    name = str(c.name) || tr("uploaded files");
+    files = textFiles(c.files);
+    if (isObj(c.added)) added = textFiles(c.added);
+  } else return fail(tr("It needs the library, or its files."));
+  // tried on a copy first: a library that can't be read changes nothing
+  const test = P.bookFromJson({ ...P.newBook(), charges: [] }, P.bookToJson(x.p.prices));
+  const r = importLibrary(test, files, name, added);
+  if (r.error) return fail(r.error);
+  // the files' texts are not kept in the log (the before of the prices is)
+  const logged = without(c, "files", "added");
+  if (c.added === false) logged.added = false;
+  x.start("prices.import", logged, tr("Price library imported: &1", name));
+  x.touch("prices");
+  x.p.prices = test;
+  return ok({ report: r.report });
 }
 
 // THE BUDGET

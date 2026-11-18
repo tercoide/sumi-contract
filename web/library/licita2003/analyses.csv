@@ -1,0 +1,468 @@
+code,rubro,name,unit,equipment_yield,labor_yield
+1,1,Excavacion para sanjas continuas a mano,m3,1,1
+2,1,Excavacion para fundaciones continuas,m3,1,1
+3,1,Excav.de pilot.a mano (p/suelos limo-arcillosos),m3,1,1
+4,1,Excavacion de bases aisladas,m3,1,1
+5,1,Excavacion de pozos,m3,1,1
+6,1,Excav.de pilot.a mano (p/suelos limo-arenosos),m3,1,1
+7,1,Excav.de pilot.a maquina (p/suelos limo-arenosos),m3,1,1
+8,1,Limpieza y nivelacion,ha,1,1
+9,1,"Relleno, apisonado y nivelacion",m3,1,1
+10,1,Desmonte y nivelacion,m3,1,1
+11,2,Hormigon armado zapatas continuas,m3,1,1
+12,2,Hormigon armado pilotines,m3,1,1
+13,2,Hormigon armado bases aisladas,m3,1,1
+14,2,Hormigon pobre zapatas continuas,m3,1,1
+15,2,Vigas de encadenados hormigon armado,m3,1,1
+16,2,Troncos de columnas hormigon armado,m3,1,1
+17,2,Mamposteria cimientos ladrillos comunes 0.30,m2,1,1
+18,2,Mamposteria cimientos ladrillos comunes 0.15,m2,1,1
+19,2,Cimiento de piedras mampuestas,m3,1,1
+20,2,Dados de hormigon en fundaciones,m3,1,1
+21,2,Base continua tipo encadenado,m3,1,1
+22,2,Plateas,m3,1,1
+23,2,Contrapiso de ho.(e=0.15 m./1:5:5),m2,1,1
+24,3,Columnas hormigon armado,m3,1,1
+25,3,Vigas hormigon armado,m3,1,1
+26,3,Losas macizas hormigon armado,m3,1,1
+27,3,Losas alivianadas horm.armado-viguetas ceramicas,m2,1,1
+28,3,Tabiques portantes hormigon armado,m3,1,1
+29,3,Tabiques no portantes hormigon armado,m3,1,1
+30,3,Escaleras hormigon armado,m3,1,1
+31,3,Encadenado ho.ao. s/pared 0.10 m.(0.10 x 0.15),m,1,1
+32,3,Encadenado ho.ao. s/pared 0.15 m.(0.15 x 0.15),m,1,1
+33,3,Encadenado ho.ao. s/pared 0.20 m.(0.20 x 0.20),m,1,1
+34,3,Encadenado ho.ao. s/pared 0.30 m.(0.30 x 0.20),m,1,1
+35,3,Encadenado con ladrillo peine s/pared 0.15 m.,m,1,1
+36,3,Encadenado con ladrillo peine s/pared 0.20 m.,m,1,1
+37,3,Barandas no portantes hormigon armado,m3,1,1
+38,3,Dinteles,m,1,1
+39,3,Losa aliv.viguetas pretensadas hormigon armado,m2,1,1
+40,3,Hormigon visto,m2,1,1
+41,3,Dinteles p/mamposteria 0.10,m,1,1
+42,3,Losa de viguetas pretensadas-inacces.l=3.5 mts.,m2,1,1
+43,3,Nervios verticales c/bloques ceramicos,m,1,1
+44,3,Encadenado dintel,m,1,1
+45,3,Losa viguetas pretensadas l= 6.5 m.,m2,1,1
+46,4,Ceramico portante 0.20 m.,m2,1,1
+47,4,Ceramico portante 0.15 m.,m2,1,1
+48,4,De 0.10 de ladrillos ceramicos huecos,m2,1,1
+49,4,De ladrillo comun 0.30 m.,m2,1,1
+50,4,De ladrillo comun 0.15 m.,m2,1,1
+51,4,De ladrillo visto e=0.15 m. 1 cara,m2,1,1
+52,4,De 0.20 de ladrillos ceramicos huecos,m2,1,1
+53,4,De 0.15 de ladrillos ceramicos huecos,m2,1,1
+54,4,De ladrillo comun 0.20 m.,m2,1,1
+55,4,De ladrillo comun para columnas,m3,1,1
+56,4,De 0.15 de bloques ceramicos portantes,m2,1,1
+57,4,"De 0,20 de bloques ceramicos portantes",m2,1,1
+58,4,"De 0,20 de bloque ceram. port. pesado",m2,1,1
+59,4,"Ladrillos a la vista, 1 cara - e= 0.30 m",m2,1,1
+60,4,De ladrillo comun en panderete,m2,1,1
+61,5,Cercos alam.5 hilos,m,1,1
+62,5,Alambrado 4 hilos c/poste de madera,m,1,1
+63,5,Alambrado 4 hilos y tejido c/poste de madera,m,1,1
+64,5,Alambrado 9 hilos c/poste de madera,m,1,1
+65,5,Alambrado de 3 hilos c/poste de madera,m,1,1
+66,5,Cerco de frente,m,1,1
+67,6,Capa aisladora horizontal y vertical de concreto,m2,1,1
+68,6,Capa aisladora vertical c/tabique panderete,m2,1,1
+69,6,Impermeabilizacion de losas (3 capas),m2,1,1
+70,6,Impermeabilizacion de losas (2 capas),m2,1,1
+71,6,Sikaflex 1a,m,1,1
+72,6,Sikaflex t68,m,1,1
+73,6,Capa aisladora horizontal bajo piso,m2,1,1
+74,6,Aislacion termica e hidraulica,m2,1,1
+75,6,Pintura asfaltica,m2,1,1
+76,7,Interior completo a la cal,m2,1,1
+77,7,Interior jaharro fratasado,m2,1,1
+78,7,Interior grueso bolseado,m2,1,1
+79,7,Exterior completo con hidrofugo terminado fino,m2,1,1
+80,7,Exterior grueso con hidrofugo,m2,1,1
+81,7,Grueso b/revestimiento c/azotado impermeable,m2,1,1
+82,7,Toma de juntas,m2,1,1
+83,7,Azotado hidrofugo,m2,1,1
+84,7,Exterior grueso fratasado con hidrofugo,m2,1,1
+85,7,Interior enrasado de juntas,m2,1,1
+86,7,Impermeable term.a la llana p/sanitario,m2,1,1
+87,7,"Interior c/hid., grueso term. a la llana",m2,1,1
+88,7,De concreto fratasado,m2,1,1
+89,7,De concreto fratasado con hidrofugo,m2,1,1
+90,7,Interior bolseado c/exceso juntas,m2,1,1
+91,7,Interior grueso fratasado,m2,1,1
+92,7,Exterior grueso fratasado s/azotado,m2,1,1
+93,7,Enlucido de yeso,m2,1,1
+94,7,Completo s/estructura metalica,m2,1,1
+95,8,Contrapiso s/terreno natural (1:4:8),m2,1,1
+96,8,Contrapiso s/losa,m2,1,1
+97,8,Contrapiso s/losa local sanitario,m2,1,1
+98,8,Piso granitico 30 x 30,m2,1,1
+99,8,Piso granitico 15 x 15,m2,1,1
+100,8,Piso calcareo 20 x 20,m2,1,1
+101,8,Piso calcareo 15 x 15,m2,1,1
+102,8,Piso ceramico antideslizante,m2,1,1
+103,8,Piso losetas hormigon premoldeado 40 x 60,m2,1,1
+104,8,Piso alisado de cemento,m2,1,1
+105,8,Piso hormigon canto rodado lavado,m2,1,1
+106,8,Zocalo granitico 10 x 30,m2,1,1
+107,8,Zocalo calcareo 10 x 30,m,1,1
+108,8,Zocalo sanitario,m,1,1
+109,8,Zocalo alisado de cemento,m,1,1
+110,8,Umbrales granito reconstituido,m2,1,1
+111,8,Contrapiso s/losa alisado,m2,1,1
+112,8,Contrap.s/terreno natural term.cemento alisado,m2,1,1
+113,8,Piso calcareo 20 x 20 tipo vainilla,m2,1,1
+114,8,Piso de ladrillos comunes de plano,m2,1,1
+115,8,Piso de ho. s/terreno nat. (e= 12 cm),m2,1,1
+116,8,Contapiso s/terr.nat.-esp.=0.15 m.m2.,m2,1,1
+117,8,Piso de cemento rodillado c/ hidrofugo,m2,1,1
+118,8,Piso de cemento alis. a la llana c/hidr.,m2,1,1
+119,8,Entrepiso de madera,m2,1,1
+120,8,Zocalo de madera,m,1,1
+121,8,Piso alisado de cemento c/hidrofugo,m2,1,1
+122,8,Piso de cemento rodillado,m2,1,1
+123,8,Contrapiso reforzado,m2,1,1
+124,8,Contrapiso s/losa de ho.liviano (1/2:1:3:5),m2,1,1
+125,8,Contrapiso de ho.de cascote s/losa (1/2:1:3:5),m2,1,1
+126,8,Contr.de ho.cascote s/terr.nat. -1:1:3:5,m2,1,1
+127,8,Piso ceramico 20 x 20,m2,1,1
+128,8,Piso de cemento rodillado,m2,1,1
+129,8,Contrapiso de ho.po.s/losa-e=10 cm.,m2,1,1
+130,8,Piso de hormigon s/losa,m2,1,1
+131,8,Piso ceramico esmaltado c/carpeta niv.,m2,1,1
+132,8,Zocalo ceramico esmaltado,m,1,1
+133,8,Piso ceramico esmaltado monococc. 15x15,m2,1,1
+134,8,Piso ceramico esmaltado monococc.30x30,m2,1,1
+135,8,Solias graniticas,m2,1,1
+136,8,Cordon de horm. arm. p/veredas,m,1,1
+137,9,Chapa sinusoidal hierro galv.prepintada nro.,m2,1,1
+138,9,Chapa sinusoidal hierro galv.nro.24,m2,1,1
+139,9,Tratamiento hidraulico completo para azotea c,m2,1,1
+140,9,De chapa ho.go. b.w.g. nro.24 s/estr.hierro redondo,m2,1,1
+141,9,De chapa fo.co. onda grande s/estr. hierro redondo,m2,1,1
+142,9,De chapa de hierro galv.s/est/madera (solo correas),m2,1,1
+143,9,De chapa ho.go. s/cabriada de madera,m2,1,1
+144,9,Tejas coloniales s/losa,m2,1,1
+145,9,Estructura de madera,m2,1,1
+146,9,Cubiertas y accesorios,m2,1,1
+147,9,Aleros y cenefas - pb/2d,u,1,1
+148,9,Aleros y cenefas - dpx/2d,u,1,1
+149,9,Cumbreras y cenefas (tm-60 viv.m.carlo),u,1,1
+150,9,Cubiertas s/cabriadas de maderas,m2,1,1
+151,9,De chapas go. bwg nro. 24 s/correa mad.,m2,1,1
+152,9,Cumbrera,m,1,1
+153,9,Cenefa lateral,m,1,1
+154,9,Chapa ga b.w.g.n 24 s/correas metalicas,m2,1,1
+155,9,"Canaletas, bajadas y accesorios",m,1,1
+156,9,Cumbreras y cupertinas,m,1,1
+157,9,De fo co onda grande s/corr. tubos est.,m2,1,1
+158,9,Cenefa de fo co onda grande,m,1,1
+159,9,Timpano de fo co onda grande,u,1,1
+160,10,Suspendido a la cal,m2,1,1
+161,10,Suspendido de placas de yeso,m2,1,1
+162,10,Suspendido de madera machimbrada con aisl.,m2,1,1
+163,10,Aplicado a la cal,m2,1,1
+164,10,Suspendido a la cal c/estruct.retic.y catre mad.,m2,1,1
+165,10,Cielorrasos,m2,1,1
+166,10,Suspendido de mad.machim. b/ est.cabriad,m2,1,1
+167,10,Aplicado de yeso,m2,1,1
+168,10,Suspendido terminado al yeso,m2,1,1
+169,11,Azulejos 1ra. 15 x 15,m2,1,1
+170,11,Azulejos 2da. 15 x 15,m2,1,1
+171,11,Salpicado plastico exterior,m2,1,1
+172,11,Salpicado plastico interior,m2,1,1
+173,11,Huella y contrahuella escalera c/granitico,m2,1,1
+174,11,Huella y contrahuella escalera c/ceramico,m2,1,1
+175,11,Rakoton relieve,m2,1,1
+176,11,Revestimiento con tejuelines,m2,1,1
+177,11,Litocal,m2,1,1
+178,11,Superlitogeno - 3,m2,1,1
+179,11,Exterior salpicado plastico,m2,1,1
+180,11,Salpicrete (e=2 mm) c/molinete,m2,1,1
+181,11,Salpicrete (4 mm.) c/molinete b/losa,m2,1,1
+182,11,Listel ceramico 5 x 15 cm,m,1,1
+183,11,Ceramico esmaltado monococc.15x15 cm.,m2,1,1
+184,12,Interior muros al latex,m2,1,1
+185,12,Interior muros a la cal,m2,1,1
+186,12,Cielorraso placas de mad.al latex,m2,1,1
+187,12,Cielorraso a la cal,m2,1,1
+188,12,Cielorraso al latex,m2,1,1
+189,12,Cielorraso madera barnizada,m2,1,1
+190,12,Carpinteria : esmalte s/metal,m2,1,1
+191,12,Carpinteria : esmalte s/madera,m2,1,1
+192,12,Carpinteria : barniz s/madera,m2,1,1
+193,12,Exterior a la cal,m2,1,1
+194,12,Impermeable s/ladrillo visto,m2,1,1
+195,12,Vidrios dobles transparentes,m2,1,1
+196,12,Vidrios triples transparentes,m2,1,1
+197,12,Vidrios dobles traslucidos,m2,1,1
+198,12,Exterior muros al latex,m2,1,1
+199,12,Rakoton para exteriores,m2,1,1
+200,12,Barniz p/cielos rasos,m2,1,1
+201,12,Anticondensante s/chapa,m2,1,1
+202,12,Cementolite (p/fondos comunes),m2,1,1
+203,12,Cementolite (para fondos dificiles),m2,1,1
+204,12,Rokolux,m2,1,1
+205,12,Barniceta s/cielos rasos de madera,m2,1,1
+206,12,Pintura exterior tipo plastica,m2,1,1
+207,12,Rakodry,m2,1,1
+208,12,Pintura al agua para interiores,m2,1,1
+209,12,Lustre mate al poliuretano,m2,1,1
+210,13,Pergolas cubiertas,u,1,1
+211,13,Pergolas descubiertas,u,1,1
+212,15,P/viviendas de 2 dorm.,dwelling,1,1
+213,15,P/vivienda de 3 dorm.,dwelling,1,1
+214,15,Vivienda tm 2d (bv1),dwelling,1,1
+215,15,Vivienda tm 3d (bv1),dwelling,1,1
+216,16,Colocacion de inodoro,u,1,1
+217,16,Caños enterrados desague pvc 0100,m,1,1
+218,16,Caños embutidos de desague pvc 0100,m,1,1
+219,16,Tanque de reserva de 1000 lts de fºcº,u,1,1
+220,16,Colocacion llave de paso para agua,u,1,1
+221,16,Camara septica pref. 3400 lts,u,1,1
+222,16,Camara de inspeccion 60x60 in situ,u,1,1
+223,16,"Pozo absorbente d=1,2 m prof.=5 m",u,1,1
+224,16,Colocacion caños hºgº 0019,m,1,1
+225,16,Colocacion caños hºgº 0025,m,1,1
+226,16,Colocacion lavatorio,u,1,1
+227,16,Colocacion bidet,u,1,1
+228,16,Caños desague embutidos pvc 0060,m,1,1
+229,16,Pileta de patio abierta,u,1,1
+230,16,Piletas de patio tapadas,u,1,1
+231,16,Pileta de cocina,u,1,1
+232,17,Bocas,u,1,1
+233,17,Caja y tablero principal,u,1,1
+234,17,Caja y medidor,u,1,1
+235,17,Caja y tablero secundario,u,1,1
+236,17,Colocacion de tomas,u,1,1
+237,16,Boca de acceso,u,1,1
+238,15,Colocacion de puertas a medida,u,1,1
+239,15,Colocacion de ventanas a medida,u,1,1
+240,1,Limpieza y nivelacion con maquina,ha,1,1
+241,15,P-vivienda 3 dorm. tipo pt9,dwelling,1,1
+242,17,P-viv. de 2 dorm.,dwelling,1,1
+243,16,Para vivienda tipo 2 o 3 dorm.,dwelling,1,1
+244,15,Para vivienda unifamiliar,u,1,1
+245,12,Colocacion de vidrios,m2,1,1
+248,8,Carpeta de asiento p/ piso ceramico,m2,1,1
+249,8,Piso ceramico 20x20 c/ adhesivo s/ carpeta,m2,1,1
+250,9,Cubierta metaica simil teja s/ est. metalica,m2,1,1
+252,10,Colocacion ciel. mad. machimbrada,m2,1,1
+254,16,Instalacion sanitaria,gl,1,1
+255,17,Instalacion electrica,gl,1,1
+256,20,Instalacion de gas,gl,1,1
+258,11,Ceramicos 20 x 20,m2,1,1
+259,3,Viga reticulada,m,1,1
+260,21,Mastil 5m altura con base,u,1,1
+262,16,Cuba interceptora de acidos 60x60x40,u,1,1
+265,16,Boca de desague tapada 30 x 30 x 70,u,1,1
+266,16,Boca de desague abierta 30 x 30 x 50,u,1,1
+270,4,"De 0,20 m-mixta con aislacion termica e hidraulica",m2,1,1
+271,9,"De losetas 40 x 40 c/contr., aisl. term. e hidrau. s/losa",m2,1,1
+272,10,Suspendido de madera machiembrada s/est. mad.,m2,1,1
+274,8,Piso de goma,m2,1,1
+278,8,Piso granitico 20 x 20 cm,m2,1,1
+281,16,Camara de inspeccion 60 x 60 pref. pvc,u,1,1
+282,16,Tanque de agua de 500 lts. s/ caño arriostrado hºgº,u,1,1
+283,5,Cerco divisorio,m,1,1
+284,13,Arborizacion,u,1,1
+285,13,Pergolas,u,1,1
+286,15,Provision y colocacion de carpinteria,gl,1,1
+288,5,Divisorio de eucalipto,m,1,1
+289,5,De frente de eucalipto,m,1,1
+290,15,Provision y colocacion de carpinteria p/pt2,dwelling,1,1
+291,15,Provision y colocacion de carpinteria p/pt3,dwelling,1,1
+292,16,Para vivienda pt2,dwelling,1,1
+294,16,Para vivienda tipo pt3,dwelling,1,1
+295,17,Para vivienda tipo pt2,dwelling,1,1
+296,17,Para vivienda tipo pt3,dwelling,1,1
+297,20,Para viviendas tipo pt2 y pt3,dwelling,1,1
+300,21,Columnas frente de galeria,dwelling,1,1
+301,21,Planos conforme a obra,gl,1,1
+302,7,Grueso fratasado sobre azotado,m2,1,1
+303,9,Reparacion de cubierta existente,m2,1,1
+306,1,Excavacion de sanjas a máquina,m3,1,1
+307,1,Retiro de tierra hasta un radio de 10 km.,m3,1,1
+308,16,Sumidero tipo sp2 para caño d=0.80 m,u,1,1
+311,18,Picado de calles de hºaº,m2,1,1
+312,19,Calles de hºaº,m3,1,1
+314,16,Camara de enlace,u,1,1
+315,16,Camara de inspeccion para caños d=1.50 m (pluvial),u,1,1
+316,16,Camara de inspeccion para caños d=0.80 m (pluvial),u,1,1
+317,16,Provision y colocacion de caños d=1.50 m,m,1,1
+320,16,Duchas,u,1,1
+321,16,D.a.m.,u,1,1
+322,16,Bocas de registro p/ des.cloac.prof. <2.5 m p/vereda,u,1,1
+323,16,Conexion domiciliaria - desagües cloacales,u,1,1
+324,16,Provision y colocacion de caños pvc 0160,m,1,1
+325,16,Provision y colocacion de caños pvc 0200,m,1,1
+326,16,Provision y colocacion de caños pvc 0250,m,1,1
+327,16,Bocas de registro p/ des. cloac. prof. < 2.5 m en calzada,u,1,1
+328,3,Provision de hº puesto en encofrado,m3,1,1
+329,6,Aislacion con membrana de alum.,m2,1,1
+330,9,PLACA POLICARBONATO DE 5 MM.,m2,1,1
+331,12,PLACA POLICARBONATO DE 5 MM.,m2,1,1
+332,12,PLACA POLICARBONATO DE 5 MM.,m2,1,1
+333,9,Chapa sinusoidal hierro galv.nro.24,1 m2,1,1
+344,8,Piso cerámico esmaltado 41x41 brasil,m2,1,1
+345,10,Cielorraso de placas Durlock,m2,1,1
+346,4,"Panel Durlock 0,10 m",m2,1,1
+348,8,Contrapiso s/Lo. alivianado c/telgopor en bolas (incompleto),m2,1,1
+349,12,Vidrios blindex e=1 cm,m2,1,1
+350,17,Cielorraso de placas Durlock,,1,1
+351,16,Colocacion de caños ff 0100 embutidos,m,1,1
+353,20,Cocina 4 hornallas c/horno visor,u,1,1
+354,20,Llave de paso con pico,u,1,1
+355,20,Caño HN 0019 m,m,1,1
+356,22,Matafuego,u,1,1
+357,22,Gabinete con manguera de 25 mts,u,1,1
+358,22,Caño HºGº 0075,m,1,1
+359,16,Pileta de lavar,u,1,1
+360,16,Bañadera completa,u,1,1
+361,16,Caño Hidro 3 embutido 0013 m,m,1,1
+362,16,Caño Hidro 3 embutido 0019 m,m,1,1
+363,16,"Cabezal de HºAº para caños de chapa D=0,40 m",m3,1,1
+364,16,"Prov,acarreo y coloc.cañerias metálicas de D=0,40m",m,1,1
+365,16,"Prov,acarreo y coloc.arena de asiento",m3,1,1
+366,1,Excavación para cunetas a cielo abierto,m3,1,1
+367,1,Excavación p/ coloc.de cañerias,m3,1,1
+368,16,Cañeria PVC K6 0075,m,1,1
+369,16,Valvula exclusa p/agua potable 0075 c/camara,u,1,1
+370,16,Valvula exclusa p/agua potable 0110 c/camara,u,1,1
+371,16,Valvula exclusa p/agua potable 0220 c/camara,u,1,1
+372,16,Hidrante desde red de agua,u,1,1
+373,16,Conexion domiciliaria agua potable completa,u,1,1
+374,16,Cañeria PVC K6 0110,m,1,1
+375,16,Cañeria PVC K6 0200,m,1,1
+376,8,Cordon de ladrillo comun de canto,m,1,1
+377,21,Junta de dilatación con brea,m,1,1
+378,17,Pilar simple de mamposteria para instalación electrica,u,1,1
+379,17,Pilar doble de mamposteria para instalación electrica,u,1,1
+380,17,"Sop. HºAº 8,00 m R 1200 ret. c/ rda. normal + AP - completo",set,1,1
+381,17,Sop. mad. 9/600/14: ret. c/rda.violin+ret.c/tiro red+AP comp,set,1,1
+382,17,Sop. mad. 9/600/14:ret.c/rda.violin+AP comp,set,1,1
+383,17,"Sop. HºAº 7,50 R 1050 ret.c/rda normal completa",set,1,1
+384,17,"Sop. mad. 7,50/625/14: ret.c/rda violin completa",set,1,1
+385,17,"Sop.mad.7,50/625/14: ret.c/rda violin+ret c/tiro red complet",set,1,1
+386,17,Sop.HºAº 8 R 1200: ret c/rda violin+susp+AP compl.,set,1,1
+387,17,Soporte suspension simple - poste EºCº 7.50/425/12,set,1,1
+388,17,Sop.mad. 9/600/14: susp. + AP completo,set,1,1
+389,17,Sop.mad. 9/600/14: susp. doble haz + AP completo,set,1,1
+390,17,Sop.mad. 7.5/625/14: susp. doble haz - completo,set,1,1
+391,17,Sop.mad. 7.5/625/14: ret c/rda normal - completo,set,1,1
+392,17,Sop.HºAº 8 R 1200 desvio ang. < 15º + AP compl.,set,1,1
+393,17,Sop.HºAº 7.5 R 1200:desvio ang.<15º compl.,set,1,1
+394,17,Sop.HºAº 7.5 R 1050:ret c/rda violin compl.,set,1,1
+395,17,Sop.HºAº 7.5 R1200:ret c/rda violin + susp doble haz compl.,set,1,1
+396,17,Prov. de medidor mon. activa 5/40 A. Iram 2411/12/13 DPEC,u,1,1
+397,17,Acometida antifraude 6 mm2,u,1,1
+398,17,Cable preensamblado Al-Al/Al 3x70+50+25 mm2,m,1,1
+399,17,Cable preensamblado Al-Al/Al 3x35+50+25 mm2,m,1,1
+400,17,Cable preensamblado Al-Al/Al 3x25+50+25 mm2,m,1,1
+401,17,Cable preensamblado Al-Al/Al 3x25+50 mm2,m,1,1
+402,17,Sop.HºAº 8 R 1200: ret c/rda violin+ret c/tiro red+AP compl.,set,1,1
+403,17,Tablero apto intemperie reglamentario completo,set,1,1
+404,17,"Sop. HºAº 7,50 R 1200 ret.c/rda violin+susp",set,1,1
+405,17,Estructura susp. poste eucalipto creosotado 11/750/16 compl,set,1,1
+406,17,Estructura SETA Terminal DR 575 completa,set,1,1
+407,17,Trafo 125 kVA 13.2/04-0.321 kV - arroll. Cu en aceite,set,1,1
+408,17,Cable Al/Al desnudo 50 mm2,m,1,1
+409,1,"Excavación p/ coloc.de cañerias, condiciones segun pliego",m3,1,1
+410,16,"Completa, de acuerdo a planos, con tanques de reserva",gl,1,1
+411,17,"Completa, incluido accesorios y cableado.",gl,1,1
+412,16,Acceso a bocas de registro existentes o pert a otros prog.,u,1,1
+413,16,Prov. acarreo y coloc.de piezas esp.de PVC de nudos,gl,1,1
+414,17,Cable preensamblado Al-Al/Al 3x25+50+16 mm2,m,1,1
+415,17,Cable preensamblado Al-Al/Al 3x70+50 mm2,m,1,1
+416,17,"Sop. ret. doble recta - columna HºAº 7,50 R1050",set,1,1
+417,17,"Sop. ret doble recta + AP - col hºAº 8,0 R 1050",set,1,1
+418,17,"Sop. ret triple - col hºAº 7,5 R 1050",set,1,1
+419,17,"Sop. ret y suspension pasante - col HºAº 7,5 R1050",set,1,1
+420,16,Cañeria PVC K6 0160,m,1,1
+421,21,Replanteo del terreno,u,1,1
+422,1,Excavación para apertura de caja para calles,m3,1,1
+423,19,"Calles de suelo selecionado, perfilado y compactado",m3,1,1
+424,3,HºAº encadenado superior,m3,1,1
+425,3,Ref. antepecho 2 x 8mm en concreto,m,1,1
+426,15,Provision y colocación de carpinteria en viviendas 2D y 3D,gl,1,1
+427,15,Provision y colocación de carpinteria en viviendas PT1 3D,gl,1,1
+428,15,Provision y coloc de carpinteria en viv. PT1 2D - VARIANTE 1,gl,1,1
+429,15,Provision y coloc de carpinteria en viv. PT1 3D - VARIANTE 1,gl,1,1
+430,15,Provision y coloc de carpinteria en viv. PT1 3D - VARIANTE 2,gl,1,1
+431,15,Provision y coloc de carpinteria en viv. PT1 2D - VARIANTE 2,gl,1,1
+432,2,"Pilotes de HºAº in situ d=0,40, h>5 m",m3,1,1
+433,2,Cabezal de Pilotes de HºAº,m3,1,1
+434,17,Pilar doble de mamposteria para instalación electrica .,u,1,1
+435,17,Pilar simple de mamposteria para instalación electrica .,u,1,1
+436,17,"Acometida antifraude 6 mm2, morsetos, cableado subterrßneo, gestion administración y mantenimiento.",m,1,1
+508,17,Sop.mad. 7.5/600/14: con ret. y/o susp.,set,,
+509,17,Tablero AP apto intemperie reglamentario completo,set,,
+514,16,Aceso a BR existente,gl,,
+518,15,Puerta tipo P1,u,,
+519,15,Puerta tipo P2,u,,
+520,15,Puerta tipo P3,u,,
+521,15,Porton tipo P1,u,,
+522,15,Porton tipo P2,u,,
+523,15,Ventiluz tipo V2,u,,
+524,15,Ventiluz tipo V1,u,,
+525,15,Ventiluz tipo V3,u,,
+526,15,Ventiluz tipo V4,u,,
+527,13,Colocación de cÚsped,m2,,
+531,8,Solias granÝticas,m2,,
+532,11,Mesadas de granito con zocalo,m2,,
+533,11,Separadores de mingitorios de granito,m2,,
+534,8,Antepechos de granito reconstituido,m2,,
+1422,16,Bocas de registro p/ des.cloac.prof. > 2.5 m p/vereda,u,1,1
+1423,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,6 - H=0,4 - L=8 (1,2,3,4,5,6,7,8,9,14,19,20,45,46)",u,1,1
+1424,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,6 - H=0,4 - L=7 (16,17,24,27,28,29,30,42,43)",u,1,1
+1425,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,6 - H=0,4 - L=13 (18)",u,1,1
+1426,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,6 - H=0,4 - L=6 (34)",u,1,1
+1427,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,6 - H=0,4 - L=4 (51,52,53,54)",u,1,1
+1428,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,6 - H=0,6 - L=5,5 (35,36)",u,1,1
+1429,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,6 - H=0,6 - L=8 (12,32,41,44)",u,1,1
+1430,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,6 - H=0,6 - L=8,6 (22)",u,1,1
+1431,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,6 - H=0,6 - L=7 (33)",u,1,1
+1432,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,6 - H=0,6 - L=4 (50)",u,1,1
+1433,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,65 - H=0,45 - L=7 (23)",u,1,1
+1434,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,7 - H=0,4 - L=7 (21)",u,1,1
+1435,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,75 - H=0,6 - L=7 (25)",u,1,1
+1436,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,75 - H=0,6 - L=8 (26)",u,1,1
+1437,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,8 - H=0,65 - L=7 (38,39,40)",u,1,1
+1438,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,85 - H=0,7 - L=8 (31,37)",u,1,1
+1439,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,9 - H=0,8 - L=8 (13)",u,1,1
+1440,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=0,9 - H=0,85 - L=8 (10,11)",u,1,1
+1441,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=1 - H=0,65 - L=8 (15)",u,1,1
+1442,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=1 - H=1 - L=8 (48)",u,1,1
+1443,16,"Ejecucion de alcantarillas de mamp. Armada esp=0,30m B=1 - H=1 - L=18,65 (49)",u,1,1
+1444,19,"Enripiado esp=0,10m con excavacion y compactado",m2,1,1
+1445,16,Saneamiento de pozos absorventes,u,1,1
+1446,17,Pilares de acometida domiciliaria,u,1,1
+1447,16,Conexion intradomiciliaria de agua,u,1,1
+1448,16,Conexion intradomiciliaria cloacal,u,1,1
+1449,13,Provision y colocacion de contenedores de residuos,u,1,1
+1450,1,"Preparacion del terreno, limpieza, nivelacion y replamteo",u,1,1
+1451,16,"Tapas de HºAº para cuentas (Hº ""C"") Esp=0,08 m",m2,1,1
+1452,16,"Tapas para cuentas de HºAº (Hº ""C"") Esp=0,10 m",m2,1,1
+1453,1,Relleno y compactacion en cunetas de Hº,m,1,1
+1454,16,Ejecucion de desagüe pluvial domiciliario,u,1,1
+1455,15,"Prov. y coloc de puerta de madera 2,50 x 0,75 m",u,1,1
+1456,15,Ventiluz con vidrios,u,1,1
+1457,16,Distr,gl,1,1
+1458,16,d2,gl,1,1
+1459,17,d3,gl,1,1
+1460,16,Obra de descarga,u,1,1
+1461,16,Camara de salida,u,1,1
+1462,16,Vertederos de HºAº,u,1,1
+1463,16,Provision y colocacion de caños pvc 0200 incluye exc.,m,1,1
+1464,16,Provision y colocacion de caños pvc 0300 incluye exc.,m,1,1
+1465,1,Terraplenes,m3,1,1
+1466,1,Excavacion para lagunas,m3,1,1
+1467,1,Excavacion para lagunas,m3,1,1
+1468,16,Conducto de HºAº B=2.0 m - H=1.30 m,m,1,1
+1469,16,Prov. y coloc cañerias PVC 075,m,1,1
+1470,16,Cañeria PVC K6 0315,m,1,1
+1471,16,"Conducto de HºAº B=1,50 - H=1,00",m,1,1
+1472,16,"Conducto de HºAº B=1,20 - H=1,00",m,1,1
+1473,8,Veredas de hormigon F,m2,1,1
+1474,1,"Puentes peatonales sobre alcantarillas de 0,80m",m2,1,1
+1475,13,Pergola 2005,u,1,1

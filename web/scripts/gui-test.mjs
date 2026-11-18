@@ -78,8 +78,42 @@ try {
   check(items[0].qty === 1234.5, "a quantity typed the person's way: " + items[0].qty);
   await shot("budget-edited");
 
+  // the Pricing tab: import licita2003 with the button, open analysis 1, change a line, look at a machine
+  await page.goto(`${base}/#/p/${id}/pricing`);
+  await page.click(".toolbar button:first-of-type");
+  await page.click("section button:has-text('licita2003')");
+  await page.waitForSelector(".report pre");
+  check((await api("book.get")).analyses >= 467, "the licita2003 library imported from the screen");
+  await shot("pricing-imported");
+  await page.fill(".listside input.search", "Excavacion para sanjas");
+  await page.locator(".listside tr.link").first().click();
+  await page.waitForSelector("table.sheet tr.rubro");
+  check((await page.textContent("table.sheet")).includes("90009"), "analysis 1's sheet shows its labor");
+  const line = page.locator("table.sheet td.num input").first();
+  await line.fill(lang === "es" ? "6,8" : "6.8");
+  await line.press("Enter");
+  await page.waitForTimeout(300);
+  const a1 = (await api("analysis.get", { key: "1" })).analysis;
+  check(Math.abs(a1.direct - 6.8 * 2.79) < 1e-9, "a line's quantity changes the analysis: " + a1.direct);
+  await shot("pricing-analysis");
+  await page.click(".subtabs button:nth-child(2)");
+  await page.fill("input.search", "Excavadora");
+  await page.locator("table.resources tbody tr").first().click();
+  await page.waitForSelector(".machine");
+  check((await page.textContent("section")).includes("104"), "the machine calculation of an equipment");
+  await shot("pricing-machine");
+  for (const n of [3, 4]) {
+    await page.click(`.subtabs button:nth-child(${n})`);
+    await page.waitForTimeout(150);
+  }
+  await shot("pricing-rubros");
+  check(errors.length === 0, "the Pricing pages: " + errors.join("; "));
+  await api("undo");
+  await api("undo");
+
   // the History tab shows it, with its before and after
   await page.goto(`${base}/#/p/${id}/history`);
+  await page.fill("input.search", "4.01");
   await page.locator("table.grid tbody tr.link").first().click();
   await page.waitForSelector(".detail pre");
   check((await page.textContent(".detail")).includes("1234.5"), "the history shows the change's before and after");

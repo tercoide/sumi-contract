@@ -54,3 +54,81 @@ msgstr "Todavía no hay proyectos: hacé uno nuevo o abrí un archivo."
 msgid "This tab comes next in the web version."
 msgstr "Esta pestaña viene a continuación en la versión web."
 
+msgid "It needs the library, or its files."
+msgstr "Necesita la biblioteca, o sus archivos."
+
+msgid "There is no library &1."
+msgstr "No hay una biblioteca &1."
+
+msgid "uploaded files"
+msgstr "archivos subidos"
+
+msgid "Add a resource: search by code or name"
+msgstr "Agregar un insumo: buscar por código o nombre"
+
+msgid "Add a sub-analysis"
+msgstr "Agregar un subanálisis"
+
+msgid "Brings resources, analyses and rubros from a CSV library (licita2003 as Tincho converted it). What the project already has with the same code is updated; nothing is removed; it can be undone."
+msgstr "Trae insumos, análisis y rubros de una biblioteca CSV (licita2003 como la convirtió Tincho). Lo que el proyecto ya tiene con el mismo código se actualiza; no se borra nada; se puede deshacer."
+
+msgid "Choose the CSV files..."
+msgstr "Elegir los archivos CSV..."
+
+msgid "Every unit price is multiplied by it (licita2003's coeficiente interno)"
+msgstr "Todos los precios unitarios se multiplican por él (el coeficiente interno de licita2003)"
+
+msgid "Import licita2003"
+msgstr "Importar licita2003"
+
+msgid "New equipment"
+msgstr "Equipo nuevo"
+
+msgid "New labor"
+msgstr "Mano de obra nueva"
+
+msgid "New material"
+msgstr "Material nuevo"
+
+msgid "Nothing has that."
+msgstr "Nada tiene eso."
+
+msgid "Only the first 400: search to find the others."
+msgstr "Solo los primeros 400: buscá para encontrar los demás."
+
+msgid "Only the first 500: search to find the others."
+msgstr "Solo los primeros 500: buscá para encontrar los demás."
+
+msgid "Other files"
+msgstr "Otros archivos"
+
+msgid "Price = D × &1 = &2 &3 a &4"
+msgstr "Precio = D × &1 = &2 &3 por &4"
+
+msgid "Remove the calculation"
+msgstr "Quitar el cálculo"
+
+msgid "This equipment has no cost calculation (its typed price is used)."
+msgstr "Este equipo no tiene cálculo de costo (se usa el precio escrito)."
+
+msgid "Units made with the equipment hours of the lines: the equipment is divided by it"
+msgstr "Unidades que se hacen con las horas de equipo de las líneas: el equipo se divide por esto"
+
+msgid "Units made with the labor of the lines (e.g. a crew's day): the labor is divided by it"
+msgstr "Unidades que se hacen con la mano de obra de las líneas (por ejemplo, el día de una cuadrilla): la mano de obra se divide por esto"
+
+msgid "Use the typed price, not the calculation"
+msgstr "Usar el precio escrito, no el cálculo"
+
+msgid "Used by &1"
+msgstr "Lo usan &1"
+
+msgid "What a truck costs a km (freight = this × distance / truck load)"
+msgstr "Lo que cuesta un camión por km (flete = esto × distancia / carga del camión)"
+
+msgid "What an hour of labor costs besides the wage: a % of it (social charges, presentismo, vacations...) or an amount spread over some hours (a monthly bonus over 176 h, work clothes over a semester...)."
+msgstr "Lo que cuesta una hora de mano de obra además del jornal: un % de él (cargas sociales, presentismo, vacaciones...) o un monto repartido en algunas horas (un bono mensual en 176 h, la ropa de trabajo en un semestre...)."
+
+msgid "with what was added after the xls"
+msgstr "con lo agregado después del xls"
+

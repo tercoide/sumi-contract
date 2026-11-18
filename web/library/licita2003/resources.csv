@@ -1,0 +1,396 @@
+code,name,unit,price,origin,loss,kind
+2,de chapa policarbonato onda sinusoilda bwg n°24,m2,23.63,Corrientes,,material
+1012,barra acero torsionado - tension 2400 kg/cm2 - d 4,t,2030.0,Corrientes,,material
+1013,barra acero torsionado -tension 2400 kg/cm2 -d=6mm,t,2160.0,Corrientes,,material
+1014,barra acero torsionado -tension 2400 kg/cm2- d 8mm,t,2060.0,Corrientes,,material
+1015,barra acero torsionado -tension 2400 kg/cm2- d 10m,t,2126.0,Corrientes,,material
+1016,barra acero torsionado -tension 2400- d 12 / 14 mm,t,2040.0,Corrientes,,material
+1017,acero para estructura (redondos),t,2160.0,Corrientes,,material
+1018,"electrodos 2,0 - 2.5mm",kg,6.0,Corrientes,,material
+1019,electrodos 3.0- 4.0mm,u,5.8,Corrientes,,material
+1151,perfil c chapa plegada bwg nº16 80 x 40 x 15,m,2.8,Corrientes,,material
+1152,perfil c 100x50x1.5 de chapa doblada nº 16,m,9.0,Corrientes,,material
+2001,cemento portland normal,t,254.0,Corrientes,,material
+2005,cemento de albanileria,t,177.75,Corrientes,,material
+2006,cemento blanco,kg,0.916,Corrientes,,material
+2012,cal hidraulica molida,t,190.0,Corrientes,,material
+2013,cal hidratada en bolsas,t,169.0,Corrientes,,material
+2014,"cal grasa viva molida,en bolsas",t,190.0,Corrientes,,material
+2021,mezcla adhesiva para azulejos,kg,0.35,Corrientes,,material
+2022,mezcla adhesiva p/ ceramicos,kg,0.35,Corrientes,,material
+2031,yeso blanco,t,161.16,Corrientes,,material
+2035,pastina color,kg,3.0,Corrientes,,material
+3001,arena fina,m3,12.5,Corrientes,,material
+3002,arena mediana,m3,12.5,Corrientes,,material
+3003,arena gruesa,m3,12.5,Corrientes,,material
+3011,piedra partida granitica 1-3,m3,37.5,Corrientes,,material
+3012,piedra partida granitica 1-5,m3,37.5,Corrientes,,material
+3016,piedra partida granitica de descarte,m3,21.0,Corrientes,,material
+3031,canto rodado 1-3,m3,38.0,Corrientes,,material
+3041,cascote de ladrillos,m3,15.0,Corrientes,,material
+3051,polvo colorante para cemento - ferrite -,kg,1.9,Corrientes,,material
+4007,ladrillo ceramico columna 18x19x40,u,0.0,Corrientes,,material
+4008,bloque ceramico portante 12x19x40,u,0.0,Corrientes,,material
+4009,bloque ceramico portanate 18x19x40,u,,Corrientes,,material
+4010,bloque ceramico portante pesad0 18x19x40,u,0.0,Corrientes,,material
+4011,ceramicos huecos portantes 12 x 18 x 25,u,0.32,Corrientes,,material
+4013,ceramicos huecos 18 x 18 x 25 portante,u,0.43,Corrientes,,material
+4021,"ceramicos huecos para viguetas 9,5/38/25",u,0.69,Corrientes,,material
+4025,"ceramicos huecos para viguetas 9,5 x38x 25",u,0.45,Corrientes,,material
+4028,ceramicos peine encadenado a:12,u,0.0,Corrientes,,material
+4029,ceramico peine encadenado a:18,u,0.0,Corrientes,,material
+4035,ceramicos huecos para tabiques 8 x 18 x 25,u,0.32,Corrientes,,material
+4037,ceramicos huecos para tabiques 12 x 18 x 25,u,0.37,Corrientes,,material
+4039,ceramicos huecos para tabiques 18 x 18 x 25,u,0.53,Corrientes,,material
+4090,ladrillo comun,mil,150.0,Corrientes,,material
+4091,ladrillo comun 1ra.: para vista,mil,170.0,Corrientes,,material
+4100,tejuelines,m2,4.3,Corrientes,,material
+4101,ladrillo bovedilla ceramico h=12 cm,u,1.53,Corrientes,,material
+4103,ladrillo bovedilla p/losa h=17cm,u,2.89,Corrientes,,material
+4105,tejas coloniales ceramicas,u,0.6,Corrientes,,material
+5002,alambre negro recocido nº14,kg,3.29,Corrientes,,material
+5013,alambre galvanizado nº 12,kg,4.19,Corrientes,,material
+5014,alambre galvanizado nº16,kg,4.19,Corrientes,,material
+5015,alambre galvanizado 3 mm,kg,4.19,Corrientes,,material
+5016,tejido corralero malla cuadrada,m2,6.5,Corrientes,,material
+5042,metal desplegado semi-pesado,m2,1.52,Corrientes,,material
+5043,herrajes columnas,u,0.0,Corrientes,,material
+5101,torniquetes,u,0.0,Corrientes,,material
+6001,cajoneros 14/38 - 1 1/2 x 30 kg,kg,3.32,Corrientes,,material
+6002,cajoneros 16 / 63 - 3 '' x 30 kg,kg,3.32,Corrientes,,material
+6003,cajoneros 16/63 -2 1/2 x 30 kg,kg,3.32,Corrientes,,material
+6004,bulon pasante 0 - 10 m,u,0.0,Corrientes,,material
+6005,bulon pasante 0 - 8 m,u,0.0,Corrientes,,material
+6006,"clavos cabeza de plomo 3""",kg,2.55,Corrientes,,material
+7003,"tabla para encofrado pino insigne 1""",m2,9.48,Corrientes,,material
+7010,"teja francesas 14 un/m2 (comunes,sin esmalte)",u,0.83,Corrientes,,material
+7011,fieltro asfaltico nº2 (15 lbs),m2,0.0,Corrientes,,material
+7012,tirante madera dura 3'' x 7 '',m,0.0,Corrientes,,material
+7013,tirantes para encofrado 3 x 3 pino insigne,m,1.97,Corrientes,,material
+7014,tirantes de pino 3 '' x 5 '',m,0.0,Corrientes,,material
+7015,tirantes de pino 3 '' x 3 '',m,0.0,Corrientes,,material
+7016,tirantes de pino 2 '' x 5 '',m,0.0,Corrientes,,material
+7017,tacos madera de pino 1 1/2 '' x 5 '' x 5 '',u,85.0,Corrientes,,material
+7018,correa de madera 3'' x 6'',m,0.0,Corrientes,,material
+7020,clavadora de madera 2'' x 3'',m,3.15,Corrientes,,material
+7025,madera para cabriada,p2,0.0,Corrientes,,material
+7031,alfajias 1 x 3 - cornizas,m,0.8,Corrientes,,material
+7032,listones 1 1/2 x 4 pulgadas,m,1.34,Corrientes,,material
+7033,listones 1 1/2 x 2 pulgadas,m,0.6,Corrientes,,material
+7046,varillas madera dura 2 1/2 x 2 pulg. x 0.90 m,u,3.0,Corrientes,,material
+7050,liston de 1/2 '' x 2 '',m,0.0,Corrientes,,material
+7051,liston de 3/4 '' x 6 '',m,0.0,Corrientes,,material
+7071,tabla pino parana cepillada 1 '',m2,10.5,Corrientes,,material
+7072,asfalto,kg,1.8,Corrientes,,material
+8001,hidrofugo,kg,0.64,Corrientes,,material
+8010,material preparado american - tech,kg,0.0,Corrientes,,material
+8020,sikaflex 1a,gr,12.71,Corrientes,,material
+8025,sikaflex t68,kg,0.0,Corrientes,,material
+8101,lana de vidrio - densidad 14 kg/m3 e/25 mm,m2,4.29,Corrientes,,material
+8109,velo de vidrio - impermeabilizacion azoteas,m2,0.0,Corrientes,,material
+8500,"poliestireno expandido 2,5 cm espesor",m2,2.0,Corrientes,,material
+9001,azulejos 15 x 15 de primera,m2,8.7,Corrientes,,material
+9007,azulejos 15 x 15 blancos de segunda,m2,8.7,Corrientes,,material
+9044,iggam relieve - color x 50 kg,kg,0.0,Corrientes,,material
+9051,salpicado plastico,kg,3.47,Corrientes,,material
+9061,huella y contrahuella - granitico reconstituido,m2,0.0,Corrientes,,material
+10001,baldosa ceramica de primera 20 x 20 cmpara azotea,m2,9.53,Corrientes,,material
+10003,ceramicos para pisos 10 x 20 cm,m2,0.0,Corrientes,,material
+10006,ceramicos esmaltados 20 x 20 cm,m2,10.0,Corrientes,,material
+10011,ceramico antideslizante 10 x 10 cm,m2,98.0,Corrientes,,material
+10015,ceramica esmaltada diseno conformado,m2,7.9,Corrientes,,material
+10016,ceramico esmaltado monococcion 15 x 15,m2,,Corrientes,,material
+10017,ceramico esmaltado monococcion 30 x 30,m2,,Corrientes,,material
+10018,listel ceramico esmaltado monococcion 5 x 15,m,1.8,Corrientes,,material
+10028,losetas hormigon prefabricadas sin armar 40x60 cm,m2,7.06,Corrientes,,material
+10031,graniticos 15 x 15 cm,m2,,Corrientes,,material
+10032,graniticos 20 x 20 cm,m2,,Corrientes,,material
+10033,graniticos 30 x 30 cm (40 x 40),m2,,Corrientes,,material
+10041,calcareos 15 x 15 cm,m2,,Corrientes,,material
+10042,calcareos 20 x 20 cm,m2,,Corrientes,,material
+10043,calcareos 20 x 20 tipo vainilla,m2,,Corrientes,,material
+10051,umbral de granito reconstituido,m2,88.89,Corrientes,,material
+10052,solia granitica,m2,88.98,Corrientes,,material
+10102,zocalos graniticos 10 x 30 cm,m,3.39,Corrientes,,material
+10103,zocalos graniticos sanitarios 10 x 15 cm,m,0.0,Corrientes,,material
+10104,zocalos calcareos 10 x 30 cm,m,1.3,Corrientes,,material
+10107,"zocalo ceramico esmaltado 7,5 x 15 cm",m,2.3,Corrientes,,material
+10108,zocalo ceramico esmaltado,m,1.5,Corrientes,,material
+10200,marmol nacional,m2,130.0,Corrientes,,material
+11002,placas de yeso,m2,9.45,Corrientes,,material
+11007,perfiles sustentacion - galera,m,0.72,Corrientes,,material
+11008,perfiles sustentacion `l',m,0.5,Corrientes,,material
+11009,balancines (madera dura 1'' x 1 ''),m,2.8,Corrientes,,material
+11010,postes madera dura 5 '',m,0.0,Corrientes,,material
+11011,madera machimbrada,m2,4.26,Corrientes,,material
+11012,"poste de eucalipto d=15 hasta 0,7 m",m,0.5,Corrientes,,material
+11013,"poste de eucalipto d=15 desde 0,7 m hasta 1,4 m",m,1.4,Corrientes,,material
+11014,"poste de eucalipto d=15 desde 0,7 m hasta 4,5 m",m,1.4,Corrientes,,material
+11015,marcos y hojas,gl,1.0,Corrientes,,material
+11112,caño pvc k6 d=75 mm,m,1.25,Corrientes,,material
+11113,caño pvc k6 d=110 mm,m,2.62,Corrientes,,material
+11114,caño pvc k6 d=200 mm,m,8.67,Corrientes,,material
+11115,valvula exclusa hf d=110mm conex.pvc,u,176.0,Corrientes,,material
+11116,valvula exclusa hf d=75mm conex.pvc,u,175.0,Corrientes,,material
+11117,valvula exclusa hf d=200mm conex.pvc,u,485.0,Corrientes,,material
+11118,hidrante s/red distr. 0075,u,141.7,Corrientes,,material
+11119,ramal tee pvc k6 0075 c/aro,u,11.25,Corrientes,,material
+11120,férula y abrazadera,u,18.7,Corrientes,,material
+11121,llave maestra p/red agua,u,7.3,Corrientes,,material
+11122,marco y tapa p/ llave maestra,u,2.92,Corrientes,,material
+11123,marco y tapa p/ medidor agua,u,9.35,Corrientes,,material
+11124,medidor de caudal para agua potable,u,19.61,Corrientes,,material
+11125,caño polietileno k10 0013,m,0.63,Corrientes,,material
+11126,marco y tapa para br en vereda,u,261.0,Corrientes,,material
+15010,ch. pleg. g. bwg n 24,m,8.4,Corrientes,,material
+15014,de chapa galvanizada onda sinusoidal bwg nº24,m2,11.7,Corrientes,,material
+15015,chapa galvanizada prepintada bwg nº24-,m2,7.99,Corrientes,,material
+15016,de chapa de fo.co. onda grande prepintada (m2 util,m2,9.77,Corrientes,,material
+15020,chapa dd no. 16,m2,12.71,Corrientes,,material
+15021,chapa dd n0. 18,m2,9.2,Corrientes,,material
+15022,chapa dd no. 20,m2,6.33,Corrientes,,material
+15023,chapa dd no. 22,m2,6.2,Corrientes,,material
+15101,chapa cumbrera : bwg nº24,m,5.88,Corrientes,,material
+15102,chapa babeta lateral bwg nº24,u,0.5,Corrientes,,material
+15103,soporte p-canaleta 1-2 cana,u,1.0,Corrientes,,material
+15151,grampas para techo con tuerca y arandela : 7 cm,u,0.25,Corrientes,,material
+15152,taco fishcer,u,0.04,Corrientes,,material
+15153,tornillo p-taco diam 8,u,0.04,Corrientes,,material
+15200,chapa galv. prepintada simil teja arsa,m2,16.57,Corrientes,,material
+18001,liquido imprimacion para muros,l,2.89,Corrientes,,material
+18002,liquido imprimacion para asfalto,kg,0.0,Corrientes,,material
+18004,latex para interiores,l,3.78,Corrientes,,material
+18005,latex para cielorrasos,l,1.65,Corrientes,,material
+18006,latex para exteriores,l,1.99,Corrientes,,material
+18007,pintura al agua con color (polvo),kg,1.1,Corrientes,,material
+18008,"al agua para interiores, pintura en polvo",kg,0.75,Corrientes,,material
+18013,pigmento color para cal,kg,1.9,Corrientes,,material
+18031,fondo sintetico antioxido,l,6.94,Corrientes,,material
+18032,esmalte sintetico brillante s/metal,l,7.98,Corrientes,,material
+18035,liquido imprimacion madera,l,5.79,Corrientes,,material
+18037,esmalte sintetico brillante s/madera,l,7.98,Corrientes,,material
+18040,barniz,l,5.88,Corrientes,,material
+18043,imp.para ladrillo visto,l,3.47,Corrientes,,material
+18051,aguarras mineral,l,0.89,Corrientes,,material
+18054,lija para madera nº0,u,0.5,Corrientes,,material
+18056,lijas al agua,u,0.5,Corrientes,,material
+18057,pintura asfaltica,kg,1.0,Corrientes,,material
+18058,rakoton,kg,2.46,Corrientes,,material
+18059,"anticondensante, revestimiento en pasta",l,5.37,Corrientes,,material
+18060,removedor,l,0.0,Corrientes,,material
+18065,cementolite,kg,0.0,Corrientes,,material
+18066,salpicrete,kg,0.0,Corrientes,,material
+18067,rakodray,l,5.79,Corrientes,,material
+18070,emulsion 'tacuru',kg,0.0,Corrientes,,material
+18075,rakolux,l,0.0,Corrientes,,material
+18080,litocal,kg,0.0,Corrientes,,material
+18081,superlitogeno-3,kg,0.0,Corrientes,,material
+18085,lustre al poliuretano,l,0.0,Corrientes,,material
+18086,pintura siliconada,lt,3.46,Corrientes,,material
+19001,vidrio doble transparente - 3 mm -,m2,30.0,Corrientes,,material
+19002,triple transparente - 4 mm -,m2,23.1,Corrientes,,material
+19003,vidrio traslucidos - doble 3 mm -,m2,18.0,Corrientes,,material
+19021,masilla,kg,2.8,Corrientes,,material
+20002,canaleta media cana nº24,m,1.8,Corrientes,,material
+22223,junta de dilatacion sika brea,m,1.3,Corrientes,,material
+25001,viguetas pretensadas de cemento,m,1.98,Corrientes,,material
+25051,viguetas prefabricadas de ladrillo ceramico,m,0.0,Corrientes,,material
+25201,postes esquineros para alambrado,u,0.0,Corrientes,,material
+25202,dado de ho. de 0.15 x 0.15 x 0.75,u,0.0,Corrientes,,material
+25210,"madera para cercos 11-2"" x 5"" mad. dura",m,6.19,Corrientes,,material
+25211,aceite para tratamiento(de lino),lt,1.24,Corrientes,,material
+25212,accesorios,u,1.0,Corrientes,,material
+29900,membrana asf. con lamina de alum god. e=4 mm,m2,2.8,Corrientes,,material
+29901,losetas 40 x 40 x 8 cm con patas,m2,20.47,Corrientes,,material
+29902,piso de goma indeval 50x50 esp.=4 mm,m2,8.31,Corrientes,,material
+30001,"puerta placa 0,7 x 2,00 m",u,52.0,Corrientes,,material
+30002,puerta p1,m2,144.0,Corrientes,,material
+30003,puerta p2,u,59.0,Corrientes,,material
+30004,puerta p3,u,52.0,Corrientes,,material
+30009,puerta casilla gas pg,u,30.0,Corrientes,,material
+30011,ventana a medida,u,98.0,Corrientes,,material
+30012,ventana v1,u,425.5,Corrientes,,material
+30013,ventana v2,u,92.0,Corrientes,,material
+30021,puerta ventana pv1,u,135.0,Corrientes,,material
+30031,marco y tapa p/ camaras agua potable,u,15.8,Corrientes,,material
+33330,"poste hºaº 8,00 m",u,304.46,Corrientes,,material
+33331,artefacto de alumbrado completo,u,127.0,Corrientes,,material
+33332,poste de madera 9 m,u,72.0,Corrientes,,material
+33333,"poste hºaº 7,50 m",u,176.82,Corrientes,,material
+33334,poste de madera 7.50 m,u,61.0,Corrientes,,material
+33335,medidor mon. activa 5/40 a. iram 2411/12/13 dpec,u,35.0,Corrientes,,material
+33336,conductor antifraude 6 mm2,m,2.33,Corrientes,,material
+33337,cable preensamblado al-al/al 3x70+50+25 mm2,m,11.11,Corrientes,,material
+33338,cable preensamblado al-al/al 3x35+50+25 mm2,m,6.7,Corrientes,,material
+33339,cable preensamblado al-al/al 3x25+50+25 mm2,m,6.7,Corrientes,,material
+33340,cable preensamblado al-al/al 3x25+50 mm2,m,6.7,Corrientes,,material
+33341,poste de eucalipto creosotado,m,7.61,Corrientes,,material
+33342,cable al/al desnudo 50 mm2,m,,Corrientes,,material
+33350,caño pvc k6 d=160 mm,m,4.1,Corrientes,,material
+40001,boca p/ inst. elec.,u,86.25,Corrientes,,material
+40002,tomas p/ calcular inst. elec.,u,85.25,Corrientes,,material
+40003,fusible aereo 60 a.,u,2.12,Corrientes,,material
+40004,tablero principal,u,892.1,Corrientes,,material
+40005,medidor electrico monofasico,u,63.0,Corrientes,,material
+40006,llave termica bipolar 10a -25 a-32 a.,u,7.97,Corrientes,,material
+40007,llave bip. para calefon,u,2.25,Corrientes,,material
+40008,interruptor diferencial bipolar 2 x 40 a.,u,22.0,Corrientes,,material
+40009,tomacorriente capsulado p/intemperie,u,2.33,Corrientes,,material
+40010,tablero secundario,u,258.75,Corrientes,,material
+40011,caja y medidor,u,0.0,Corrientes,,material
+40012,m de o.p/inst. electrica comp.viv. fonavi,gl,200.0,Corrientes,,material
+40013,pulsador de embutir comp.,u,0.73,Corrientes,,material
+40019,cinta aisladora p.v.c. x 20m,u,0.8,Corrientes,,material
+40020,"conductor normaliz. 1 x 2,5mm2.",m,0.08,Corrientes,,material
+40021,conductor normaliz. 1 x 6 mm2.,m,0.2,Corrientes,,material
+40022,conductor normaliz. 1 x 10 mm2.,m,0.35,Corrientes,,material
+40035,conductor subterr. 3 x 6 mm2.,m,1.01,Corrientes,,material
+40050,caja din chapa c/pta. p/4-6 termicas,u,6.92,Corrientes,,material
+40051,caja chapa semipesada 10x10,u,0.92,Corrientes,,material
+40052,caja octog.chica y rectang. semipesada,u,0.52,Corrientes,,material
+40053,"conector hierro a rosca 7/8"".",u,0.38,Corrientes,,material
+40054,"conector hierro c/rosca 3/4"".",u,0.16,Corrientes,,material
+40055,"caño acero semip. 7/8"". de 3m",u,5.45,Corrientes,,material
+40056,"caño acero semip. 3/4"". de 3m",u,3.92,Corrientes,,material
+40057,caja din plastica p/6 - 10 termicas c/pta.,u,6.2,Corrientes,,material
+40058,caja pvc rectang. y octog.chica,u,0.27,Corrientes,,material
+40059,caja chapa semipesada p/medidor.,u,22.25,Corrientes,,material
+40060,"caño pvc gris rigido de 3m 3/4"".",u,0.45,Corrientes,,material
+40061,"caño pvc gris rigido de 7/8"".",u,0.59,Corrientes,,material
+40062,caño hidro 3 - 13 mm,m,1.36,Corrientes,,material
+40063,caño hidro 3 - 19 mm,m,2.1,Corrientes,,material
+41000,marco y tapa de fundicion p/ calzada,u,333.0,Corrientes,,material
+41001,caños hº aº d=1.50 m (largo 1.25 m),u,312.52,Corrientes,,material
+41002,caños hº aº d=0.80 m (largo 1 m),u,81.86,Corrientes,,material
+44425,cable preensamblado al-al/al 3x25+50+16 mm2,m,6.7,Corrientes,,material
+44427,cable preensamblado al-al/al 3x70+50 mm2,m,6.7,Corrientes,,material
+44444,"caño hierro galvanizado corrugado d=0,40m",m,44.0,Corrientes,,material
+49000,material ficticio para globales,u,1.0,Corrientes,,material
+49001,Ripio,ton,19.212,Las Piedritas,,material
+50001,canilla d=0019,u,5.26,Corrientes,,material
+50002,caño h.g. 0019,m,2.1,Corrientes,,material
+50003,caño hºgº 0025,m,9.75,Corrientes,,material
+50004,caño pvc 0110,m,6.2,Corrientes,,material
+50005,caño pvc 0060,m,3.9167,Corrientes,,material
+50006,codo pvc 45º 0110,u,7.2,Corrientes,,material
+50007,ramal a pvc 45º 160 x 110,u,16.15,Corrientes,,material
+50008,inodoro pedestal comun,u,43.8,Corrientes,,material
+50009,pileta de cocina,u,40.0,Corrientes,,material
+50010,tanque 1000 lts. fibrocemento,u,80.0,Corrientes,,material
+50011,mingitorio,u,21.07,Corrientes,,material
+50012,camara septica 3400 lts pref.,u,474.0,Corrientes,,material
+50013,llave de paso 0025,u,3.55,Corrientes,,material
+50014,pileta de lavar,u,66.87,Corrientes,,material
+50015,pileta de patio abierta pref.,u,5.1,Corrientes,,material
+50016,boca de acceso,u,5.2,Corrientes,,material
+50017,"camara de inspeccion de p v c ,0.60 x 0.60",u,28.8,Corrientes,,material
+50018,lavatorio,u,29.65,Corrientes,,material
+50019,deposito de inodoro embutir 12 lts.,u,16.75,Corrientes,,material
+50020,tapa de inodoro,u,5.0,Corrientes,,material
+50021,tiron de plomo,u,6.2,Corrientes,,material
+50022,enchufe corrugado p/sifon pvc,u,1.0,Corrientes,,material
+50023,tornillo de bronce,u,0.3,Corrientes,,material
+50024,bidet,u,36.5,Corrientes,,material
+50025,griferia,u,56.5,Corrientes,,material
+50026,sifon 0050 de pvc,u,2.98,Corrientes,,material
+50027,flotante p/tanque comp.,u,2.78,Corrientes,,material
+50028,colector,u,8.69,Corrientes,,material
+50029,valvula de limpieza,u,3.25,Corrientes,,material
+50030,valvula exclusa,u,4.5,Corrientes,,material
+50031,"jabalina ac/cu. diam14mm x 1,50m",u,7.35,Corrientes,,material
+50032,regulador de gas,u,4.0,Corrientes,,material
+50033,llave de paso para gas 13 mm,u,5.3,Corrientes,,material
+50034,ruptor de vacio,u,5.0,Corrientes,,material
+50035,grampas para el lavatorio,u,0.9,Corrientes,,material
+50036,marco y tapa para camara de inspeccion,u,8.0,Corrientes,,material
+50037,marco y tapa para pozo absorbente,u,13.5,Corrientes,,material
+50038,tapa hºaº para pozo absorbente,u,4.68,Corrientes,,material
+50039,pileta de patio tapada pref.,u,4.5,Corrientes,,material
+50040,boca de acceso,u,5.2,Corrientes,,material
+50041,"mat.nec.(caños,artef.,griferia,etc.)p-la cta.ejec.",gl,330.0,Corrientes,,material
+50042,codo a 45º fºgº,u,11.18,Corrientes,,material
+50043,marco y tapa 30 x 30,u,6.0,Corrientes,,material
+50044,marco y rejilla 30 x 30,u,7.5,Corrientes,,material
+50045,camara de inspeccion 60x60 de cemento,u,19.4,Corrientes,,material
+50046,tanque de agua pref. 500 lts.,u,38.0,Corrientes,,material
+50047,planchuela 40 mm x 3 mm,m,1.5,Corrientes,,material
+50048,planchuela 50 mm x 3 mm,m,2.0,Corrientes,,material
+50049,perfil t 30x30x3,m,2.4,Corrientes,,material
+50050,caño hºgº a-53 x 6 m,u,137.64,Corrientes,,material
+50051,perfil doble t 80,m,5.51,Corrientes,,material
+50052,materiales para instalacion sanitaria,gl,1.0,Corrientes,,material
+50053,materiales para instalacion de gas,gl,1.0,Corrientes,,material
+50054,materiales para instalacion electrica,gl,1.0,Corrientes,,material
+50055,m de o. comp.inst.sanit.viv.fonavi c/conex.a red,gl,300.0,Corrientes,,material
+50100,flor para ducha plastica,u,2.5,Corrientes,,material
+50102,caño pvc 160,m,9.25,Corrientes,,material
+50103,caño pvc 200,m,22.05,Corrientes,,material
+50104,caño pvc 250,m,33.85,Corrientes,,material
+50105,caño pvc 355,m,27.15,Corrientes,,material
+50106,ramal a pvc 45º 200 x 110,u,52.43,Corrientes,,material
+50107,ramal a pvc 45º 250 x 110,u,87.3,Corrientes,,material
+50108,ramal a pvc 45º 315 x 110,u,48.7,Corrientes,,material
+50109,caño pvc 315,m,70.0,Corrientes,,material
+55554,varios,gl,1.0,Corrientes,,material
+56501,Morsetos,u,4.0,Resistencia,,material
+56502,Cable 1x4mm,m,,Resistencia,,material
+56503,Cable 1x4mm desnudo,m,,Resistencia,,material
+56504,Contenedor para residuos,u,29.0,Resistencia,,material
+56505,caño PPN 13mm,m,1.3,Resistencia,,material
+56506,codo 90º PPN 13mm,u,0.15,Resistencia,,material
+56507,llave de paso bronce 13mm,u,3.05,Resistencia,,material
+56508,cuplas PPn 13 mm,u,0.15,Resistencia,,material
+56509,Te PPN 13x13mm,u,0.35,Resistencia,,material
+56510,Canilla servicio bronce 13 mm,u,3.58,Resistencia,,material
+56511,Sombrerete de ventilación PVC 0100,u,2.35,Resistencia,,material
+56512,Curva PVC 0110,u,5.1,Resistencia,,material
+56513,codo 90º PVC 0110x0100,u,3.05,Resistencia,,material
+56514,Ventiluz,u,33.0,Resistencia,,material
+56515,"Distribucion de agua fria,griferia y lavatorio",gl,334.47,Resistencia,,material
+56516,"Desagües primario, secundario y ventilacion (incluye artefactos y accesorios)",gl,310.0,Resistencia,,material
+56517,Interna de iluminacion,gl,328.04,Resistencia,,material
+56518,Alambre de puas,m,4.95,Resistencia,,material
+56519,Alambre de alta resistencia,m,4.65,Resistencia,,material
+56520,"Postes 2,20 m para alambrados",u,1.0,Resistencia,,material
+56521,Arena sucia,m3,5.0,Resistencia,,material
+56522,Caja tipo brasero FF,,28.5,Resistencia,,material
+56523,Llave esferica,u,12.45,Resistencia,,material
+56524,Medidos de agua potable SAMEEP,u,167.6,Resistencia,,material
+56525,Manguito de empotramiento,gl,1.0,Resistencia,,material
+56526,Pantalla de AºInox c/accesorios,u,30.0,Resistencia,,material
+56527,Guard Rail,m,95.0,Resistencia,,material
+56528,Caño PVC cloacal 0315,m,34.76,Resistencia,,material
+56529,Caño PVC cl6 0075,m,2.96,Resistencia,,material
+56530,marco y tapa p/ medidor agua POLIAMIDA,u,56.5,Resistencia,,material
+56531,abrazadera 13 mm,u,5.25,Resistencia,,material
+56532,Caño PVC cloacal 0200,m,17.23,Resistencia,,material
+56671,polvo de ladrillo,m3,20.0,Corrientes,,material
+56672,Escombro,m3,5.5,Resistencia,,material
+56673,Tierra,m3,1.5,Resistencia,,material
+59000,planos conforme a obra,gl,1.0,Corrientes,,material
+66666,chapa policarbonato de 5 mm,m2,22.0,Corrientes,,material
+70001,botiquin primeros auxilios,u,56.0,Corrientes,,material
+75001,arbol,u,5.0,Corrientes,,material
+90001,oficial especializado,h,3.87,Corrientes,,labor
+90003,oficial albanil,h,3.17,Corrientes,,labor
+90005,medio oficial albanil,h,2.97469861818182,Corrientes,,labor
+90009,ayudante,h,2.79,Corrientes,,labor
+90010,mde o. (oficial) p/la ejec.de inst.electrica,h,3.75,Corrientes,,labor
+90011,colocacion de carpinteria,h,3.0,Corrientes,,labor
+90012,mde o.(oficial) p/-la ejec.de inst.sanitaria,h,3.75,Corrientes,,labor
+90013,mano de obra para instalacion de gas,h,3.75,Corrientes,,labor
+90034,"varios, accesorios y trabajos y trab equip",gl,1.0,Corrientes,,labor
+100001,Excavadora s/oruga,h,89.5,Corrientes,,equipment
+100002,Retroexcavadora,h,37.0,Corrientes,,equipment
+100003,Cargador frontal,h,52.0,Corrientes,,equipment
+100004,Minicargador,h,30.0,Corrientes,,equipment
+100005,Zanjadora,h,16.5021,Corrientes,,equipment
+100006,Tunelera,h,19.88625,Corrientes,,equipment
+100007,Motoniveladora,h,75.0,Corrientes,,equipment
+100008,Camion volcador,h,24.0,Corrientes,,equipment
+100009,Compactador,h,11.24,Corrientes,,equipment
+100010,Tractor,h,20.0,Corrientes,,equipment
+100011,Camion larga dist,h,74.7015,Corrientes,,equipment
+100020,Depresor de napa,h,30.0,Resistencia,,equipment
+100021,Motobomba,h,21.0,Resistencia,,equipment
+100022,Desagote de pozos absorventes,u,10.0,Resistencia,,equipment

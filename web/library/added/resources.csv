@@ -1,0 +1,36 @@
+code,name,unit,price,origin,loss,kind
+56231,cocina a gas 4 hornallas con horno y visor,u,,,,material
+55503,bañadera completa,u,,,,material
+55501,matafuego,u,,,,material
+55502,gabinete con manguera de 25 m,u,,,,material
+65111,vidrio blindex 1 cm,m2,,,,material
+65555,panel de placa de yeso 0.10 m,m2,,,,material
+62054,piso ceramico esmaltado 41x41,m2,,,,material
+46545,tablero de aplicar apto intemperie reglamentario,u,,,,material
+200001,madera cepillada de pino 2x4 pulgadas (estructura de tabique),m,,,,material
+200002,madera cepillada de pino 2x6 pulgadas (tirantes de piso y techo),m,,,,material
+200003,madera tratada 3x6 pulgadas (viga base sobre zapatas),m,,,,material
+200004,placa OSB 9 mm,m2,,,,material
+200005,placa OSB 18 mm (piso),m2,,,,material
+200006,fieltro asfaltico (ruberoid),m2,,,,material
+200007,membrana hidrofuga y cortaviento permeable al vapor,m2,,,,material
+200008,barrera de vapor (film de polietileno),m2,,,,material
+200009,aislante termico de lana mineral 50 mm,m2,,,,material
+200010,tabla de revestimiento exterior de madera tratada (tinglado),m2,,,,material
+200011,clavos y tornillos para madera,kg,,,,material
+200012,protector fungicida e hidrorrepelente para madera,l,,,,material
+200013,puerta exterior de madera con marco 0.80 x 2.00 m,u,,,,material
+200014,ventana con marco de madera y vidrio 0.60 x 0.60 m,u,,,,material
+200015,"herrajes de puerta (bisagras, cerradura, picaporte)",gl,,,,material
+200016,zapata pequeña premoldeada de hormigon 0.30 x 0.30 x 0.30 m,u,,,,material
+200017,barrera capilar bajo madera (cartera asfaltica),m,,,,material
+200020,parrilla (barbacoa) de ladrillo refractario con campana y conducto,gl,,,,material
+200021,mesada de trabajo de hormigon o granito con pileta (quincho),gl,,,,material
+200030,"ascensor electrico de pasajeros 6 personas, por parada",u,,,,material
+200031,puerta de ascensor y marco por parada,u,,,,material
+200040,puerta de garage seccional o levadiza,u,,,,material
+200041,puerta de garage basculante de chapa,u,,,,material
+200042,puerta de garage enrollable (persiana metalica) con motor,u,,,,material
+200043,puerta de garage corrediza con riel y herrajes,u,,,,material
+200044,puerta de garage plegable de hojas con herrajes,u,,,,material
+200045,puerta de garage batiente de dos hojas de chapa,u,,,,material

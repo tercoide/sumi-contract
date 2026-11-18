@@ -1,0 +1,17 @@
+code,rubro,name,unit,equipment_yield,labor_yield
+5001,6,"Tabique de madera: estructura 2x4, OSB 9 mm, aislacion, barrera de vapor, membrana hidrofuga y cortaviento, revestimiento exterior de madera",m2,1,1
+5002,8,Piso de OSB 18 mm sobre tirantes 2x6 con membrana,m2,1,1
+5003,9,"Techo de una pendiente: tirantes 2x6, OSB 9 mm, aislacion, fieltro asfaltico (ruberoid)",m2,1,1
+5004,2,Zapata pequeña premoldeada con barrera capilar (cabina),u,1,1
+5005,2,Viga base de madera tratada 3x6 sobre zapatas,m,1,1
+5006,15,Puerta exterior de madera con marco y herrajes (cabina),u,1,1
+5007,15,Ventana con marco de madera y vidrio (cabina),u,1,1
+5010,21,"Parrilla (barbacoa) con campana, quincho",gl,1,1
+5011,21,"Mesada de trabajo con pileta, quincho",gl,1,1
+5012,21,"Ascensor electrico por parada, con puerta y marco",u,1,1
+5013,15,Puerta de garage,u,1,1
+5014,15,Puerta de garage basculante,u,1,1
+5015,15,Puerta de garage enrollable con motor,u,1,1
+5016,15,Puerta de garage corrediza,u,1,1
+5017,15,Puerta de garage plegable,u,1,1
+5018,15,Puerta de garage batiente de dos hojas,u,1,1

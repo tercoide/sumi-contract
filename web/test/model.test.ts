@@ -478,3 +478,55 @@ test("a project file written by the Gambas version", async () => {
   assert.equal(K.findContract(s.project!.contracts, "C-01")!.payments.length, 1, "redo of an undo made by the Gambas version");
   assert.equal(must(s, "contract.list").contracts[0].contractor, "Juan Pérez", "the company's contractors from the Gambas files");
 });
+
+test("the licita2003 import", async () => {
+  const { importLibrary, parseCsv } = await import("../src/model/library.ts");
+  const a = parseCsv('a,b,c\r\n1,"x, ""y""",3\n\n4,5');
+  assert.ok(a.length === 4 && a[1][1] === 'x, "y"' && a[3][0] === "4" && a[3][1] === "5", "csv: rows, quoted fields, no newline at the end");
+
+  const files = {
+    "rubros.csv": "number,name\n1,MOVIMIENTO DE SUELOS\n",
+    "resources.csv": 'code,name,unit,price,origin,loss,kind\n2001,"cemento, portland",t,254.0,Corrientes,,material\n90009,ayudante,h,2.79,Corrientes,,labor\n90010,mo electrica,h,3.75,Corrientes,,labor\n',
+    "analyses.csv": "code,rubro,name,unit,equipment_yield,labor_yield\n1,1,Excavacion,m3,1,1\n",
+    "analysis-items.csv": "analysis,resource,quantity\n1,90009,3.4\n1,7777,1\n9,2001,1\n",
+    "labor.csv": "code,category,wage_per_hour\n90009,Ayudante,1.14\n90010,Sereno,1.04\n",
+  };
+  const added = { "resources.csv": "code,name,unit,price,origin,loss,kind\n7777,bañadera,u,,,,material\n" };
+  let b = P.newBook();
+  let r = importLibrary(b, files, "base", added);
+  assert.ok(!r.error, "import a library");
+  assert.ok(b.resources.size === 4 && b.analyses.size === 1 && b.rubros.size === 1, "imported counts");
+  assert.equal(P.resourceByCode(b, "2001")!.name, "cemento, portland", "a quoted name");
+  assert.equal(P.analysisByCode(b, "1")!.lines.length, 2, "analysis lines (one of an analysis that doesn't exist skipped)");
+  const ayu = P.resourceByCode(b, "90009")!;
+  assert.ok(ayu.override && P.priceOf(b, ayu) === 2.79 && ayu.wage === 1.14, "labor keeps its typed price as an override, with its wage");
+  assert.equal(P.resourceByCode(b, "90010")!.name, "Sereno", "the mdo name wins (90010 is Sereno)");
+  const tub = P.resourceByCode(b, "7777")!;
+  assert.ok(tub.name === "bañadera" && P.priceOf(b, tub) === 0, "the added files fill a missing resource, without price");
+  assert.ok(r.report.join("\n").includes("overrides"), "the report lists the overrides");
+  assert.ok(r.report.join("\n").includes("have no price"), "the report says what has no price");
+  importLibrary(b, files, "base", added);
+  assert.ok(b.resources.size === 4 && b.analyses.size === 1 && P.analysisByCode(b, "1")!.lines.length === 2, "importing again updates");
+  assert.ok(importLibrary(P.newBook(), {}, "nothing").error, "nothing to read is refused");
+
+  // the real library, shipped with the program
+  const fs = await import("node:fs");
+  const read = (dir: string) => Object.fromEntries(fs.readdirSync(new URL(dir, import.meta.url)).map((f) => [f, fs.readFileSync(new URL(dir + f, import.meta.url), "utf8")]));
+  b = P.newBook();
+  r = importLibrary(b, read("../../library/licita2003/"), "licita2003", read("../../library/added/"));
+  assert.ok(!r.error && b.analyses.size >= 467 && b.resources.size >= 395, `licita2003: ${b.analyses.size} analyses, ${b.resources.size} resources`);
+  // licita2003 analysis 1: Excavacion para sanjas continuas a mano = 3.4 h of ayudante 90009 (typed 2.79)
+  assert.ok(near(P.direct(b, P.analysisByCode(b, "1")!), 3.4 * 2.79), "licita2003 analysis 1 costs 3.4 h of ayudante at 2.79");
+  assert.equal(P.resourceByCode(b, "90010")!.name, "Sereno", "licita2003: 90010 is Sereno");
+
+  // the command: logged, undone at once
+  const s = session();
+  s.library = (name) => (name === "licita2003" ? { files: read("../../library/licita2003/"), added: read("../../library/added/") } : undefined);
+  const c = must(s, "prices.import", { library: "licita2003" });
+  assert.ok(c.report.length > 3 && s.project!.prices.analyses.size >= 467, "prices.import");
+  assert.ok(fails(s, "prices.import", { library: "nothing" }), "an unknown library");
+  assert.ok(fails(s, "prices.import", { files: { "x.csv": "" } }) && s.project!.prices.analyses.size >= 467, "files that aren't a library change nothing");
+  assert.ok(!("files" in s.project!.changes[0].args), "the files' texts are not kept in the log");
+  must(s, "undo");
+  assert.equal(s.project!.prices.analyses.size, 0, "undo the import");
+});

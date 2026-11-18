@@ -379,3 +379,105 @@ h2 {
     grid-template-columns: 1fr;
   }
 }
+
+/* the Pricing tab */
+.split {
+  display: grid;
+  grid-template-columns: minmax(320px, 2fr) 3fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1000px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+}
+.scroll {
+  max-height: calc(100vh - 260px);
+  overflow: auto;
+  border: 1px solid var(--line);
+}
+.scroll .grid {
+  border: none;
+}
+.scroll .grid th {
+  top: 0;
+  z-index: 1;
+}
+.scroll.wide {
+  max-height: calc(100vh - 220px);
+}
+.grid tr.selected td {
+  background: var(--accent-soft);
+}
+.grid tr.subtotal td {
+  color: var(--muted);
+  border-bottom-width: 2px;
+}
+.grid td select {
+  border-color: transparent;
+  background: transparent;
+}
+.resources td {
+  padding: 1px 4px;
+}
+.resources td.num input {
+  width: 6.5em;
+}
+.resources td input {
+  min-width: 7em;
+}
+.resources td.namecol input {
+  min-width: 18em;
+}
+.subtabs {
+  display: flex;
+  gap: 4px;
+  margin: 4px 0 10px;
+}
+.subtabs button.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.sheethead {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  column-gap: 16px;
+}
+.sheethead .row {
+  grid-template-columns: 8em 1fr;
+}
+.totals {
+  margin-top: 10px;
+}
+.problems {
+  color: var(--error);
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.report pre {
+  max-height: 300px;
+  overflow: auto;
+  font-size: 12px;
+}
+.report h2 button {
+  float: right;
+}
+.machine {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  column-gap: 16px;
+}
+.machine .row {
+  grid-template-columns: 14em 1fr;
+}
+.narrow {
+  max-width: 760px;
+}
+.pick {
+  position: relative;
+}
+.toolbar label.inline {
+  align-items: center;
+  color: var(--muted);
+}
