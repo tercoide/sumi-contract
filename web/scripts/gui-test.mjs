@@ -26,7 +26,7 @@ function check(ok, what) {
   }
 }
 
-const server = spawn(process.execPath, ["dist/src/server/main.js"], { cwd: web, env: { ...process.env, SUMI_DATA: data, SUMI_PORT: String(port), SUMI_USER: "Tester" }, stdio: ["ignore", "pipe", "inherit"] });
+const server = spawn(process.execPath, ["dist/src/server/main.js"], { cwd: web, env: { ...process.env, GOOGLE_CLIENT_ID: "", SUMI_GOOGLE_KEYS: "/nonexistent", SUMI_DATA: data, SUMI_PORT: String(port), SUMI_USER: "Tester" }, stdio: ["ignore", "pipe", "inherit"] });
 await new Promise((ok) => server.stdout.once("data", ok));
 
 const browser = await chromium.launch();
@@ -151,6 +151,17 @@ try {
   const k3 = (await api("contract.get", { key: c3.id })).contract;
   check(k3.certificates[0].work > 0, "a certificate measured: " + k3.certificates[0].work);
   await shot("contract-certificate");
+  // its PDF, from the certificate's button, and the budget's from the top bar's menu
+  const pdfs = [];
+  page.context().on("response", (r) => r.url().includes("/report/") && pdfs.push([r.url(), r.headers()["content-type"], r.status()]));
+  await page.click("button:has-text('" + (lang === "es" ? "Certificado" : "Certificate") + "') >> nth=-1");
+  await page.waitForTimeout(800);
+  await page.click(".bar .menu summary");
+  await page.click(".menulist button:first-child");
+  await page.waitForTimeout(800);
+  check(pdfs.some(([u, t, s]) => u.includes("/report/certificate") && t === "application/pdf" && s === 200), "the certificate's PDF: " + JSON.stringify(pdfs));
+  check(pdfs.some(([u, t, s]) => u.includes("/report/budget") && u.includes("lang=" + lang) && t === "application/pdf" && s === 200), "the budget's PDF from the menu");
+  for (const p of page.context().pages()) if (p !== page) await p.close();
   await page.click(".subtabs button:nth-child(3)");
   await page.click("button:has-text('" + (lang === "es" ? "Agregar pago" : "Add payment") + "')");
   await page.waitForTimeout(300);

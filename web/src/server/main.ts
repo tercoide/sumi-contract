@@ -5,10 +5,13 @@
 //   POST /api/projects                   a new one -> {id}
 //   POST /api/projects/import            a .contract-proj in the body -> {id}
 //   GET  /api/projects/<id>/file         the .contract-proj, to download
+//   GET  /api/projects/<id>/report/<kind>?contract=&cert=&lang=   a PDF report (model/reports.ts)
 //   POST /api/run {project?, command, args}   a command (see model/cmd.ts) -> its result
+//   GET  /api/me                         who is signed in, and whether logins are on
+//   /auth/login, /auth/callback, /auth/logout   signing in with Google (auth.ts)
 //
-// Who: until there are logins (Google, with the company's accounts), the person is SUMI_USER or the computer's
-// user, with a permanent id kept in data/people.json.
+// Who: the person signed in with Google (their company account), when the Google keys are there (see auth.ts);
+// else SUMI_USER or the computer's user. Each has a permanent id kept in data/people.json.
 
 import fs from "node:fs";
 import http from "node:http";
@@ -18,7 +21,9 @@ import { fileURLToPath } from "node:url";
 import { PERSON, type Who } from "../model/change.ts";
 import { run, type Session } from "../model/cmd.ts";
 import { makeId } from "../model/ids.ts";
-import { isObj, setCatalog, str } from "../model/text.ts";
+import { isObj, setCatalog, str, tr } from "../model/text.ts";
+import { makeReport } from "../model/reports.ts";
+import { Auth, loadAuth, type Person } from "./auth.ts";
 import { Store } from "./store.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url)); // dist/src/server
@@ -26,27 +31,37 @@ const root = path.resolve(here, "../../.."); // web/
 const port = Number(process.env.SUMI_PORT || 8064);
 const store = new Store(process.env.SUMI_DATA || path.join(root, "data"));
 const clientDir = path.join(root, "dist/client");
+let auth: Auth | null = null;
+try {
+  const c = loadAuth(store.dir, port);
+  if (c) auth = new Auth(c, store.dir);
+} catch (e) {
+  console.error("sumi-contract: " + (e instanceof Error ? e.message : String(e)));
+  process.exit(1);
+}
 const spanish = new Map<string, string>(Object.entries(JSON.parse(fs.readFileSync(path.join(root, "src/i18n/es.json"), "utf8"))));
 
 /** The texts of a request in the person's language (the screens send it; else the browser's) */
 function language(req: http.IncomingMessage): void {
-  const l = String(req.headers["x-sumi-lang"] || req.headers["accept-language"] || "");
+  const q = new URL(req.url ?? "/", "http://x").searchParams.get("lang");
+  const l = String(q || req.headers["x-sumi-lang"] || req.headers["accept-language"] || "");
   setCatalog(l.toLowerCase().startsWith("es") ? spanish : null);
 }
 
-/** The person at the screen (one, until logins) */
-function who(): Who {
-  const name = process.env.SUMI_USER || os.userInfo().username;
+/** The person making the request: signed in with Google (by their address), or the computer's user */
+function who(person: Person | null): Who {
+  const name = person ? person.name : process.env.SUMI_USER || os.userInfo().username;
+  const key = person ? person.email : name;
   const file = path.join(store.dir, "people.json");
   let people: Record<string, string> = {};
   try {
     people = JSON.parse(fs.readFileSync(file, "utf8"));
   } catch {}
-  if (!people[name]) {
-    people[name] = makeId("u");
+  if (!people[key]) {
+    people[key] = makeId("u");
     fs.writeFileSync(file, JSON.stringify(people, null, 1));
   }
-  return { name, userId: people[name], via: PERSON, model: "" };
+  return { name, userId: people[key], via: PERSON, model: "" };
 }
 
 /** A library shipped with the program: library/<name>/*.csv, and library/added */
@@ -62,14 +77,31 @@ function library(name: string) {
   return files && { files, added: read(path.join(root, "library", "added")) };
 }
 
-function session(projectId: string): Session {
+/** Where a report can be downloaded */
+function reportUrl(project: string, kind: string, contract = "", cert = ""): string {
+  const q = new URLSearchParams();
+  if (contract) q.set("contract", contract);
+  if (cert) q.set("cert", cert);
+  return `/api/projects/${project}/report/${kind}` + (q.size ? "?" + q : "");
+}
+
+function session(projectId: string, person: Person | null): Session {
   const project = projectId ? (store.get(projectId) ?? null) : null;
   return {
     project,
     company: store.company,
-    who: who(),
+    who: who(person),
     group: "",
     library,
+    extra: {
+      // the PDF is made to see it can be; the screens (or the person the AI works for) download it from the url
+      "report.pdf": (_x, c) => {
+        if (!project) return { error: tr("Open a project first.") };
+        const r = makeReport(project, store.company, str(c.kind), str(c.contract), str(c.cert));
+        if (r.error) return { error: r.error };
+        return { ok: true, url: reportUrl(project.id, str(c.kind), str(c.contract), str(c.cert)), name: r.name, pages: r.pages };
+      },
+    },
     changed: (what) => (what === "company" ? store.saveCompany() : project && store.saveProject(project)),
   };
 }
@@ -104,10 +136,21 @@ function serveStatic(url: string, res: http.ServerResponse): void {
 
 async function handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   const url = req.url ?? "/";
+  if (url.startsWith("/auth/")) {
+    language(req);
+    if (auth && (await auth.handle(req, res))) return;
+    return send(res, 404, "not found", "text/plain");
+  }
   if (!url.startsWith("/api/")) return serveStatic(url, res);
   const parts = url.split("?")[0].split("/").filter(Boolean); // ["api", ...]
   language(req);
-  if (req.method === "GET" && url === "/api/projects") return send(res, 200, { projects: store.list(), you: who().name });
+  const person = auth ? auth.person(req) : null;
+  if (req.method === "GET" && url === "/api/me") return send(res, 200, { login: !!auth, person: auth ? person : { name: who(null).name, email: "", picture: "" } });
+  if (auth && !person) return send(res, 401, { error: tr("Sign in first."), login: true });
+  // with logins, only the program's own pages may send changes (the cookie is SameSite=Lax too)
+  const origin = req.headers.origin;
+  if (auth && req.method !== "GET" && origin && new URL(origin).host !== req.headers.host) return send(res, 403, { error: "forbidden" });
+  if (req.method === "GET" && url === "/api/projects") return send(res, 200, { projects: store.list(), you: who(person).name });
   if (req.method === "POST" && url === "/api/projects") return send(res, 200, { id: store.create().id });
   if (req.method === "POST" && url === "/api/projects/import") return send(res, 200, { id: store.importFile(await readBody(req)).id });
   if (req.method === "GET" && parts[1] === "projects" && parts[3] === "file") {
@@ -116,11 +159,20 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     res.setHeader("content-disposition", `attachment; filename="${(p.name || p.id).replace(/[^\w .-]/g, "_")}.contract-proj"`);
     return send(res, 200, store.fileOf(p));
   }
+  if (req.method === "GET" && parts[1] === "projects" && parts[3] === "report" && parts[4]) {
+    const p = store.get(parts[2]);
+    if (!p) return send(res, 404, { error: "no such project" });
+    const q = new URL(url, "http://x").searchParams;
+    const r = makeReport(p, store.company, parts[4], q.get("contract") ?? "", q.get("cert") ?? "");
+    if (r.error || !r.pdf) return send(res, 400, r.error ?? "?", "text/plain; charset=utf-8");
+    res.writeHead(200, { "content-type": "application/pdf", "content-length": r.pdf.length, "cache-control": "no-store", "content-disposition": `inline; filename*=UTF-8''${encodeURIComponent(r.name!)}` });
+    return void res.end(r.pdf);
+  }
   if (req.method === "POST" && url === "/api/run") {
     const body = JSON.parse((await readBody(req)) || "{}");
     if (!isObj(body)) return send(res, 400, { error: "bad request" });
     const projectId = str(body.project);
-    const s = session(projectId);
+    const s = session(projectId, person);
     if (projectId && !s.project) return send(res, 404, { error: "no such project" });
     return send(res, 200, run(s, str(body.command), isObj(body.args) ? body.args : {}));
   }
@@ -130,4 +182,10 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
 const server = http.createServer((req, res) => {
   handle(req, res).catch((e) => send(res, 500, { error: e instanceof Error ? e.message : String(e) }));
 });
-server.listen(port, "127.0.0.1", () => console.log(`sumi-contract: http://localhost:${port} (data in ${store.dir})`));
+// SUMI_HOST=0.0.0.0 to be reached from other computers (only with logins on)
+const host = process.env.SUMI_HOST || "127.0.0.1";
+if (!auth && host !== "127.0.0.1" && host !== "localhost") {
+  console.error("sumi-contract: without Google sign-in it only listens on this computer (see src/server/auth.ts)");
+  process.exit(1);
+}
+server.listen(port, host, () => console.log(`sumi-contract: ${auth ? auth.config.url : "http://localhost:" + port} (data in ${store.dir}; ${auth ? "Google sign-in" : "no logins: " + who(null).name})`));

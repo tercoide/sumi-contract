@@ -63,6 +63,22 @@ ES = {
     "The budget has no items yet: add them from the analyses of the Pricing tab, or manual ones.": "El presupuesto todavía no tiene ítems: agregalos desde los análisis de la pestaña Precios, o manuales.",
     "There are no projects yet: make a new one, or open a file.": "Todavía no hay proyectos: hacé uno nuevo o abrí un archivo.",
     "This tab comes next in the web version.": "Esta pestaña viene a continuación en la versión web.",
+    "&1 can't come in: it isn't an account of the company.": "&1 no puede entrar: no es una cuenta de la empresa.",
+    "&1: &2 pages": "&1: &2 páginas",
+    "A certificate's PDF is in the Contracts tab.": "El PDF de un certificado está en la pestaña Contratos.",
+    "Back to sumi-contract": "Volver a sumi-contract",
+    "Google can't be reached: &1": "No se puede llegar a Google: &1",
+    "Google hasn't verified the address &1.": "Google no verificó la dirección &1.",
+    "Google said: &1": "Google dijo: &1",
+    "Open a project first.": "Primero abrí un proyecto.",
+    "Sign in first.": "Primero iniciá sesión.",
+    "Sign in with Google": "Iniciar sesión con Google",
+    "Sign in with your company's Google account.": "Iniciá sesión con tu cuenta de Google de la empresa.",
+    "Sign out": "Cerrar sesión",
+    "The certificate in PDF, to print and sign": "El certificado en PDF, para imprimir y firmar",
+    "The reports, in PDF": "Los informes, en PDF",
+    "The sign-in took too long or was started elsewhere: try again.": "El inicio de sesión tardó demasiado o se empezó en otro lado: probá de nuevo.",
+    "You couldn't sign in": "No pudiste iniciar sesión",
 }
 
 path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "i18n", "es.po")

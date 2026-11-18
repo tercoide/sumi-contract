@@ -189,3 +189,51 @@ msgstr "borrador: emitirlo"
 msgid "issued: back to draft"
 msgstr "emitido: volver a borrador"
 
+msgid "&1 can't come in: it isn't an account of the company."
+msgstr "&1 no puede entrar: no es una cuenta de la empresa."
+
+msgid "&1: &2 pages"
+msgstr "&1: &2 páginas"
+
+msgid "A certificate's PDF is in the Contracts tab."
+msgstr "El PDF de un certificado está en la pestaña Contratos."
+
+msgid "Back to sumi-contract"
+msgstr "Volver a sumi-contract"
+
+msgid "Google can't be reached: &1"
+msgstr "No se puede llegar a Google: &1"
+
+msgid "Google hasn't verified the address &1."
+msgstr "Google no verificó la dirección &1."
+
+msgid "Google said: &1"
+msgstr "Google dijo: &1"
+
+msgid "Open a project first."
+msgstr "Primero abrí un proyecto."
+
+msgid "Sign in first."
+msgstr "Primero iniciá sesión."
+
+msgid "Sign in with Google"
+msgstr "Iniciar sesión con Google"
+
+msgid "Sign in with your company's Google account."
+msgstr "Iniciá sesión con tu cuenta de Google de la empresa."
+
+msgid "Sign out"
+msgstr "Cerrar sesión"
+
+msgid "The certificate in PDF, to print and sign"
+msgstr "El certificado en PDF, para imprimir y firmar"
+
+msgid "The reports, in PDF"
+msgstr "Los informes, en PDF"
+
+msgid "The sign-in took too long or was started elsewhere: try again."
+msgstr "El inicio de sesión tardó demasiado o se empezó en otro lado: probá de nuevo."
+
+msgid "You couldn't sign in"
+msgstr "No pudiste iniciar sesión"
+

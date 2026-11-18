@@ -1,7 +1,7 @@
 // The program: the list of projects, or a project with the top bar and its tabs (as the Gambas version's
 // main window). The address says which: #/ or #/p/<project id>/<tab>.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import * as api from "./api.ts";
 import { Ctx, useCommand, type Work } from "./work.ts";
 import { lang, setLang, tr } from "./tr.ts";
@@ -34,8 +34,97 @@ function useHash(): string[] {
 
 export function App() {
   const h = useHash();
-  if (h[0] === "p" && h[1]) return <Workspace id={h[1]} tab={h[2] || "project"} />;
-  return <Projects />;
+  const [me, setMe] = useState<api.Result | null>(null);
+  useEffect(() => {
+    api.me().then(setMe);
+  }, []);
+  if (!me) return null;
+  if (me.login && !me.person) return <SignIn />;
+  return (
+    <MeCtx.Provider value={me}>{h[0] === "p" && h[1] ? <Workspace id={h[1]} tab={h[2] || "project"} /> : <Projects />}</MeCtx.Provider>
+  );
+}
+
+const MeCtx = createContext<api.Result>({});
+
+// SIGNING IN (with the company's Google account, when the server has the keys)
+
+function SignIn() {
+  useEffect(() => {
+    document.title = "sumi-contract";
+  }, []);
+  return (
+    <div className="page">
+      <header className="bar">
+        <span className="brand">sumi-contract</span>
+        <span className="grow" />
+        <LangSwitch />
+      </header>
+      <main className="signin">
+        <h1>sumi-contract</h1>
+        <p>{tr("Sign in with your company's Google account.")}</p>
+        <a className="button google" href={api.loginUrl()}>
+          {tr("Sign in with Google")}
+        </a>
+      </main>
+    </div>
+  );
+}
+
+/** Who is working, and signing out, at the end of the top bar */
+function You() {
+  const me = useContext(MeCtx);
+  if (!me.person) return null;
+  return (
+    <>
+      <span className="you" title={me.person.email}>
+        {me.person.picture && <img src={me.person.picture} alt="" referrerPolicy="no-referrer" />}
+        {me.person.name}
+      </span>
+      {me.login && (
+        <button onClick={() => api.logout()} title={tr("Sign out")}>
+          <Icon name="application-exit" />
+        </button>
+      )}
+    </>
+  );
+}
+
+const REPORTS = [
+  { kind: "budget", label: () => tr("Budget") },
+  { kind: "summary", label: () => tr("Budget summary") },
+  { kind: "analyses", label: () => tr("Unit price analyses") },
+  { kind: "gantt", label: () => tr("Gantt") },
+];
+
+/** The PDF reports of the project */
+function PdfMenu({ id, setStatus }: { id: string; setStatus: Work["setStatus"] }) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const away = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && ref.current.removeAttribute("open");
+    document.addEventListener("click", away);
+    return () => document.removeEventListener("click", away);
+  }, []);
+  const open = async (kind: string) => {
+    ref.current?.removeAttribute("open");
+    const r = await api.openReport(id, { kind });
+    setStatus(r.error ? { text: r.error, error: true } : { text: tr("&1: &2 pages", r.name, r.pages), error: false });
+  };
+  return (
+    <details className="menu" ref={ref}>
+      <summary className="button" title={tr("The reports, in PDF")}>
+        <Icon name="document-print" /> PDF
+      </summary>
+      <div className="menulist">
+        {REPORTS.map((x) => (
+          <button key={x.kind} onClick={() => open(x.kind)}>
+            {x.label()}
+          </button>
+        ))}
+        <p className="muted">{tr("A certificate's PDF is in the Contracts tab.")}</p>
+      </div>
+    </details>
+  );
 }
 
 function Icon({ name }: { name: string }) {
@@ -88,6 +177,7 @@ function Projects() {
         <input ref={file} type="file" accept=".contract-proj,application/json" hidden onChange={(e) => open(e.target.files?.[0])} />
         <span className="grow" />
         <LangSwitch />
+        <You />
       </header>
       {error && <p className="error">{error}</p>}
       <main className="projects">
@@ -163,8 +253,10 @@ function Workspace({ id, tab }: { id: string; tab: string }) {
           <a className="button" href={api.fileUrl(id)} title={tr("The .contract-proj file, also for the desktop version")}>
             <Icon name="document-export" /> {tr("Download")}
           </a>
+          <PdfMenu id={id} setStatus={setStatus} />
           <span className="grow" />
           <LangSwitch />
+          <You />
         </header>
         <nav className="tabs">
           {TABS.map((t) => (
