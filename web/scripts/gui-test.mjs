@@ -227,7 +227,7 @@ try {
   await page.click(".people .toolbar button:first-of-type");
   await page.waitForSelector(".people td:has-text('juan@empresa.com.ar')");
   const juanRow = page.locator(".people tbody tr", { hasText: "juan@empresa.com.ar" });
-  await juanRow.locator(".rolechecks label").nth(2).locator("input").click();
+  await juanRow.locator(".rolechecks label", { hasText: lang === "es" ? "Presupuestista" : "Estimator" }).locator("input").click();
   await page.waitForTimeout(300);
   const juan = (await api("person.list")).people.find((k) => k.email === "juan@empresa.com.ar");
   check(juan?.roles?.includes("estimator"), "a person added and given a role: " + JSON.stringify(juan));
