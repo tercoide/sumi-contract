@@ -349,6 +349,11 @@ test("the Gantt", () => {
   assert.ok(S.dateOf(p, 5) === "2026-11-23" && c.end === "2026-12-04", "dates on working days");
   const spent = c.curve.reduce((t: number, v: [string, number, number]) => t + v[1], 0);
   assert.ok(c.curve.length === 2 && near(spent, B.totals(p)[1], 1e-6), "the investment curve spends the whole budget by month");
+  // all at once: 100 m2 x 1 h / (4 x 8) = 3.125 -> 4 days; the obrador has no labor and keeps its 3
+  assert.equal(must(s, "schedule.suggest", { crew: 4 }).changed, 2, "schedule.suggest");
+  assert.ok(task(m).days === 4 && task(e).days === 3 && task(f).days === 3, "suggested days: " + [task(e).days, task(m).days, task(f).days]);
+  must(s, "undo");
+  assert.equal(task(m).days, 10, "undone at once");
   must(s, "task.set", { key: "4.01", lag: 2 });
   must(s, "schedule.get");
   assert.equal(task(m).earlyStart, 7, "a lag");

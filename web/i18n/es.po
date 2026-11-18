@@ -132,3 +132,60 @@ msgstr "Lo que cuesta una hora de mano de obra además del jornal: un % de él (
 msgid "with what was added after the xls"
 msgstr "con lo agregado después del xls"
 
+msgid "Gantt: durations from the labor hours"
+msgstr "Gantt: duraciones según las horas de mano de obra"
+
+msgid "The crew is 1 person or more."
+msgstr "La cuadrilla es de 1 persona o más."
+
+msgid "Investment curve"
+msgstr "Curva de inversión"
+
+msgid "The Gantt has a task for each budget item: add items in the Budget tab."
+msgstr "El Gantt tiene una tarea por cada ítem del presupuesto: agregá ítems en la pestaña Presupuesto."
+
+msgid "(on account)"
+msgstr "(a cuenta)"
+
+msgid "A payment of the balance, today: change what isn't so"
+msgstr "Un pago del saldo, hoy: cambiá lo que no sea así"
+
+msgid "Add a budget item..."
+msgstr "Agregar un ítem del presupuesto..."
+
+msgid "Amount &1 &2 · done &3 % · certified &1 &4 · paid &1 &5 · balance &1 &6"
+msgstr "Monto &1 &2 · hecho &3 % · certificado &1 &4 · pagado &1 &5 · saldo &1 &6"
+
+msgid "Base month"
+msgstr "Mes base"
+
+msgid "Budget: &1"
+msgstr "Presupuesto: &1"
+
+msgid "Certificate &1, &2"
+msgstr "Certificado &1, &2"
+
+msgid "Expires"
+msgstr "Vence"
+
+msgid "New contract with..."
+msgstr "Nuevo contrato con..."
+
+msgid "No contracts yet: choose a contractor and make one."
+msgstr "Todavía no hay contratos: elegí un contratista y hacé uno."
+
+msgid "Shared by all the projects of the company. Red: a document expired or expiring within 15 days."
+msgstr "Compartidos por todos los proyectos de la empresa. En rojo: un documento vencido o que vence en 15 días."
+
+msgid "There are no contractors yet: add them with Contractors... (they are the company's, shared by all the projects)."
+msgstr "Todavía no hay contratistas: agregalos con Contratistas... (son de la empresa, compartidos por todos los proyectos)."
+
+msgid "What no contract takes yet of the item, at the budget's unit price"
+msgstr "Lo que ningún contrato toma todavía del ítem, al precio unitario del presupuesto"
+
+msgid "draft: issue it"
+msgstr "borrador: emitirlo"
+
+msgid "issued: back to draft"
+msgstr "emitido: volver a borrador"
+

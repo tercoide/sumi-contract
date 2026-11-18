@@ -481,3 +481,94 @@ h2 {
   align-items: center;
   color: var(--muted);
 }
+
+/* the Gantt tab */
+.gantt td {
+  padding: 1px 6px;
+}
+.gantt td.num input {
+  width: 4.5em;
+}
+.gantt td.desc {
+  max-width: 22em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gantt th.bars,
+.gantt td.bars {
+  width: 38%;
+  min-width: 260px;
+  position: relative;
+}
+.gantt .bar {
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  background: var(--accent);
+  opacity: 0.75;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.gantt tr.critical .bar {
+  background: var(--error);
+}
+.gantt tr.critical td:first-child {
+  color: var(--error);
+  font-weight: 600;
+}
+.gantt .bar.milestone {
+  width: 10px !important;
+  transform: rotate(45deg);
+  border-radius: 1px;
+}
+.gantt .rubrobar {
+  background: var(--muted);
+  top: 10px;
+  bottom: 10px;
+}
+.gantt .bar .done {
+  height: 3px;
+  margin-top: 4px;
+  background: var(--text);
+}
+.curvebox {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1000px) {
+  .curvebox {
+    grid-template-columns: 1fr;
+  }
+}
+.curve svg {
+  width: 100%;
+  height: auto;
+}
+.curve rect.month {
+  fill: var(--accent);
+  opacity: 0.5;
+}
+.curve polyline.acc {
+  fill: none;
+  stroke: var(--error);
+  stroke-width: 2;
+}
+.curve text {
+  font-size: 11px;
+  fill: var(--muted);
+}
+.toolbar .error {
+  color: var(--error);
+}
+
+/* the Contracts tab */
+.contractors h2 button {
+  float: right;
+}
+.grid td.error {
+  color: var(--error);
+  font-weight: 600;
+}

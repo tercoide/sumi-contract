@@ -460,6 +460,8 @@ function dispatch(x: Op, command: string, c: Args): Result {
       return scheduleGet(x, c);
     case "task.set":
       return taskSet(x, c);
+    case "schedule.suggest":
+      return scheduleSuggest(x, c);
     case "standard.export":
       return standardExport(x, c);
     case "prices.fromstandard":
@@ -526,6 +528,7 @@ export function help(): Record<string, string> {
     "item.move": "{key, by} moves an item up (by < 0) or down within its rubro",
     "schedule.get": "{curve?} -> the Gantt: for each item its task (days, crew, after, lag, earlyStart, earlyFinish, slack, critical, start and end dates), the length in working days, the end date, and with curve the money spent each month",
     "task.set": "{key (budget item id or code), days?, crew?, after? [item keys it waits for], lag?, startNotBefore?, done? (0 to 1), suggest? (true: days from the labor hours and the crew)}",
+    "schedule.suggest": "{crew? (default: each task's, or 2)} every task's days from its labor hours and its crew (items without labor keep theirs), as one change",
     "contractor.list": "{text?, trade?} -> the company's contractors (shared by all projects), with their documents due",
     "contractor.get": "{key (id or name)}",
     "contractor.add": "{name, trade?, taxId?, contact?, phone?, email?, address?, bank?, note?, docs? [{kind, number, expires (yyyy-mm-dd), file, note}...]} -> its id",
@@ -1142,6 +1145,26 @@ function taskSet(x: Op, c: Args): Result {
   x.touch("schedule");
   S.applyTask(t, set);
   return ok({ days: t.days });
+}
+
+function scheduleSuggest(x: Op, c: Args): Result {
+  const p = x.p;
+  S.sync(p);
+  const crew = has(c, "crew") ? num(c.crew, "crew") : 0;
+  if (has(c, "crew") && crew <= 0) return fail(tr("The crew is 1 person or more."));
+  x.start("schedule.suggest", c, tr("Gantt: durations from the labor hours"));
+  x.touch("schedule");
+  let n = 0;
+  for (const b of p.budget.items) {
+    const t = p.schedule.tasks.get(b.id)!;
+    const k = crew || (t.crew > 0 ? t.crew : 2);
+    const d = S.suggestDays(p, b, k);
+    if (d <= 0) continue;
+    t.crew = k;
+    t.days = Math.max(1, Math.ceil(d - 1e-9));
+    n++;
+  }
+  return ok({ changed: n });
 }
 
 // THE COMPANY: CONTRACTORS AND THE STANDARD LIBRARY

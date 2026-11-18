@@ -35,7 +35,7 @@ try {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
-  const shot = async (name) => shots && (await page.screenshot({ path: path.join(shots, name + ".png"), fullPage: true }));
+  const shot = async (name) => shots && (await page.screenshot({ path: path.join(shots, name + ".png") }));
   const api = async (command, args = {}) => (await fetch(base + "/api/run", { method: "POST", body: JSON.stringify({ project: id, command, args }) })).json();
 
   // the list, empty, then a file of the Gambas version
@@ -111,9 +111,55 @@ try {
   await api("undo");
   await api("undo");
 
+  // the Gantt tab: the bars, a duration typed, the curve
+  await page.goto(`${base}/#/p/${id}/gantt`);
+  await page.waitForSelector("table.gantt .bar");
+  const days = page.locator("table.gantt tbody tr:not(.rubro) td.num input").first();
+  await days.fill("12");
+  await days.press("Enter");
+  await page.waitForTimeout(300);
+  check((await api("schedule.get")).length === 12, "a task's days change the Gantt");
+  check((await page.locator(".curve svg rect").count()) > 0, "the investment curve");
+  await shot("gantt");
+
+  // the Contracts tab: a contractor of the company, a contract, a certificate measured, a payment
+  await page.goto(`${base}/#/p/${id}/contracts`);
+  await page.click("button:has-text('" + (lang === "es" ? "Contratistas..." : "Contractors...") + "')");
+  await page.fill(".contractors input[placeholder]", "Constructora Sur");
+  await page.click(".contractors .toolbar button:has-text('" + (lang === "es" ? "Agregar" : "Add") + "')");
+  await page.waitForSelector(".contractors .row");
+  check((await api("contractor.list")).contractors.some((k) => k.name === "Constructora Sur"), "a contractor added from the screen");
+  check((await page.textContent(".contractors table.grid tbody")).includes("Constructora Sur"), "the contractors list shows it");
+  await shot("contractors");
+  await page.selectOption(".toolbar select", { label: "Constructora Sur" });
+  await page.click(".toolbar button:has-text('" + (lang === "es" ? "Contrato nuevo" : "New contract") + "')");
+  await page.waitForTimeout(300);
+  const contracts = (await api("contract.list")).contracts;
+  const c3 = contracts[contracts.length - 1];
+  check(c3.contractor === "Constructora Sur", "a new contract");
+  await page.selectOption(".toolbar select >> nth=-1", { index: 1 });
+  await page.click(".toolbar button:has-text('" + (lang === "es" ? "Agregar" : "Add") + "') >> nth=-1");
+  await page.waitForTimeout(300);
+  await page.click(".subtabs button:nth-child(2)");
+  await page.click("button:has-text('" + (lang === "es" ? "Este período" : "This period") + "')");
+  await page.waitForTimeout(300);
+  const acc = page.locator("section table.grid td.num input").first();
+  check((await (await fetch(base + "/api/run", { method: "POST", body: JSON.stringify({ project: id, command: "contract.get", args: { key: c3.id } }) })).json()).contract.parts.length === 1, "an item added to the contract");
+  await acc.fill("10");
+  await acc.press("Enter");
+  await page.waitForTimeout(300);
+  const k3 = (await api("contract.get", { key: c3.id })).contract;
+  check(k3.certificates[0].work > 0, "a certificate measured: " + k3.certificates[0].work);
+  await shot("contract-certificate");
+  await page.click(".subtabs button:nth-child(3)");
+  await page.click("button:has-text('" + (lang === "es" ? "Agregar pago" : "Add payment") + "')");
+  await page.waitForTimeout(300);
+  check((await api("contract.get", { key: c3.id })).contract.payments.length === 1, "a payment");
+  check(errors.length === 0, "the Gantt and Contracts tabs: " + errors.join("; "));
+
   // the History tab shows it, with its before and after
   await page.goto(`${base}/#/p/${id}/history`);
-  await page.fill("input.search", "4.01");
+  await page.fill("input.search", "4.01: qty");
   await page.locator("table.grid tbody tr.link").first().click();
   await page.waitForSelector(".detail pre");
   check((await page.textContent(".detail")).includes("1234.5"), "the history shows the change's before and after");
