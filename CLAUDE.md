@@ -1,5 +1,7 @@
 # sumi-contract
 
+> **Frozen (2026-11-18).** This Gambas PC version is no longer developed. The web versions live in `~/sumi-suite/sumi-contract` (TypeScript) and `~/sumi-suite/sumi-contract-gweb` (Gambas with gb.web.gui, a trial). The `web/` folder here is an old copy: don't work in it.
+
 The paperwork part of the **sumi suite** (GambasCAD for 2D plans, sumi-e for 3D and rendering, sumi-designer for the BIM model). It gathers the tasks needed to build a design, makes the budget, splits it among speciality contractors, and tracks progress and payments. Written in **Gambas 3** (runtime 3.19+, tested with 3.22). Comments may be in English or Spanish, as in the rest of the suite.
 
 Started 2026-11-17 as a fresh skeleton modeled on sumi-designer (not a fork: none of the CAD/OpenGL code came along). Pieces copied from sumi-designer: `AppLog`, `Icons`, `fSettings` (with its `Config.Behaviour()` pattern), the `actions` svg icon set and the program icon. sumi-designer's notes call the suite's quantities and costs program **sumi-sheets**; this is that program, now named sumi-contract.
